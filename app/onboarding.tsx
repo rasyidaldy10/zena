@@ -11,23 +11,23 @@ import { Persona, Language, BudgetMethod } from '../types'
 const PRIMARY = '#185FA5'
 
 const PERSONA_PREVIEW: Record<string, (name: string, lang: string) => string> = {
-  bestie: (n, l) => l === 'en' ? `"Yo ${n}! I got your wallet covered. Let's go! 😎"` : `"Eh ${n}! Santai aja, gue jagain dompet lo. Gas! 😎"`,
-  advisor: (n, l) => l === 'en' ? `"Welcome, ${n}. I'm here to help you manage your finances professionally."` : `"Selamat datang, ${n}. Saya siap membantu Anda mengelola keuangan dengan baik."`,
-  kakak: (n, l) => l === 'en' ? `"Hey ${n}! I'm always here for you 🧡"` : `"Eh ${n}, kak di sini ya. Tenang aja, kak bantu pelan-pelan 🧡"`,
-  adek: (n, l) => l === 'en' ? `"Hiii ${n}! I'll cheer you on every step! 🎉"` : `"Kak ${n}! Dek seneng bisa bantu kak! Semangat terus ya kak! 🎉"`,
-  pacar: (n, l) => l === 'en' ? `"Hey babe ${n}, let's manage our money together ♡"` : `"${n} sayang, aku selalu ada kok. Kita atur keuangan bareng yuk ♡"`,
-  stoic: (n, l) => l === 'en' ? `"${n}. Good finances start with action today."` : `"${n}. Keuangan baik dimulai dari langkah hari ini."`,
+  bestie: (n, l) => l === 'en' ? `"Yo ${n}! I got your wallet covered. Let's go! 😎"` : l === 'my' ? `"Eh ${n}! Jom kita jaga duit sama-sama! 😎"` : l === 'zh' ? `"嘿 ${n}！我来帮你管钱啦！😎"` : `"Eh ${n}! Santai aja, gue jagain dompet lo. Gas! 😎"`,
+  advisor: (n, l) => l === 'en' ? `"Welcome, ${n}. I'm here to help you manage your finances professionally."` : l === 'my' ? `"Selamat datang, ${n}. Saya sedia membantu anda mengurus kewangan."` : l === 'zh' ? `"欢迎，${n}。我将专业地帮助您管理财务。"` : `"Selamat datang, ${n}. Saya siap membantu Anda mengelola keuangan dengan baik."`,
+  kakak: (n, l) => l === 'en' ? `"Hey ${n}! I'm always here for you 🧡"` : l === 'my' ? `"Eh ${n}, akak ada di sini ya. Jangan risau 🧡"` : l === 'zh' ? `"嘿 ${n}，我一直在这里支持你 🧡"` : `"Eh ${n}, kak di sini ya. Tenang aja, kak bantu pelan-pelan 🧡"`,
+  adek: (n, l) => l === 'en' ? `"Hiii ${n}! I'll cheer you on every step! 🎉"` : l === 'my' ? `"Kak ${n}! Adik akan sokong kak selalu! 🎉"` : l === 'zh' ? `"${n}！我会一直为你加油的！🎉"` : `"Kak ${n}! Dek seneng bisa bantu kak! Semangat terus ya kak! 🎉"`,
+  pacar: (n, l) => l === 'en' ? `"Hey babe ${n}, let's manage our money together ♡"` : l === 'my' ? `"${n} sayang, jom kita uruskan duit bersama ♡"` : l === 'zh' ? `"${n} 亲爱的，我们一起管理财务吧 ♡"` : `"${n} sayang, aku selalu ada kok. Kita atur keuangan bareng yuk ♡"`,
+  stoic: (n, l) => l === 'en' ? `"${n}. Good finances start with action today."` : l === 'my' ? `"${n}. Kewangan yang baik bermula dengan tindakan hari ini."` : l === 'zh' ? `"${n}。良好的财务从今天的行动开始。"` : `"${n}. Keuangan baik dimulai dari langkah hari ini."`,
 }
 
 const LANG_LABELS: Record<string, Record<string, string>> = {
   id: {
-    step1Title: 'Siapa namamu?',
-    step1Sub: 'Biar Zena bisa nyapa kamu dengan cara yang paling nyaman',
-    step1Placeholder: 'Nama panggilanmu...',
-    step2Title: 'Zena mau jadi siapa buat kamu?',
-    step2Sub: 'Bisa diganti kapan saja di pengaturan',
-    step3Title: 'Pilih bahasa',
-    step3Sub: 'Zena akan ngobrol pakai bahasa ini',
+    step1Title: 'Pilih bahasa',
+    step1Sub: 'Zena akan ngobrol pakai bahasa ini',
+    step2Title: 'Siapa namamu?',
+    step2Sub: 'Biar Zena bisa nyapa kamu dengan cara yang paling nyaman',
+    step2Placeholder: 'Nama panggilanmu...',
+    step3Title: 'Zena mau jadi siapa buat kamu?',
+    step3Sub: 'Bisa diganti kapan saja di pengaturan',
     step4Title: 'Metode budgeting',
     step4Sub: 'Pilih yang paling cocok, bisa diubah nanti',
     step5Title: 'Berapa penghasilan bulananmu?',
@@ -39,13 +39,13 @@ const LANG_LABELS: Record<string, Record<string, string>> = {
     start: 'Mulai pakai Zena 🚀',
   },
   en: {
-    step1Title: "What's your name?",
-    step1Sub: 'So Zena can greet you the way you like',
-    step1Placeholder: 'Your nickname...',
-    step2Title: 'Who should Zena be for you?',
-    step2Sub: 'You can change this anytime in settings',
-    step3Title: 'Pick a language',
-    step3Sub: 'Zena will talk to you in this language',
+    step1Title: 'Pick a language',
+    step1Sub: 'Zena will talk to you in this language',
+    step2Title: "What's your name?",
+    step2Sub: 'So Zena can greet you the way you like',
+    step2Placeholder: 'Your nickname...',
+    step3Title: 'Who should Zena be for you?',
+    step3Sub: 'You can change this anytime in settings',
     step4Title: 'Budgeting method',
     step4Sub: 'Pick one that fits, you can change later',
     step5Title: "What's your monthly income?",
@@ -57,13 +57,13 @@ const LANG_LABELS: Record<string, Record<string, string>> = {
     start: 'Start using Zena 🚀',
   },
   my: {
-    step1Title: 'Siapa nama anda?',
-    step1Sub: 'Supaya Zena boleh sapa anda dengan cara yang selesa',
-    step1Placeholder: 'Nama panggilan anda...',
-    step2Title: 'Zena nak jadi siapa untuk anda?',
-    step2Sub: 'Boleh tukar bila-bila masa dalam tetapan',
-    step3Title: 'Pilih bahasa',
-    step3Sub: 'Zena akan berbual dalam bahasa ini',
+    step1Title: 'Pilih bahasa',
+    step1Sub: 'Zena akan berbual dalam bahasa ini',
+    step2Title: 'Siapa nama anda?',
+    step2Sub: 'Supaya Zena boleh sapa anda dengan cara yang selesa',
+    step2Placeholder: 'Nama panggilan anda...',
+    step3Title: 'Zena nak jadi siapa untuk anda?',
+    step3Sub: 'Boleh tukar bila-bila masa dalam tetapan',
     step4Title: 'Kaedah belanjawan',
     step4Sub: 'Pilih yang sesuai, boleh tukar kemudian',
     step5Title: 'Berapa pendapatan bulanan anda?',
@@ -75,13 +75,13 @@ const LANG_LABELS: Record<string, Record<string, string>> = {
     start: 'Mula guna Zena 🚀',
   },
   zh: {
-    step1Title: '你叫什么名字？',
-    step1Sub: 'Zena 会用你喜欢的方式问候你',
-    step1Placeholder: '你的昵称...',
-    step2Title: 'Zena 应该扮演什么角色？',
-    step2Sub: '随时可以在设置中更改',
-    step3Title: '选择语言',
-    step3Sub: 'Zena 将使用这种语言与你交流',
+    step1Title: '选择语言',
+    step1Sub: 'Zena 将使用这种语言与你交流',
+    step2Title: '你叫什么名字？',
+    step2Sub: 'Zena 会用你喜欢的方式问候你',
+    step2Placeholder: '你的昵称...',
+    step3Title: 'Zena 应该扮演什么角色？',
+    step3Sub: '随时可以在设置中更改',
     step4Title: '预算方法',
     step4Sub: '选择适合你的，之后可以更改',
     step5Title: '你的月收入是多少？',
@@ -98,12 +98,12 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(1)
   const [nickname, setNickname] = useState('')
   const [persona, setPersona] = useState<Persona>('bestie')
-  const [language, setLanguage] = useState<Language>('id')
+  const [language, setLanguage] = useState<Language>('en')
   const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>('503020')
   const [income, setIncome] = useState('')
   const [loading, setLoading] = useState(false)
 
-  const t = LANG_LABELS[language] ?? LANG_LABELS['id']
+  const t = LANG_LABELS[language] ?? LANG_LABELS['en']
 
   const formatIncome = (text: string) => {
     const numbers = text.replace(/\D/g, '')
@@ -142,21 +142,26 @@ export default function OnboardingScreen() {
             <Text style={styles.stepNum}>1 / 5</Text>
             <Text style={styles.stepTitle}>{t.step1Title}</Text>
             <Text style={styles.stepSub}>{t.step1Sub}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder={t.step1Placeholder}
-              placeholderTextColor="#888780"
-              value={nickname}
-              onChangeText={setNickname}
-              autoFocus
-            />
-            <TouchableOpacity
-              style={[styles.nextBtn, !nickname && styles.nextBtnDisabled]}
-              onPress={() => nickname && setStep(2)}
-              disabled={!nickname}
-            >
-              <Text style={styles.nextBtnText}>{t.next}</Text>
-            </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(Object.entries(LANGUAGE_CONFIG) as [Language, typeof LANGUAGE_CONFIG[Language]][]).map(([key, l]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.personaBtn, language === key && styles.personaBtnActive]}
+                  onPress={() => setLanguage(key)}
+                >
+                  <Text style={styles.personaIcon}>{l.flag}</Text>
+                  <View style={styles.personaInfo}>
+                    <Text style={[styles.personaName, language === key && styles.personaNameActive]}>{l.label}</Text>
+                    <Text style={styles.personaDesc}>{l.desc}</Text>
+                  </View>
+                  {language === key && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[styles.nextBtn, { marginTop: 16 }]} onPress={() => setStep(2)}>
+                <Text style={styles.nextBtnText}>{t.next}</Text>
+              </TouchableOpacity>
+              <View style={{ height: 40 }} />
+            </ScrollView>
           </View>
         )
 
@@ -166,6 +171,30 @@ export default function OnboardingScreen() {
             <Text style={styles.stepNum}>2 / 5</Text>
             <Text style={styles.stepTitle}>{t.step2Title}</Text>
             <Text style={styles.stepSub}>{t.step2Sub}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder={t.step2Placeholder}
+              placeholderTextColor="#888780"
+              value={nickname}
+              onChangeText={setNickname}
+              autoFocus
+            />
+            <TouchableOpacity
+              style={[styles.nextBtn, !nickname && styles.nextBtnDisabled]}
+              onPress={() => nickname && setStep(3)}
+              disabled={!nickname}
+            >
+              <Text style={styles.nextBtnText}>{t.next}</Text>
+            </TouchableOpacity>
+          </View>
+        )
+
+      case 3:
+        return (
+          <View style={styles.stepWrap}>
+            <Text style={styles.stepNum}>3 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step3Title}</Text>
+            <Text style={styles.stepSub}>{t.step3Sub}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {(Object.entries(PERSONA_CONFIG) as [Persona, typeof PERSONA_CONFIG[Persona]][]).map(([key, p]) => (
                 <TouchableOpacity
@@ -187,36 +216,7 @@ export default function OnboardingScreen() {
                   {PERSONA_PREVIEW[persona]?.(nickname, language)}
                 </Text>
               </View>
-              <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(3)}>
-                <Text style={styles.nextBtnText}>{t.next}</Text>
-              </TouchableOpacity>
-              <View style={{ height: 40 }} />
-            </ScrollView>
-          </View>
-        )
-
-      case 3:
-        return (
-          <View style={styles.stepWrap}>
-            <Text style={styles.stepNum}>3 / 5</Text>
-            <Text style={styles.stepTitle}>{t.step3Title}</Text>
-            <Text style={styles.stepSub}>{t.step3Sub}</Text>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {(Object.entries(LANGUAGE_CONFIG) as [Language, typeof LANGUAGE_CONFIG[Language]][]).map(([key, l]) => (
-                <TouchableOpacity
-                  key={key}
-                  style={[styles.personaBtn, language === key && styles.personaBtnActive]}
-                  onPress={() => setLanguage(key)}
-                >
-                  <Text style={styles.personaIcon}>{l.flag}</Text>
-                  <View style={styles.personaInfo}>
-                    <Text style={[styles.personaName, language === key && styles.personaNameActive]}>{l.label}</Text>
-                    <Text style={styles.personaDesc}>{l.desc}</Text>
-                  </View>
-                  {language === key && <Text style={styles.checkmark}>✓</Text>}
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity style={[styles.nextBtn, { marginTop: 16 }]} onPress={() => setStep(4)}>
+              <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
                 <Text style={styles.nextBtnText}>{t.next}</Text>
               </TouchableOpacity>
               <View style={{ height: 40 }} />
