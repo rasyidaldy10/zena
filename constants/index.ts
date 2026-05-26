@@ -1,51 +1,48 @@
 export const APP_NAME = 'Zena'
-
 export const PERSONA_CONFIG = {
   bestie: {
     name: 'Si Bestie',
     icon: '😎',
-    desc: 'Teman gaul yang paham finansial',
+    desc: 'Teman deket yang ngerti finansial, ngobrolnya santai',
     color: '#E1F5EE',
   },
   advisor: {
     name: 'Pak/Bu Advisor',
     icon: '👔',
-    desc: 'Financial advisor profesional',
+    desc: 'Profesional, terstruktur, dan selalu berbasis data',
     color: '#E6F1FB',
   },
   kakak: {
     name: 'Kak Zena',
     icon: '🧡',
-    desc: 'Kakak yang bijak & perhatian',
+    desc: 'Kakak kandung yang care, nggak menghakimi, selalu support',
     color: '#FAEEDA',
   },
   adek: {
     name: 'Dek Zena',
     icon: '😊',
-    desc: 'Adek semangat yang selalu support',
+    desc: 'Adek kandung yang semangat, polos, dan bikin ketawa',
     color: '#FCEBEB',
   },
   pacar: {
     name: 'Si Sayang',
     icon: '🥰',
-    desc: 'Pasangan yang perhatiin keuangan',
+    desc: 'Partner hidup yang perhatiin keuangan bareng',
     color: '#FBEAF0',
   },
   stoic: {
     name: 'Mentor Zen',
     icon: '🧘',
-    desc: 'Mentor stoik yang to the point',
+    desc: 'Singkat, tajam, to the point. No basa-basi',
     color: '#F1EFE8',
   },
 }
-
 export const LANGUAGE_CONFIG = {
-  id: { label: 'Indonesia', flag: '🇮🇩' },
-  en: { label: 'English',   flag: '🇬🇧' },
-  my: { label: 'Malaysia',  flag: '🇲🇾' },
-  zh: { label: '中文',       flag: '🇨🇳' },
+  id: { label: 'Indonesia', flag: '🇮🇩', desc: 'Bahasa Indonesia' },
+  en: { label: 'English', flag: '🇬🇧', desc: 'English' },
+  my: { label: 'Malaysia', flag: '🇲🇾', desc: 'Bahasa Melayu' },
+  zh: { label: '中文', flag: '🇨🇳', desc: '中文 (简体)' },
 }
-
 export const BUDGET_METHODS = {
   '503020': {
     name: '50/30/20',
@@ -80,11 +77,11 @@ export const BUDGET_METHODS = {
     name: 'Envelope',
     desc: 'Bagi ke amplop per kategori',
     allocations: [
-      { label: 'Makan',    pct: 30, color: '#1D9E75' },
-      { label: 'Transport',pct: 15, color: '#BA7517' },
-      { label: 'Tagihan',  pct: 20, color: '#E24B4A' },
-      { label: 'Tabungan', pct: 20, color: '#534AB7' },
-      { label: 'Hiburan',  pct: 15, color: '#888780' },
+      { label: 'Makan',     pct: 30, color: '#1D9E75' },
+      { label: 'Transport', pct: 15, color: '#BA7517' },
+      { label: 'Tagihan',   pct: 20, color: '#E24B4A' },
+      { label: 'Tabungan',  pct: 20, color: '#534AB7' },
+      { label: 'Hiburan',   pct: 15, color: '#888780' },
     ],
   },
   payfirst: {
@@ -102,7 +99,6 @@ export const BUDGET_METHODS = {
     allocations: [],
   },
 }
-
 export const COLORS = {
   primary:   '#185FA5',
   secondary: '#534AB7',

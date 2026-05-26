@@ -10,6 +10,90 @@ import { Persona, Language, BudgetMethod } from '../types'
 
 const PRIMARY = '#185FA5'
 
+const PERSONA_PREVIEW: Record<string, (name: string, lang: string) => string> = {
+  bestie: (n, l) => l === 'en' ? `"Yo ${n}! I got your wallet covered. Let's go! 😎"` : `"Eh ${n}! Santai aja, gue jagain dompet lo. Gas! 😎"`,
+  advisor: (n, l) => l === 'en' ? `"Welcome, ${n}. I'm here to help you manage your finances professionally."` : `"Selamat datang, ${n}. Saya siap membantu Anda mengelola keuangan dengan baik."`,
+  kakak: (n, l) => l === 'en' ? `"Hey ${n}! I'm always here for you 🧡"` : `"Eh ${n}, kak di sini ya. Tenang aja, kak bantu pelan-pelan 🧡"`,
+  adek: (n, l) => l === 'en' ? `"Hiii ${n}! I'll cheer you on every step! 🎉"` : `"Kak ${n}! Dek seneng bisa bantu kak! Semangat terus ya kak! 🎉"`,
+  pacar: (n, l) => l === 'en' ? `"Hey babe ${n}, let's manage our money together ♡"` : `"${n} sayang, aku selalu ada kok. Kita atur keuangan bareng yuk ♡"`,
+  stoic: (n, l) => l === 'en' ? `"${n}. Good finances start with action today."` : `"${n}. Keuangan baik dimulai dari langkah hari ini."`,
+}
+
+const LANG_LABELS: Record<string, Record<string, string>> = {
+  id: {
+    step1Title: 'Siapa namamu?',
+    step1Sub: 'Biar Zena bisa nyapa kamu dengan cara yang paling nyaman',
+    step1Placeholder: 'Nama panggilanmu...',
+    step2Title: 'Zena mau jadi siapa buat kamu?',
+    step2Sub: 'Bisa diganti kapan saja di pengaturan',
+    step3Title: 'Pilih bahasa',
+    step3Sub: 'Zena akan ngobrol pakai bahasa ini',
+    step4Title: 'Metode budgeting',
+    step4Sub: 'Pilih yang paling cocok, bisa diubah nanti',
+    step5Title: 'Berapa penghasilan bulananmu?',
+    step5Sub: 'Buat bantu Zena hitung budget yang pas buat kamu',
+    step5Note: 'Bisa dilewati, isi nanti di profil',
+    preview: 'Preview sapaan:',
+    next: 'Lanjut →',
+    back: '← Kembali',
+    start: 'Mulai pakai Zena 🚀',
+  },
+  en: {
+    step1Title: "What's your name?",
+    step1Sub: 'So Zena can greet you the way you like',
+    step1Placeholder: 'Your nickname...',
+    step2Title: 'Who should Zena be for you?',
+    step2Sub: 'You can change this anytime in settings',
+    step3Title: 'Pick a language',
+    step3Sub: 'Zena will talk to you in this language',
+    step4Title: 'Budgeting method',
+    step4Sub: 'Pick one that fits, you can change later',
+    step5Title: "What's your monthly income?",
+    step5Sub: 'Helps Zena calculate the right budget for you',
+    step5Note: 'You can skip this and fill it later in profile',
+    preview: 'Preview:',
+    next: 'Next →',
+    back: '← Back',
+    start: 'Start using Zena 🚀',
+  },
+  my: {
+    step1Title: 'Siapa nama anda?',
+    step1Sub: 'Supaya Zena boleh sapa anda dengan cara yang selesa',
+    step1Placeholder: 'Nama panggilan anda...',
+    step2Title: 'Zena nak jadi siapa untuk anda?',
+    step2Sub: 'Boleh tukar bila-bila masa dalam tetapan',
+    step3Title: 'Pilih bahasa',
+    step3Sub: 'Zena akan berbual dalam bahasa ini',
+    step4Title: 'Kaedah belanjawan',
+    step4Sub: 'Pilih yang sesuai, boleh tukar kemudian',
+    step5Title: 'Berapa pendapatan bulanan anda?',
+    step5Sub: 'Untuk bantu Zena kira belanjawan yang sesuai',
+    step5Note: 'Boleh langkau dan isi kemudian di profil',
+    preview: 'Pratonton sapaan:',
+    next: 'Seterusnya →',
+    back: '← Kembali',
+    start: 'Mula guna Zena 🚀',
+  },
+  zh: {
+    step1Title: '你叫什么名字？',
+    step1Sub: 'Zena 会用你喜欢的方式问候你',
+    step1Placeholder: '你的昵称...',
+    step2Title: 'Zena 应该扮演什么角色？',
+    step2Sub: '随时可以在设置中更改',
+    step3Title: '选择语言',
+    step3Sub: 'Zena 将使用这种语言与你交流',
+    step4Title: '预算方法',
+    step4Sub: '选择适合你的，之后可以更改',
+    step5Title: '你的月收入是多少？',
+    step5Sub: '帮助 Zena 为你计算合适的预算',
+    step5Note: '可以跳过，稍后在个人资料中填写',
+    preview: '问候预览：',
+    next: '下一步 →',
+    back: '← 返回',
+    start: '开始使用 Zena 🚀',
+  },
+}
+
 export default function OnboardingScreen() {
   const [step, setStep] = useState(1)
   const [nickname, setNickname] = useState('')
@@ -18,6 +102,8 @@ export default function OnboardingScreen() {
   const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>('503020')
   const [income, setIncome] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const t = LANG_LABELS[language] ?? LANG_LABELS['id']
 
   const formatIncome = (text: string) => {
     const numbers = text.replace(/\D/g, '')
@@ -39,7 +125,6 @@ export default function OnboardingScreen() {
       updated_at: new Date().toISOString(),
     })
 
-    // Buat wallet default
     await supabase.from('user_wallets').insert([
       { user_id: user?.id, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
       { user_id: user?.id, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
@@ -54,12 +139,12 @@ export default function OnboardingScreen() {
       case 1:
         return (
           <View style={styles.stepWrap}>
-            <Text style={styles.stepNum}>1 / 4</Text>
-            <Text style={styles.stepTitle}>Siapa namamu?</Text>
-            <Text style={styles.stepSub}>Biar AI-mu bisa nyapa dengan cara yang paling nyaman</Text>
+            <Text style={styles.stepNum}>1 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step1Title}</Text>
+            <Text style={styles.stepSub}>{t.step1Sub}</Text>
             <TextInput
               style={styles.input}
-              placeholder="Nama panggilanmu..."
+              placeholder={t.step1Placeholder}
               placeholderTextColor="#888780"
               value={nickname}
               onChangeText={setNickname}
@@ -70,7 +155,7 @@ export default function OnboardingScreen() {
               onPress={() => nickname && setStep(2)}
               disabled={!nickname}
             >
-              <Text style={styles.nextBtnText}>Lanjut →</Text>
+              <Text style={styles.nextBtnText}>{t.next}</Text>
             </TouchableOpacity>
           </View>
         )
@@ -78,9 +163,9 @@ export default function OnboardingScreen() {
       case 2:
         return (
           <View style={styles.stepWrap}>
-            <Text style={styles.stepNum}>2 / 4</Text>
-            <Text style={styles.stepTitle}>AI kamu mau jadi siapa?</Text>
-            <Text style={styles.stepSub}>Bisa diganti kapan saja di pengaturan</Text>
+            <Text style={styles.stepNum}>2 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step2Title}</Text>
+            <Text style={styles.stepSub}>{t.step2Sub}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {(Object.entries(PERSONA_CONFIG) as [Persona, typeof PERSONA_CONFIG[Persona]][]).map(([key, p]) => (
                 <TouchableOpacity
@@ -97,18 +182,13 @@ export default function OnboardingScreen() {
                 </TouchableOpacity>
               ))}
               <View style={styles.previewBox}>
-                <Text style={styles.previewLabel}>Preview sapaan:</Text>
+                <Text style={styles.previewLabel}>{t.preview}</Text>
                 <Text style={styles.previewText}>
-                  {persona === 'bestie' && `"Hei ${nickname}! Gue siap jagain dompet lo. Gas! 😎"`}
-                  {persona === 'advisor' && `"Selamat datang, ${nickname}. Saya siap membantu Anda mengelola keuangan."`}
-                  {persona === 'kakak' && `"Hei ${nickname}! Kak bakal selalu ada buat jagain keuanganmu ya 🧡"`}
-                  {persona === 'adek' && `"Kak ${nickname}! Dek siap bantu kak kelola keuangan! Semangat! 🎉"`}
-                  {persona === 'pacar' && `"${nickname} sayang, aku siap bantu jaga keuangan kita bareng ♡"`}
-                  {persona === 'stoic' && `"${nickname}. Keuangan yang baik dimulai dari tindakan hari ini."`}
+                  {PERSONA_PREVIEW[persona]?.(nickname, language)}
                 </Text>
               </View>
               <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(3)}>
-                <Text style={styles.nextBtnText}>Lanjut →</Text>
+                <Text style={styles.nextBtnText}>{t.next}</Text>
               </TouchableOpacity>
               <View style={{ height: 40 }} />
             </ScrollView>
@@ -118,9 +198,38 @@ export default function OnboardingScreen() {
       case 3:
         return (
           <View style={styles.stepWrap}>
-            <Text style={styles.stepNum}>3 / 4</Text>
-            <Text style={styles.stepTitle}>Metode budgeting</Text>
-            <Text style={styles.stepSub}>Pilih yang paling cocok, bisa diubah nanti</Text>
+            <Text style={styles.stepNum}>3 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step3Title}</Text>
+            <Text style={styles.stepSub}>{t.step3Sub}</Text>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {(Object.entries(LANGUAGE_CONFIG) as [Language, typeof LANGUAGE_CONFIG[Language]][]).map(([key, l]) => (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.personaBtn, language === key && styles.personaBtnActive]}
+                  onPress={() => setLanguage(key)}
+                >
+                  <Text style={styles.personaIcon}>{l.flag}</Text>
+                  <View style={styles.personaInfo}>
+                    <Text style={[styles.personaName, language === key && styles.personaNameActive]}>{l.label}</Text>
+                    <Text style={styles.personaDesc}>{l.desc}</Text>
+                  </View>
+                  {language === key && <Text style={styles.checkmark}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity style={[styles.nextBtn, { marginTop: 16 }]} onPress={() => setStep(4)}>
+                <Text style={styles.nextBtnText}>{t.next}</Text>
+              </TouchableOpacity>
+              <View style={{ height: 40 }} />
+            </ScrollView>
+          </View>
+        )
+
+      case 4:
+        return (
+          <View style={styles.stepWrap}>
+            <Text style={styles.stepNum}>4 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step4Title}</Text>
+            <Text style={styles.stepSub}>{t.step4Sub}</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
               {(Object.entries(BUDGET_METHODS) as [BudgetMethod, typeof BUDGET_METHODS[BudgetMethod]][]).map(([key, m]) => (
                 <TouchableOpacity
@@ -133,20 +242,20 @@ export default function OnboardingScreen() {
                   {budgetMethod === key && <Text style={styles.checkmark}>✓</Text>}
                 </TouchableOpacity>
               ))}
-              <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(4)}>
-                <Text style={styles.nextBtnText}>Lanjut →</Text>
+              <TouchableOpacity style={styles.nextBtn} onPress={() => setStep(5)}>
+                <Text style={styles.nextBtnText}>{t.next}</Text>
               </TouchableOpacity>
               <View style={{ height: 40 }} />
             </ScrollView>
           </View>
         )
 
-      case 4:
+      case 5:
         return (
           <View style={styles.stepWrap}>
-            <Text style={styles.stepNum}>4 / 4</Text>
-            <Text style={styles.stepTitle}>Berapa penghasilan bulananmu?</Text>
-            <Text style={styles.stepSub}>Ini untuk membantu AI menghitung budget yang tepat</Text>
+            <Text style={styles.stepNum}>5 / 5</Text>
+            <Text style={styles.stepTitle}>{t.step5Title}</Text>
+            <Text style={styles.stepSub}>{t.step5Sub}</Text>
             <View style={styles.incomeWrap}>
               <Text style={styles.incomePrefix}>Rp</Text>
               <TextInput
@@ -159,7 +268,7 @@ export default function OnboardingScreen() {
                 autoFocus
               />
             </View>
-            <Text style={styles.incomeNote}>Bisa dilewati dan diisi nanti di profil</Text>
+            <Text style={styles.incomeNote}>{t.step5Note}</Text>
             <TouchableOpacity
               style={styles.nextBtn}
               onPress={handleFinish}
@@ -167,7 +276,7 @@ export default function OnboardingScreen() {
             >
               {loading
                 ? <ActivityIndicator color="#fff" />
-                : <Text style={styles.nextBtnText}>Mulai pakai Zena 🚀</Text>
+                : <Text style={styles.nextBtnText}>{t.start}</Text>
               }
             </TouchableOpacity>
           </View>
@@ -183,7 +292,7 @@ export default function OnboardingScreen() {
       <View style={styles.header}>
         {step > 1 && (
           <TouchableOpacity onPress={() => setStep(step - 1)} style={styles.backBtn}>
-            <Text style={styles.backText}>← Kembali</Text>
+            <Text style={styles.backText}>{t.back}</Text>
           </TouchableOpacity>
         )}
         <Text style={styles.logo}>Zena</Text>
@@ -191,7 +300,7 @@ export default function OnboardingScreen() {
       </View>
 
       <View style={styles.progressWrap}>
-        {[1, 2, 3, 4].map(s => (
+        {[1, 2, 3, 4, 5].map(s => (
           <View key={s} style={[styles.progressDot, s <= step && styles.progressDotActive]} />
         ))}
       </View>
