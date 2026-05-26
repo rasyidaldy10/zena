@@ -95,14 +95,7 @@ export default function DashboardScreen() {
             <Text style={styles.qaIcon}>➕</Text>
             <Text style={styles.qaLabel}>Catat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/scan-struk')}>
-            <Text style={styles.qaIcon}>📷</Text>
-            <Text style={styles.qaLabel}>Scan struk</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/voice-note')}>
-            <Text style={styles.qaIcon}>🎤</Text>
-            <Text style={styles.qaLabel}>Voice</Text>
-          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/chat')}>
             <Text style={styles.qaIcon}>🤖</Text>
             <Text style={styles.qaLabel}>AI Chat</Text>
