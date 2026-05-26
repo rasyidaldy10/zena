@@ -104,7 +104,7 @@ export const BUDGET_METHODS = {
 }
 
 export const COLORS = {
-  primary:   '#1D9E75',
+  primary:   '#185FA5',
   secondary: '#534AB7',
   amber:     '#BA7517',
   coral:     '#D85A30',

@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F0F' },
   inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
   logoWrap: { alignItems: 'center', marginBottom: 48 },
-  logo: { fontSize: 48, fontWeight: '600', color: '#1D9E75', letterSpacing: -1 },
+  logo: { fontSize: 48, fontWeight: '600', color: '#185FA5', letterSpacing: -1 },
   tagline: { fontSize: 14, color: '#888780', marginTop: 6 },
   form: { gap: 12 },
   input: {
@@ -121,7 +121,7 @@ const styles = StyleSheet.create({
   },
   btnPrimary: {
     height: 52,
-    backgroundColor: '#1D9E75',
+    backgroundColor: '#185FA5',
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
