@@ -13,10 +13,20 @@ export default function RootLayout() {
       setLoading(false)
     })
 
-    supabase.auth.onAuthStateChange((_event, session) => {
+    supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session)
       if (session) {
-        router.replace('/(tabs)')
+        const { data } = await supabase
+          .from('user_preferences')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .single()
+
+        if (data) {
+          router.replace('/(tabs)')
+        } else {
+          router.replace('/onboarding')
+        }
       } else {
         router.replace('/(auth)/login')
       }
@@ -29,6 +39,9 @@ export default function RootLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="tambah-transaksi" />
+      <Stack.Screen name="chat" />
     </Stack>
   )
 }
