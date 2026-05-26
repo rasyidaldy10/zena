@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { Transaction } from '../../types'
@@ -15,8 +15,7 @@ export default function DashboardScreen() {
   const fetchTransactions = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user?.id)
@@ -25,28 +24,22 @@ export default function DashboardScreen() {
 
     if (data) {
       setTransactions(data)
-      const total = data.reduce((sum, t) => {
-        return t.type === 'income' ? sum + t.amount : sum - t.amount
-      }, 0)
+      const total = data.reduce((sum, t) =>
+        t.type === 'income' ? sum + t.amount : sum - t.amount, 0)
       setTotalBalance(total)
     }
     setLoading(false)
   }
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchTransactions()
-    }, [])
-  )
+  useFocusEffect(useCallback(() => { fetchTransactions() }, []))
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.replace('/(auth)/login')
   }
 
-  const formatRupiah = (amount: number) => {
-    return 'Rp ' + Math.abs(amount).toLocaleString('id-ID')
-  }
+  const formatRupiah = (amount: number) =>
+    'Rp ' + Math.abs(amount).toLocaleString('id-ID')
 
   const getCategoryEmoji = (category: string) => {
     const map: Record<string, string> = {
@@ -65,7 +58,7 @@ export default function DashboardScreen() {
           <Text style={styles.greeting}>Selamat datang 👋</Text>
           <Text style={styles.appName}>Zena</Text>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+        <TouchableOpacity onPress={handleLogout}>
           <Text style={styles.logoutText}>Keluar</Text>
         </TouchableOpacity>
       </View>
@@ -98,29 +91,25 @@ export default function DashboardScreen() {
 
         <Text style={styles.sectionTitle}>Aksi cepat</Text>
         <View style={styles.quickActions}>
-          <TouchableOpacity
-            style={styles.qaBtn}
-            onPress={() => router.push('/tambah-transaksi')}
-          >
+          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/tambah-transaksi')}>
             <Text style={styles.qaIcon}>➕</Text>
             <Text style={styles.qaLabel}>Catat</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn}>
+          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/scan-struk')}>
             <Text style={styles.qaIcon}>📷</Text>
             <Text style={styles.qaLabel}>Scan struk</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn}>
+          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/voice-note')}>
             <Text style={styles.qaIcon}>🎤</Text>
             <Text style={styles.qaLabel}>Voice</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn}>
+          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/chat')}>
             <Text style={styles.qaIcon}>🤖</Text>
             <Text style={styles.qaLabel}>AI Chat</Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionTitle}>Transaksi terakhir</Text>
-
         {loading ? (
           <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
         ) : transactions.length === 0 ? (
@@ -145,7 +134,6 @@ export default function DashboardScreen() {
             </View>
           ))
         )}
-
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -160,7 +148,6 @@ const styles = StyleSheet.create({
   },
   greeting: { fontSize: 13, color: '#888780' },
   appName: { fontSize: 24, fontWeight: '600', color: '#FFFFFF', letterSpacing: -0.5 },
-  logoutBtn: { padding: 8 },
   logoutText: { fontSize: 13, color: '#888780' },
   toggleWrap: {
     flexDirection: 'row', backgroundColor: '#1A1A1A',
