@@ -11,10 +11,21 @@ export default function DashboardScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [totalBalance, setTotalBalance] = useState(0)
+  const [nickname, setNickname] = useState('')
 
-  const fetchTransactions = async () => {
+  const fetchData = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
+
+    // Fetch nickname
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('nickname')
+      .eq('user_id', user?.id)
+      .single()
+    if (prefs?.nickname) setNickname(prefs.nickname)
+
+    // Fetch transactions
     const { data } = await supabase
       .from('transactions')
       .select('*')
@@ -31,7 +42,7 @@ export default function DashboardScreen() {
     setLoading(false)
   }
 
-  useFocusEffect(useCallback(() => { fetchTransactions() }, []))
+  useFocusEffect(useCallback(() => { fetchData() }, []))
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -40,6 +51,14 @@ export default function DashboardScreen() {
 
   const formatRupiah = (amount: number) =>
     'Rp ' + Math.abs(amount).toLocaleString('id-ID')
+
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Selamat pagi'
+    if (hour < 15) return 'Selamat siang'
+    if (hour < 18) return 'Selamat sore'
+    return 'Selamat malam'
+  }
 
   const getCategoryEmoji = (category: string) => {
     const map: Record<string, string> = {
@@ -55,7 +74,7 @@ export default function DashboardScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>Selamat datang 👋</Text>
+          <Text style={styles.greeting}>{getGreeting()}, {nickname || 'Kamu'} 👋</Text>
           <Text style={styles.appName}>Zena</Text>
         </View>
         <TouchableOpacity onPress={handleLogout}>
@@ -95,8 +114,10 @@ export default function DashboardScreen() {
             <Text style={styles.qaIcon}>➕</Text>
             <Text style={styles.qaLabel}>Catat</Text>
           </TouchableOpacity>
-          
-    
+          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/chat')}>
+            <Text style={styles.qaIcon}>🤖</Text>
+            <Text style={styles.qaLabel}>AI Chat</Text>
+          </TouchableOpacity>
         </View>
 
         <Text style={styles.sectionTitle}>Transaksi terakhir</Text>
