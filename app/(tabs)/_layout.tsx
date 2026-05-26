@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router'
-import { View, Text, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { router } from 'expo-router'
 
 const PRIMARY = '#185FA5'
 
@@ -9,6 +10,14 @@ function TabIcon({ focused, icon, label }: { focused: boolean; icon: string; lab
       <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>{icon}</Text>
       <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{label}</Text>
     </View>
+  )
+}
+
+function AddButton() {
+  return (
+    <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/tambah-transaksi')}>
+      <Text style={styles.addBtnText}>+</Text>
+    </TouchableOpacity>
   )
 }
 
@@ -35,6 +44,14 @@ export default function TabsLayout() {
           tabBarIcon: ({ focused }) => (
             <TabIcon focused={focused} icon="📊" label="Laporan" />
           ),
+        }}
+      />
+      <Tabs.Screen
+        name="tambah"
+        options={{
+          tabBarIcon: () => <AddButton />,
+          tabBarLabel: () => null,
+          href: null,
         }}
       />
       <Tabs.Screen
@@ -70,4 +87,11 @@ const styles = StyleSheet.create({
   tabIconActive: { opacity: 1 },
   tabLabel: { fontSize: 10, color: '#888780', marginTop: 2 },
   tabLabelActive: { color: PRIMARY, fontWeight: '600' },
+  addBtn: {
+    width: 52, height: 52, borderRadius: 26,
+    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
+    marginBottom: 16,
+    shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+  },
+  addBtnText: { fontSize: 28, color: '#fff', fontWeight: '300', lineHeight: 32 },
 })

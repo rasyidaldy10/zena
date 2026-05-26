@@ -96,10 +96,7 @@ export default function DashboardScreen() {
             <Text style={styles.qaLabel}>Catat</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/chat')}>
-            <Text style={styles.qaIcon}>🤖</Text>
-            <Text style={styles.qaLabel}>AI Chat</Text>
-          </TouchableOpacity>
+    
         </View>
 
         <Text style={styles.sectionTitle}>Transaksi terakhir</Text>
