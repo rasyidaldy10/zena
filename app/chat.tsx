@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20,
     backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
-  quickText: { fontSize: 12, color: '#888780', whiteSpace: 'nowrap' },
+  quickText: { fontSize: 12, color: '#888780' },
   inputWrap: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 16, paddingVertical: 12,
