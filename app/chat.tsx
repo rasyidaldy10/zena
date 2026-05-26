@@ -32,8 +32,8 @@ export default function ChatScreen() {
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [persona] = useState<Persona>('bestie')
-  const [language] = useState<Language>('id')
+  const [persona, setPersona] = useState<Persona>('bestie')
+  const [language, setLanguage] = useState<Language>('id')
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
@@ -45,6 +45,8 @@ export default function ChatScreen() {
       .select('*')
       .eq('user_id', user?.id)
       .single()
+    if (prefs?.persona) setPersona(prefs.persona)
+    if (prefs?.language) setLanguage(prefs.language)
     return prefs
   }
 
