@@ -1,24 +1,27 @@
-const ANTHROPIC_API_KEY = process.env.EXPO_PUBLIC_ANTHROPIC_API_KEY
+import { supabase } from './supabase'
+
+const PROXY_URL = 'https://lcvenmsxauasaemjjxtc.supabase.co/functions/v1/claude-proxy'
+
+const getAuthHeader = async () => {
+  const { data: { session } } = await supabase.auth.getSession()
+  return session ? `Bearer ${session.access_token}` : ''
+}
 
 export const claudeChat = async (
   systemPrompt: string,
   messages: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<string> => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const auth = await getAuthHeader()
+  const response = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-5',
       max_tokens: 1000,
       system: systemPrompt,
       messages,
     }),
   })
-
   const data = await response.json()
   return data.content[0].text
 }
@@ -28,15 +31,12 @@ export const claudeVision = async (
   mediaType: string,
   prompt: string
 ): Promise<string> => {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
+  const auth = await getAuthHeader()
+  const response = await fetch(PROXY_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+        model: 'claude-sonnet-4-5',
       max_tokens: 1000,
       messages: [
         {
@@ -44,11 +44,7 @@ export const claudeVision = async (
           content: [
             {
               type: 'image',
-              source: {
-                type: 'base64',
-                media_type: mediaType,
-                data: imageBase64,
-              },
+              source: { type: 'base64', media_type: mediaType, data: imageBase64 },
             },
             { type: 'text', text: prompt },
           ],
@@ -56,7 +52,6 @@ export const claudeVision = async (
       ],
     }),
   })
-
   const data = await response.json()
   return data.content[0].text
 }

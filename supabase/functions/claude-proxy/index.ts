@@ -1,9 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY') ?? ''
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? ''
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,27 +10,6 @@ const corsHeaders = {
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
-  }
-
-  // Cek auth — hanya user login Zena yang bisa akses
-  const authHeader = req.headers.get('Authorization')
-  if (!authHeader) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 401,
-    })
-  }
-
-  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    global: { headers: { Authorization: authHeader } },
-  })
-
-  const { data: { user }, error } = await supabase.auth.getUser()
-  if (error || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 401,
-    })
   }
 
   try {
@@ -56,7 +32,7 @@ serve(async (req) => {
       status: response.status,
     })
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: String(err) }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
     })

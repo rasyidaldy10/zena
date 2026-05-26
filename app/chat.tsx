@@ -66,6 +66,7 @@ export default function ChatScreen() {
       
       setMessages(prev => [...prev, { role: 'assistant', content: response }])
     } catch (error) {
+      console.error('Chat error:', error)
       setMessages(prev => [...prev, {
         role: 'assistant',
         content: 'Maaf, gue lagi gangguan bentar. Coba lagi ya!'
