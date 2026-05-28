@@ -13,14 +13,6 @@ function TabIcon({ focused, icon, label }: { focused: boolean; icon: string; lab
   )
 }
 
-function AddButton() {
-  return (
-    <TouchableOpacity style={styles.addBtn} onPress={() => router.push('/tambah-transaksi')}>
-      <Text style={styles.addBtnText}>+</Text>
-    </TouchableOpacity>
-  )
-}
-
 export default function TabsLayout() {
   return (
     <Tabs
@@ -47,11 +39,23 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
-        name="tambah"
+        name="tambah-tab"
         options={{
-          tabBarIcon: () => <AddButton />,
-          tabBarLabel: () => null,
-          href: null,
+          tabBarIcon: () => (
+            <View style={styles.addBtn}>
+              <Text style={styles.addBtnText}>+</Text>
+            </View>
+          ),
+          tabBarButton: (props) => (
+            <TouchableOpacity
+              style={styles.addBtnWrap}
+              onPress={() => router.push('/tambah-transaksi')}
+            >
+              <View style={styles.addBtn}>
+                <Text style={styles.addBtnText}>+</Text>
+              </View>
+            </TouchableOpacity>
+          ),
         }}
       />
       <Tabs.Screen
@@ -79,7 +83,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111111',
     borderTopColor: '#2A2A2A',
     borderTopWidth: 0.5,
-    height: 64,
+    height: 72,
     paddingBottom: 8,
   },
   tabItem: { alignItems: 'center', justifyContent: 'center', paddingTop: 6 },
@@ -87,10 +91,15 @@ const styles = StyleSheet.create({
   tabIconActive: { opacity: 1 },
   tabLabel: { fontSize: 10, color: '#888780', marginTop: 2 },
   tabLabelActive: { color: PRIMARY, fontWeight: '600' },
+  addBtnWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
   addBtn: {
     width: 52, height: 52, borderRadius: 26,
     backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
-    marginBottom: 16,
     shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
   },
   addBtnText: { fontSize: 28, color: '#fff', fontWeight: '300', lineHeight: 32 },
