@@ -4,6 +4,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## STATUS SESI TERAKHIR (2026-05-30)
+
+- ✅ TypeScript: semua error bersih (`npx tsc --noEmit` 0 error)
+- ✅ Wallet balance: diambil dari `current_balance` di tabel `user_wallets` (bukan dihitung dari transaksi)
+- ✅ Wallet type/fungsi: `app/tambah-wallet.tsx` sudah dibuat, `WALLET_TYPE_CONFIG` sudah ada di `types/index.ts`
+- ✅ Seksi "Dompet Saya" di tab Profil: daftar wallet + tombol tambah
+- ✅ Claude Code: sudah setup dan jalan di project ini
+- ⚙️ Testing: belum bisa dicoba di emulator/device (Xcode tidak support macOS 12, Android emulator belum terbuka sempurna)
+
+---
+
 ## FITUR YANG SUDAH JALAN
 
 ### Autentikasi
