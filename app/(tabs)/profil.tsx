@@ -3,11 +3,11 @@ import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, TextInput, ActivityIndicator
 } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { useFocusEffect, router } from 'expo-router'
 import { supabase } from '../../lib/supabase'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
-import { TIER_CONFIG } from '../../types'
+import { TIER_CONFIG, WALLET_TYPE_CONFIG, UserWallet } from '../../types'
 import { Persona, BudgetMethod, UserPreferences } from '../../types'
 
 const PRIMARY = '#185FA5'
@@ -21,6 +21,7 @@ export default function ProfilScreen() {
   const [income, setIncome] = useState('')
   const [score, setScore] = useState(0)
   const [tier, setTier] = useState('Starter')
+  const [wallets, setWallets] = useState<UserWallet[]>([])
 
   const fetchData = async () => {
     setLoading(true)
@@ -48,6 +49,14 @@ export default function ProfilScreen() {
       setScore(scoreData.total)
       setTier(scoreData.tier)
     }
+
+    const { data: walletsData } = await supabase
+      .from('user_wallets')
+      .select('*')
+      .eq('user_id', user?.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+    if (walletsData) setWallets(walletsData)
 
     setLoading(false)
   }
@@ -202,6 +211,37 @@ export default function ProfilScreen() {
         ))}
       </View>
 
+      {/* Dompet Saya */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Dompet Saya</Text>
+          <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
+            <Text style={styles.editBtn}>+ Tambah</Text>
+          </TouchableOpacity>
+        </View>
+        {wallets.length === 0 ? (
+          <Text style={styles.emptyWallet}>Belum ada dompet</Text>
+        ) : (
+          wallets.map((w) => {
+            const typeLabel = WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type
+            return (
+              <View key={w.id} style={styles.walletItem}>
+                <View style={[styles.walletDot, { backgroundColor: w.color || PRIMARY }]}>
+                  <Text style={styles.walletDotIcon}>{w.icon}</Text>
+                </View>
+                <View style={styles.walletInfo}>
+                  <Text style={styles.walletName}>{w.wallet_name}</Text>
+                  <Text style={styles.walletType}>{typeLabel}</Text>
+                </View>
+                <Text style={styles.walletBalance}>
+                  Rp {w.current_balance.toLocaleString('id-ID')}
+                </Text>
+              </View>
+            )
+          })
+        )}
+      </View>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   )
@@ -262,4 +302,15 @@ const styles = StyleSheet.create({
   methodName: { fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 3 },
   methodNameActive: { color: PRIMARY },
   methodDesc: { fontSize: 11, color: '#888780' },
+  emptyWallet: { fontSize: 13, color: '#888780', textAlign: 'center', paddingVertical: 12 },
+  walletItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+  },
+  walletDot: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  walletDotIcon: { fontSize: 18 },
+  walletInfo: { flex: 1 },
+  walletName: { fontSize: 14, fontWeight: '500', color: '#fff' },
+  walletType: { fontSize: 11, color: '#888780', marginTop: 2 },
+  walletBalance: { fontSize: 13, fontWeight: '600', color: '#fff' },
 })

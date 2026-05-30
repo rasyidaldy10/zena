@@ -4,7 +4,19 @@ export type BudgetMethod = '503020' | '703010' | 'zero' | 'envelope' | 'payfirst
 export type TransactionType = 'income' | 'expense' | 'transfer'
 export type TransactionSource = 'manual' | 'receipt_scan' | 'email' | 'voice'
 export type Mood = 'happy' | 'neutral' | 'stressed' | 'bored' | 'excited'
-export type WalletType = 'personal' | 'business' | 'shared'
+export type WalletType =
+  | 'personal' | 'business' | 'shared'
+  | 'rekening_utama' | 'dana_darurat' | 'ewallet'
+  | 'dompet_transit' | 'tabungan' | 'investasi'
+
+export const WALLET_TYPE_CONFIG: Record<string, { label: string; icon: string; desc: string }> = {
+  rekening_utama: { label: 'Rekening Utama', icon: '🏦', desc: 'Rekening bank utama sehari-hari' },
+  dana_darurat:   { label: 'Dana Darurat',   icon: '🛡️', desc: 'Simpanan untuk kondisi darurat' },
+  ewallet:        { label: 'E-Wallet',        icon: '📱', desc: 'Dompet digital (GoPay, OVO, Dana)' },
+  dompet_transit: { label: 'Dompet Transit',  icon: '💸', desc: 'Uang tunai keperluan harian' },
+  tabungan:       { label: 'Tabungan',        icon: '🐷', desc: 'Rekening tabungan tujuan tertentu' },
+  investasi:      { label: 'Investasi',       icon: '📈', desc: 'Saham, reksa dana, dll' },
+}
 export type TierName = 'Starter' | 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Sovereign'
 
 export interface UserPreferences {
