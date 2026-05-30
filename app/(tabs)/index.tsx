@@ -2,18 +2,20 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator
 import { useState, useCallback } from 'react'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { Transaction } from '../../types'
+import { Transaction, UserWallet } from '../../types'
 
 const PRIMARY = '#185FA5'
 
 export default function DashboardScreen() {
   const [mode, setMode] = useState<'personal' | 'business'>('personal')
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [wallets, setWallets] = useState<UserWallet[]>([])
+  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [totalBalance, setTotalBalance] = useState(0)
   const [nickname, setNickname] = useState('')
 
-  const fetchData = async () => {
+  const fetchData = async (walletFilter: string | null = null) => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -24,26 +26,43 @@ export default function DashboardScreen() {
       .single()
     if (prefs?.nickname) setNickname(prefs.nickname)
 
-    const { data: wallets } = await supabase
+    const { data: walletsData } = await supabase
       .from('user_wallets')
-      .select('current_balance')
+      .select('id, wallet_name, wallet_type, current_balance, color, icon, is_active')
       .eq('user_id', user?.id)
       .eq('is_active', true)
-    const total = (wallets ?? []).reduce((sum: number, w: any) => sum + (w.current_balance || 0), 0)
-    setTotalBalance(total)
+      .order('created_at', { ascending: true })
 
-    const { data } = await supabase
+    if (walletsData) {
+      setWallets(walletsData as UserWallet[])
+      const total = walletsData.reduce((sum: number, w: any) => sum + (w.current_balance || 0), 0)
+      setTotalBalance(total)
+    }
+
+    let query = supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user?.id)
       .order('created_at', { ascending: false })
       .limit(10)
+
+    if (walletFilter) {
+      query = query.eq('wallet_id', walletFilter)
+    }
+
+    const { data } = await query
     if (data) setTransactions(data)
 
     setLoading(false)
   }
 
-  useFocusEffect(useCallback(() => { fetchData() }, []))
+  useFocusEffect(useCallback(() => { fetchData(selectedWalletId) }, []))
+
+  const handleSelectWallet = (walletId: string) => {
+    const newId = selectedWalletId === walletId ? null : walletId
+    setSelectedWalletId(newId)
+    fetchData(newId)
+  }
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -70,6 +89,8 @@ export default function DashboardScreen() {
     }
     return map[category] || '📦'
   }
+
+  const selectedWallet = wallets.find(w => w.id === selectedWalletId)
 
   return (
     <View style={styles.container}>
@@ -99,16 +120,60 @@ export default function DashboardScreen() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Balance Card */}
         <View style={styles.balanceCard}>
           <Text style={styles.balanceLabel}>
             {mode === 'personal' ? 'Total saldo pribadi' : 'Total saldo bisnis'}
           </Text>
           <Text style={styles.balanceAmount}>{formatRupiah(totalBalance)}</Text>
           <Text style={styles.balanceSub}>
-            {transactions.length > 0 ? `${transactions.length} transaksi tercatat` : 'Belum ada transaksi'}
+            {wallets.length} dompet aktif
           </Text>
         </View>
 
+        {/* Dompet Saya */}
+        {wallets.length > 0 && (
+          <>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>Dompet Saya</Text>
+              <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
+                <Text style={styles.sectionAction}>+ Tambah</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.walletScroll}
+              contentContainerStyle={styles.walletScrollContent}
+            >
+              {wallets.map((wallet) => {
+                const isSelected = selectedWalletId === wallet.id
+                return (
+                  <TouchableOpacity
+                    key={wallet.id}
+                    style={[
+                      styles.walletCard,
+                      { borderColor: wallet.color || PRIMARY },
+                      isSelected && { backgroundColor: wallet.color || PRIMARY },
+                    ]}
+                    onPress={() => handleSelectWallet(wallet.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.walletIcon}>{wallet.icon || '💰'}</Text>
+                    <Text style={[styles.walletName, isSelected && styles.walletNameSelected]} numberOfLines={1}>
+                      {wallet.wallet_name}
+                    </Text>
+                    <Text style={[styles.walletBalance, isSelected && styles.walletBalanceSelected]}>
+                      {formatRupiah(wallet.current_balance)}
+                    </Text>
+                  </TouchableOpacity>
+                )
+              })}
+            </ScrollView>
+          </>
+        )}
+
+        {/* Quick Actions */}
         <Text style={styles.sectionTitle}>Aksi cepat</Text>
         <View style={styles.quickActions}>
           <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/tambah-transaksi')}>
@@ -121,14 +186,27 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.sectionTitle}>Transaksi terakhir</Text>
+        {/* Transaksi */}
+        <View style={styles.sectionRow}>
+          <Text style={styles.sectionTitle}>
+            {selectedWallet ? `Transaksi: ${selectedWallet.wallet_name}` : 'Transaksi terakhir'}
+          </Text>
+          {selectedWalletId && (
+            <TouchableOpacity onPress={() => { setSelectedWalletId(null); fetchData(null) }}>
+              <Text style={styles.sectionAction}>Semua</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {loading ? (
           <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
         ) : transactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>💸</Text>
             <Text style={styles.emptyText}>Belum ada transaksi</Text>
-            <Text style={styles.emptySubtext}>Mulai catat pengeluaran pertamamu!</Text>
+            <Text style={styles.emptySubtext}>
+              {selectedWalletId ? 'Di dompet ini belum ada transaksi' : 'Mulai catat pengeluaran pertamamu!'}
+            </Text>
           </View>
         ) : (
           transactions.map((txn) => (
@@ -174,7 +252,20 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
   balanceAmount: { fontSize: 32, fontWeight: '600', color: '#fff', letterSpacing: -1 },
   balanceSub: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#888780', marginBottom: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionAction: { fontSize: 13, color: PRIMARY, fontWeight: '500' },
+  walletScroll: { marginBottom: 24, marginHorizontal: -20 },
+  walletScrollContent: { paddingHorizontal: 20, gap: 10 },
+  walletCard: {
+    width: 130, backgroundColor: '#1A1A1A', borderRadius: 14,
+    padding: 14, borderWidth: 1.5,
+  },
+  walletIcon: { fontSize: 22, marginBottom: 8 },
+  walletName: { fontSize: 12, color: '#888780', fontWeight: '500', marginBottom: 4 },
+  walletNameSelected: { color: '#fff' },
+  walletBalance: { fontSize: 13, color: '#fff', fontWeight: '600' },
+  walletBalanceSelected: { color: '#fff' },
   quickActions: { flexDirection: 'row', gap: 10, marginBottom: 24 },
   qaBtn: { flex: 1, backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A' },
   qaIcon: { fontSize: 20, marginBottom: 6 },
