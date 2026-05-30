@@ -47,23 +47,31 @@ export default function RegisterScreen() {
   const handleGoogleRegister = async () => {
     setGoogleLoading(true)
     try {
-      const redirectTo = Linking.createURL('/')
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo,
-          skipBrowserRedirect: true,
-          scopes: 'email profile',
-        },
-      })
-      if (error) throw error
-      if (!data?.url) throw new Error('Tidak ada URL OAuth')
+      if (Platform.OS === 'web') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          },
+        })
+        if (error) throw error
+      } else {
+        const redirectTo = Linking.createURL('/')
+        const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo,
+            skipBrowserRedirect: true,
+          },
+        })
+        if (error) throw error
+        if (!data?.url) throw new Error('Tidak ada URL OAuth')
 
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
-      if (result.type === 'success') {
-        const { url } = result
-        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(url)
-        if (sessionError) throw sessionError
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+        if (result.type === 'success') {
+          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url)
+          if (sessionError) throw sessionError
+        }
       }
     } catch (err: any) {
       Alert.alert('Gagal daftar dengan Google', err.message || 'Coba lagi ya')
