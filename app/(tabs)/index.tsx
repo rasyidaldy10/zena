@@ -17,7 +17,6 @@ export default function DashboardScreen() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    // Fetch nickname
     const { data: prefs } = await supabase
       .from('user_preferences')
       .select('nickname')
@@ -25,20 +24,22 @@ export default function DashboardScreen() {
       .single()
     if (prefs?.nickname) setNickname(prefs.nickname)
 
-    // Fetch transactions
+    const { data: wallets } = await supabase
+      .from('user_wallets')
+      .select('current_balance')
+      .eq('user_id', user?.id)
+      .eq('is_active', true)
+    const total = (wallets ?? []).reduce((sum: number, w: any) => sum + (w.current_balance || 0), 0)
+    setTotalBalance(total)
+
     const { data } = await supabase
       .from('transactions')
       .select('*')
       .eq('user_id', user?.id)
       .order('created_at', { ascending: false })
       .limit(10)
+    if (data) setTransactions(data)
 
-    if (data) {
-      setTransactions(data)
-      const total = data.reduce((sum, t) =>
-        t.type === 'income' ? sum + t.amount : sum - t.amount, 0)
-      setTotalBalance(total)
-    }
     setLoading(false)
   }
 
