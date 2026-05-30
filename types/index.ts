@@ -27,6 +27,7 @@ export interface UserPreferences {
   budget_method: BudgetMethod
   monthly_income: number
   nickname: string
+  avatar_url?: string
   created_at: string
   updated_at: string
 }

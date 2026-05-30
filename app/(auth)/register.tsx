@@ -4,13 +4,18 @@ import {
   StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
 } from 'react-native'
 import { router } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
+import * as Linking from 'expo-linking'
 import { supabase } from '../../lib/supabase'
+
+WebBrowser.maybeCompleteAuthSession()
 
 export default function RegisterScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
 
   const handleRegister = async () => {
     if (!email || !password || !confirmPassword) {
@@ -39,19 +44,45 @@ export default function RegisterScreen() {
     setLoading(false)
   }
 
+  const handleGoogleRegister = async () => {
+    setGoogleLoading(true)
+    try {
+      const redirectTo = Linking.createURL('/')
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+          scopes: 'email profile',
+        },
+      })
+      if (error) throw error
+      if (!data?.url) throw new Error('Tidak ada URL OAuth')
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+      if (result.type === 'success') {
+        const { url } = result
+        const { error: sessionError } = await supabase.auth.exchangeCodeForSession(url)
+        if (sessionError) throw sessionError
+      }
+    } catch (err: any) {
+      Alert.alert('Gagal daftar dengan Google', err.message || 'Coba lagi ya')
+    } finally {
+      setGoogleLoading(false)
+    }
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.inner}>
-        {/* Logo */}
         <View style={styles.logoWrap}>
           <Text style={styles.logo}>Zena</Text>
           <Text style={styles.tagline}>Mulai perjalanan finansialmu</Text>
         </View>
 
-        {/* Form */}
         <View style={styles.form}>
           <TextInput
             style={styles.input}
@@ -82,11 +113,31 @@ export default function RegisterScreen() {
           <TouchableOpacity
             style={styles.btnPrimary}
             onPress={handleRegister}
-            disabled={loading}
+            disabled={loading || googleLoading}
           >
             {loading
               ? <ActivityIndicator color="#fff" />
               : <Text style={styles.btnPrimaryText}>Daftar Sekarang</Text>
+            }
+          </TouchableOpacity>
+
+          <View style={styles.dividerRow}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>atau daftar dengan</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          <TouchableOpacity
+            style={styles.btnGoogle}
+            onPress={handleGoogleRegister}
+            disabled={loading || googleLoading}
+          >
+            {googleLoading
+              ? <ActivityIndicator color="#fff" />
+              : <>
+                  <Text style={styles.googleIcon}>G</Text>
+                  <Text style={styles.btnGoogleText}>Daftar dengan Google</Text>
+                </>
             }
           </TouchableOpacity>
 
@@ -128,6 +179,26 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
+  dividerLine: { flex: 1, height: 0.5, backgroundColor: '#2A2A2A' },
+  dividerText: { fontSize: 12, color: '#888780' },
+  btnGoogle: {
+    height: 52,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: '#2A2A2A',
+    gap: 10,
+  },
+  googleIcon: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#4285F4',
+  },
+  btnGoogleText: { color: '#fff', fontSize: 15, fontWeight: '500' },
   btnSecondary: { alignItems: 'center', paddingVertical: 12 },
   btnSecondaryText: { color: '#888780', fontSize: 14 },
 })

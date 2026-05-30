@@ -18,11 +18,18 @@ export default function RootLayout() {
       if (session) {
         const { data } = await supabase
           .from('user_preferences')
-          .select('id')
+          .select('id, avatar_url')
           .eq('user_id', session.user.id)
           .single()
 
         if (data) {
+          const googleAvatar = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture
+          if (googleAvatar && !data.avatar_url) {
+            await supabase
+              .from('user_preferences')
+              .update({ avatar_url: googleAvatar })
+              .eq('user_id', session.user.id)
+          }
           router.replace('/(tabs)')
         } else {
           router.replace('/onboarding')

@@ -115,13 +115,16 @@ export default function OnboardingScreen() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+
     await supabase.from('user_preferences').upsert({
       user_id: user?.id,
-      nickname,
+      nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
       persona,
       language,
       budget_method: budgetMethod,
       monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       updated_at: new Date().toISOString(),
     })
 
