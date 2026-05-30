@@ -8,12 +8,11 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 - ✅ TypeScript: semua error bersih (`npx tsc --noEmit` 0 error)
 - ✅ Multi-wallet dashboard: section "Dompet Saya" di Home, klik wallet filter transaksi
-- ✅ Google SSO: tombol "Masuk/Daftar dengan Google" di login & register via Supabase OAuth
+- ✅ Google SSO: aktif di Supabase + Google Cloud Console, redirect URL sudah dikonfigurasi
 - ✅ Avatar URL dari Google disimpan ke `user_preferences.avatar_url`
-- ✅ Deploy Vercel: `vercel.json` siap, `npx expo export --platform web` build sukses ke `dist/`
-- ✅ `.env.example` dibuat untuk dokumentasi environment variables
-- ⚙️ Google SSO butuh setup di Supabase Dashboard: aktifkan provider Google, tambah redirect URL `zena://`
-- ⚙️ Deploy Vercel butuh: connect repo di vercel.com, set env vars EXPO_PUBLIC_SUPABASE_URL & EXPO_PUBLIC_SUPABASE_ANON_KEY
+- ✅ Deploy Vercel: live di https://zena-mu.vercel.app
+- ✅ Google Cloud OAuth: Client ID & Secret sudah terhubung ke Supabase
+- ✅ Supabase URL Configuration: Site URL & Redirect URL sudah diset ke zena-mu.vercel.app
 - ⚙️ Testing di emulator Android: emulator Pixel_6 sudah terinstall tapi boot sangat lambat di macOS 12
 
 ---
@@ -132,6 +131,6 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 16. PDF export laporan (fitur Bisnis)
 17. Submit Play Store & App Store
 
-### Setup yang Dibutuhkan (Manual)
-- **Google SSO**: Aktifkan provider Google di Supabase Dashboard → Authentication → Providers. Tambah redirect URL: `zena://` dan URL Vercel kamu.
-- **Deploy Vercel**: Connect repo di vercel.com, set env vars `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+### Setup yang Sudah Selesai (Manual)
+- ✅ **Google SSO**: Provider Google aktif di Supabase, Client ID/Secret dari Google Cloud terhubung, redirect URL `zena://` dan `https://zena-mu.vercel.app` sudah dikonfigurasi
+- ✅ **Deploy Vercel**: Live di https://zena-mu.vercel.app, env vars sudah diset, auto-deploy dari GitHub main branch
