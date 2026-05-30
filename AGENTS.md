@@ -72,3 +72,49 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 ### Bottom Navigation
 - Tab: Home, Laporan, + (tambah transaksi), Reminder, Profil
 - Tombol + di tengah navigasi bawah
+
+---
+
+## TASK LIST
+
+### Sudah Selesai ✅
+1. Auth: login, register
+2. Onboarding 5 step: bahasa (pertama), nama, persona, budgeting, income - 4 bahasa (ID, EN, MY, ZH)
+3. Dashboard: greeting pakai nama + waktu, balance card dari current_balance wallet, quick actions, transaksi terakhir
+4. Bottom nav: tombol + di tengah naik (opsi A)
+5. Tambah transaksi manual + pilih wallet + update current_balance otomatis
+6. Laporan: breakdown kategori, chart, filter bulan
+7. Reminder: tambah tagihan, toggle paid/unpaid
+8. Profil: tier display, financial score, ganti persona, seksi Dompet Saya
+9. Tambah wallet: app/tambah-wallet.tsx + WALLET_TYPE_CONFIG di types/index.ts
+10. AI Chat: proxy via Supabase Edge Function (API key aman di server)
+11. Scan struk di chat AI via Claude Vision
+12. Voice note placeholder di chat (tombol ada, pending Whisper)
+13. 6 persona AI (bestie, advisor, kakak, adek, pacar, stoic)
+14. Tier system: Starter→Bronze→Silver→Gold→Platinum→Sovereign
+15. Financial score engine
+16. TypeScript errors semua bersih
+17. Claude Code setup dan jalan
+18. AGENTS.md selalu diupdate tiap akhir sesi
+
+### Belum Dikerjakan
+1. Hapus data transaksi test (skip dulu)
+2. Google SSO + sekalian minta scope gmail.readonly
+3. Gmail parsing - auto-detect transaksi & transfer antar wallet dari notif email bank
+4. Push notification - budget alert 3 level (75%, 90%, 100%)
+5. Push notification - notif real-time transaksi dari Gmail
+6. Voice Note - integrasi Whisper OpenAI
+7. Transaction chaining - transfer antar wallet bukan pengeluaran
+8. Smart categorization - AI tanya jam 18.00 untuk transaksi uncategorized
+9. Multi-wallet dashboard - saldo per wallet
+10. Pattern detection AI - kirim tiap Sabtu/Minggu
+11. Prediksi akhir bulan AI
+12. Anomaly detection AI
+13. Share laporan - generate gambar ringkasan bulanan untuk IG story
+14. Couple mode - shared wallet dengan pasangan
+15. Referral reward - ajak teman dapat 1 bulan Pro gratis
+16. AdSense (web) / AdMob (mobile) untuk free tier
+17. In-app purchase - Pro Rp 39k/bln, Bisnis Rp 79k/bln
+18. PDF export laporan (fitur Bisnis)
+19. Deploy ke Vercel
+20. Submit Play Store & App Store
