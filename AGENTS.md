@@ -7,11 +7,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 ## STATUS SESI TERAKHIR (2026-05-30)
 
 - ✅ TypeScript: semua error bersih (`npx tsc --noEmit` 0 error)
-- ✅ Wallet balance: diambil dari `current_balance` di tabel `user_wallets` (bukan dihitung dari transaksi)
-- ✅ Wallet type/fungsi: `app/tambah-wallet.tsx` sudah dibuat, `WALLET_TYPE_CONFIG` sudah ada di `types/index.ts`
-- ✅ Seksi "Dompet Saya" di tab Profil: daftar wallet + tombol tambah
-- ✅ Claude Code: sudah setup dan jalan di project ini
-- ⚙️ Testing: belum bisa dicoba di emulator/device (Xcode tidak support macOS 12, Android emulator belum terbuka sempurna)
+- ✅ Multi-wallet dashboard: section "Dompet Saya" di Home, klik wallet filter transaksi
+- ✅ Google SSO: tombol "Masuk/Daftar dengan Google" di login & register via Supabase OAuth
+- ✅ Avatar URL dari Google disimpan ke `user_preferences.avatar_url`
+- ✅ Deploy Vercel: `vercel.json` siap, `npx expo export --platform web` build sukses ke `dist/`
+- ✅ `.env.example` dibuat untuk dokumentasi environment variables
+- ⚙️ Google SSO butuh setup di Supabase Dashboard: aktifkan provider Google, tambah redirect URL `zena://`
+- ⚙️ Deploy Vercel butuh: connect repo di vercel.com, set env vars EXPO_PUBLIC_SUPABASE_URL & EXPO_PUBLIC_SUPABASE_ANON_KEY
+- ⚙️ Testing di emulator Android: emulator Pixel_6 sudah terinstall tapi boot sangat lambat di macOS 12
 
 ---
 
@@ -19,6 +22,9 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ### Autentikasi
 - Login & Register dengan Supabase Auth
+- Google SSO di login & register via `expo-web-browser` + Supabase OAuth
+- Avatar URL dari Google otomatis disimpan ke `user_preferences.avatar_url`
+- Redirect otomatis: user baru → onboarding, user lama → dashboard
 
 ### Onboarding
 - Pilih bahasa (ID, EN, MY, ZH)
@@ -47,6 +53,13 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - Tersimpan ke kolom `wallet_type` di tabel `user_wallets`
 - Picker ikon (emoji) dan warna untuk wallet
 - Input saldo awal saat buat wallet
+
+### Multi-wallet Dashboard
+- Section "Dompet Saya" di tab Home (horizontal scroll cards)
+- Setiap card tampilkan icon, nama, dan saldo wallet
+- Klik wallet → filter transaksi by `wallet_id`
+- Klik lagi → kembali ke semua transaksi
+- Balance card tetap menampilkan total gabungan semua wallet
 
 ### Laporan
 - Filter per bulan (navigasi bulan sebelum/sesudah)
@@ -96,25 +109,29 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 16. TypeScript errors semua bersih
 17. Claude Code setup dan jalan
 18. AGENTS.md selalu diupdate tiap akhir sesi
+19. Multi-wallet dashboard: section "Dompet Saya" di Home + filter transaksi per wallet
+20. Google SSO: login & register dengan Google, simpan avatar_url (perlu setup di Supabase Dashboard)
+21. Deploy ke Vercel: vercel.json siap, web build sukses (perlu connect repo & set env vars di vercel.com)
 
 ### Belum Dikerjakan
 1. Hapus data transaksi test (skip dulu)
-2. Google SSO + sekalian minta scope gmail.readonly
-3. Gmail parsing - auto-detect transaksi & transfer antar wallet dari notif email bank
-4. Push notification - budget alert 3 level (75%, 90%, 100%)
-5. Push notification - notif real-time transaksi dari Gmail
-6. Voice Note - integrasi Whisper OpenAI
-7. Transaction chaining - transfer antar wallet bukan pengeluaran
-8. Smart categorization - AI tanya jam 18.00 untuk transaksi uncategorized
-9. Multi-wallet dashboard - saldo per wallet
-10. Pattern detection AI - kirim tiap Sabtu/Minggu
-11. Prediksi akhir bulan AI
-12. Anomaly detection AI
-13. Share laporan - generate gambar ringkasan bulanan untuk IG story
-14. Couple mode - shared wallet dengan pasangan
-15. Referral reward - ajak teman dapat 1 bulan Pro gratis
-16. AdSense (web) / AdMob (mobile) untuk free tier
-17. In-app purchase - Pro Rp 39k/bln, Bisnis Rp 79k/bln
-18. PDF export laporan (fitur Bisnis)
-19. Deploy ke Vercel
-20. Submit Play Store & App Store
+2. Gmail parsing - auto-detect transaksi & transfer antar wallet dari notif email bank (butuh Google OAuth scope gmail.readonly)
+3. Push notification - budget alert 3 level (75%, 90%, 100%)
+4. Push notification - notif real-time transaksi dari Gmail
+5. Voice Note - integrasi Whisper OpenAI
+6. Transaction chaining - transfer antar wallet bukan pengeluaran
+7. Smart categorization - AI tanya jam 18.00 untuk transaksi uncategorized
+8. Pattern detection AI - kirim tiap Sabtu/Minggu
+9. Prediksi akhir bulan AI
+10. Anomaly detection AI
+11. Share laporan - generate gambar ringkasan bulanan untuk IG story
+12. Couple mode - shared wallet dengan pasangan
+13. Referral reward - ajak teman dapat 1 bulan Pro gratis
+14. AdSense (web) / AdMob (mobile) untuk free tier
+15. In-app purchase - Pro Rp 39k/bln, Bisnis Rp 79k/bln
+16. PDF export laporan (fitur Bisnis)
+17. Submit Play Store & App Store
+
+### Setup yang Dibutuhkan (Manual)
+- **Google SSO**: Aktifkan provider Google di Supabase Dashboard → Authentication → Providers. Tambah redirect URL: `zena://` dan URL Vercel kamu.
+- **Deploy Vercel**: Connect repo di vercel.com, set env vars `EXPO_PUBLIC_SUPABASE_URL` dan `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
