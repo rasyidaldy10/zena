@@ -117,20 +117,22 @@ export default function OnboardingScreen() {
 
     const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
 
-    await supabase.from('user_preferences').upsert({
-      user_id: user?.id,
-      nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
-      persona,
-      language,
-      budget_method: budgetMethod,
-      monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-      updated_at: new Date().toISOString(),
-    })
-
-    await supabase.from('user_wallets').insert([
-      { user_id: user?.id, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
-      { user_id: user?.id, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
+    // Jalankan kedua query paralel, bukan sequential
+    await Promise.all([
+      supabase.from('user_preferences').upsert({
+        user_id: user?.id,
+        nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
+        persona,
+        language,
+        budget_method: budgetMethod,
+        monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        updated_at: new Date().toISOString(),
+      }),
+      supabase.from('user_wallets').insert([
+        { user_id: user?.id, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
+        { user_id: user?.id, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
+      ]),
     ])
 
     router.replace('/(tabs)')
