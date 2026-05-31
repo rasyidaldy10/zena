@@ -144,14 +144,9 @@ export default function DashboardScreen() {
     { rank: 3, name: 'Dani K', tier: 'Silver' as TierName, score: 61, isMe: false },
   ].sort((a, b) => b.score - a.score).map((item, i) => ({ ...item, rank: i + 1 }))
 
-  const handleLogout = () => {
-    Alert.alert('Keluar', 'Yakin mau keluar?', [
-      { text: 'Batal', style: 'cancel' },
-      { text: 'Keluar', style: 'destructive', onPress: async () => {
-        await supabase.auth.signOut()
-        router.replace('/(auth)/login')
-      }},
-    ])
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.replace('/(auth)/login')
   }
 
   if (loading) return (
