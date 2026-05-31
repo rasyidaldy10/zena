@@ -179,8 +179,8 @@ export default function DashboardScreen() {
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/(tabs)/reminder')}>
             <Text style={styles.iconBtnText}>🔔</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
-            <Text style={styles.iconBtnText}>↪️</Text>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutBtnText}>Keluar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -392,6 +392,8 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
   iconBtnText: { fontSize: 16 },
+  logoutBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A' },
+  logoutBtnText: { fontSize: 13, color: '#888780', fontWeight: '500' },
 
   // Tier Card
   tierCard: {
