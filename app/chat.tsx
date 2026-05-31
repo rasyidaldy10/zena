@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert
@@ -9,8 +9,8 @@ import { Audio } from 'expo-av'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { claudeChat, claudeVision } from '../lib/claude'
-import { getSystemPrompt } from '../lib/personas'
-import { Persona, Language } from '../types'
+import { getContextualSystemPrompt } from '../lib/personas'
+import { Persona, Language, BudgetMethod, Transaction } from '../types'
 
 const PRIMARY = '#185FA5'
 
@@ -20,34 +20,105 @@ interface Message {
 }
 
 const QUICK_REPLIES = [
-  'Rekap pengeluaran hari ini',
-  'Budget bulan ini gimana?',
-  'Tips hemat minggu ini',
-  'Analisis spending ku',
+  'Rekap pengeluaran bulan ini',
+  'Budget aku gimana?',
+  'Prediksi akhir bulan',
+  'Analisis pola belanjaku',
+  'Tips hemat bulan ini',
+  'Kategori terboros aku apa?',
 ]
 
 export default function ChatScreen() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hei! Gue Zena, asisten keuangan lo. Mau ngomongin apa hari ini? 💙' }
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [initLoading, setInitLoading] = useState(true)
   const [persona, setPersona] = useState<Persona>('bestie')
   const [language, setLanguage] = useState<Language>('id')
+  const [nickname, setNickname] = useState('Kamu')
+  const [monthlyIncome, setMonthlyIncome] = useState(0)
+  const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>('503020')
+  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
-  const getPrefs = async () => {
+  useEffect(() => {
+    initChat()
+  }, [])
+
+  const initChat = async () => {
+    const prefs = await loadPrefs()
+    const txns = await loadTransactions()
+
+    const welcomes: Record<Persona, string> = {
+      bestie: 'Hei! Gue Zena — asisten keuangan lo yang paling ngerti lo 😎 Mau ngomongin apa?',
+      advisor: 'Selamat datang. Saya siap membantu menganalisis kondisi keuangan Anda.',
+      kakak: 'Halo dek! Kak Zena siap bantu yaa. Ada yang mau diceritain soal keuangan? 🧡',
+      adek: 'Hiii Kak! Dek Zena seneng bisa bantu! Mau ngobrol apa hari ini? 🎉',
+      pacar: 'Hei Sayang~ Aku di sini kok. Mau cerita soal keuangan? ♡',
+      stoic: 'Apa yang ingin kamu ketahui tentang kondisi keuanganmu?',
+    }
+
+    const p = prefs?.persona || 'bestie'
+    const income = prefs?.monthly_income || 0
+
+    let welcome = welcomes[p as Persona] || welcomes.bestie
+
+    if (income > 0 && txns.length > 0) {
+      const currentMonth = new Date().toISOString().slice(0, 7)
+      const thisMonthTxns = txns.filter(t => !t.is_wallet_transfer && t.date?.startsWith(currentMonth))
+      const totalExp = thisMonthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+
+      if (totalExp > 0) {
+        const pct = Math.round((totalExp / income) * 100)
+        const emoji = pct > 80 ? '🔴' : pct > 60 ? '🟡' : '🟢'
+        welcome += `\n\nFYI, bulan ini kamu udah keluar Rp ${totalExp.toLocaleString('id-ID')} (${pct}% dari penghasilan) ${emoji}`
+      }
+    }
+
+    setMessages([{ role: 'assistant', content: welcome }])
+    setInitLoading(false)
+  }
+
+  const loadPrefs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data: prefs } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user?.id)
       .single()
+
     if (prefs?.persona) setPersona(prefs.persona)
     if (prefs?.language) setLanguage(prefs.language)
+    if (prefs?.nickname) setNickname(prefs.nickname)
+    if (prefs?.monthly_income) setMonthlyIncome(prefs.monthly_income)
+    if (prefs?.budget_method) setBudgetMethod(prefs.budget_method)
     return prefs
+  }
+
+  const loadTransactions = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const threeMonthsAgo = new Date()
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
+
+    const { data } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('user_id', user?.id)
+      .gte('date', threeMonthsAgo.toISOString().split('T')[0])
+      .order('date', { ascending: false })
+      .limit(100)
+
+    const txns = (data || []) as Transaction[]
+    setRecentTransactions(txns)
+    return txns
+  }
+
+  const buildSystemPrompt = () => {
+    return getContextualSystemPrompt(
+      persona, language, nickname, monthlyIncome, recentTransactions, budgetMethod
+    )
   }
 
   const sendMessage = async (text?: string) => {
@@ -58,19 +129,14 @@ export default function ChatScreen() {
     setMessages(newMessages)
     setInput('')
     setLoading(true)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
+
     try {
-      const prefs = await getPrefs()
-      const systemPrompt = getSystemPrompt(
-        prefs?.persona || persona,
-        prefs?.language || language,
-        prefs?.nickname || 'Kamu',
-        prefs?.monthly_income || 0
-      )
+      const systemPrompt = buildSystemPrompt()
       const response = await claudeChat(systemPrompt, newMessages)
       setMessages(prev => [...prev, { role: 'assistant', content: response }])
-    } catch (error) {
-      console.error('Chat error:', error)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gue lagi gangguan bentar. Coba lagi ya!' }])
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, lagi gangguan bentar. Coba lagi ya!' }])
     }
     setLoading(false)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
@@ -107,6 +173,7 @@ export default function ChatScreen() {
   const processStruk = async (uri: string) => {
     setLoading(true)
     setMessages(prev => [...prev, { role: 'user', content: '📷 [Mengirim foto struk...]' }])
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
       const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
@@ -115,8 +182,9 @@ export default function ChatScreen() {
 1. Sebutkan nama toko dan tanggal (jika ada)
 2. List item-item yang dibeli beserta harganya
 3. Sebutkan total belanja
-4. Berikan 1 komentar singkat tentang pengeluaran ini (friendly, bahasa gaul)
-Format jawaban natural dan friendly, bukan JSON.`)
+4. Kategori transaksi yang tepat (Makan & Minum / Belanja / Tagihan / Hiburan / Kesehatan / Transport / dll)
+5. Berikan 1 komentar singkat yang friendly tentang pengeluaran ini
+Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
       setMessages(prev => [...prev, { role: 'assistant', content: result }])
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gagal baca struk. Pastikan foto jelas ya!' }])
@@ -157,11 +225,10 @@ Format jawaban natural dan friendly, bukan JSON.`)
     try {
       await recording.stopAndUnloadAsync()
       setRecording(null)
-      // Tanpa Whisper, minta user ketik manual
       setLoading(false)
       Alert.alert(
         '🎤 Voice Note',
-        'Rekaman selesai! Ketik transaksinya di chat ya (contoh: "beli nasi 15 ribu")',
+        'Rekaman selesai! Ketik transaksinya di chat ya (contoh: "beli nasi 15 ribu tadi siang")',
         [{ text: 'OK' }]
       )
     } catch {
@@ -169,6 +236,25 @@ Format jawaban natural dan friendly, bukan JSON.`)
       Alert.alert('Error', 'Gagal memproses rekaman.')
     }
   }
+
+  const getPersonaLabel = () => {
+    const labels: Record<Persona, string> = {
+      bestie: 'Si Bestie',
+      advisor: 'Pak/Bu Advisor',
+      kakak: 'Kak Zena',
+      adek: 'Dek Zena',
+      pacar: 'Si Sayang',
+      stoic: 'Mentor Zen',
+    }
+    return labels[persona] || 'Zena AI'
+  }
+
+  if (initLoading) return (
+    <View style={styles.loadingWrap}>
+      <ActivityIndicator color={PRIMARY} />
+      <Text style={styles.loadingText}>Zena lagi nyiapin konteks keuangan kamu...</Text>
+    </View>
+  )
 
   return (
     <KeyboardAvoidingView
@@ -182,7 +268,7 @@ Format jawaban natural dan friendly, bukan JSON.`)
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Zena AI</Text>
-          <Text style={styles.headerSub}>Si Bestie • Online</Text>
+          <Text style={styles.headerSub}>{getPersonaLabel()} · Online</Text>
         </View>
         <View style={{ width: 80 }} />
       </View>
@@ -214,7 +300,10 @@ Format jawaban natural dan friendly, bukan JSON.`)
               <Text style={styles.avatarText}>Z</Text>
             </View>
             <View style={styles.bubbleAI}>
-              <ActivityIndicator size="small" color={PRIMARY} />
+              <View style={styles.typingDots}>
+                <ActivityIndicator size="small" color={PRIMARY} />
+                <Text style={styles.typingText}>Zena lagi mikir...</Text>
+              </View>
             </View>
           </View>
         )}
@@ -247,12 +336,11 @@ Format jawaban natural dan friendly, bukan JSON.`)
         </TouchableOpacity>
         <TextInput
           style={styles.input}
-          placeholder="Ketik pesan..."
+          placeholder="Tanya Zena apa aja..."
           placeholderTextColor="#888780"
           value={input}
           onChangeText={setInput}
           multiline
-          onSubmitEditing={() => sendMessage()}
         />
         <TouchableOpacity
           style={[styles.sendBtn, (!input.trim() || loading) && styles.sendBtnDisabled]}
@@ -268,6 +356,8 @@ Format jawaban natural dan friendly, bukan JSON.`)
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F0F' },
+  loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { fontSize: 13, color: '#888780' },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
@@ -294,6 +384,8 @@ const styles = StyleSheet.create({
   bubbleUser: { backgroundColor: PRIMARY },
   bubbleText: { fontSize: 14, color: '#fff', lineHeight: 20 },
   bubbleTextUser: { color: '#fff' },
+  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  typingText: { fontSize: 12, color: '#888780' },
   quickScroll: { maxHeight: 44, borderTopWidth: 0.5, borderTopColor: '#1A1A1A' },
   quickContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 8 },
   quickBtn: {

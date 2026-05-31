@@ -9,6 +9,11 @@ import { supabase } from '../lib/supabase'
 import { CATEGORIES } from '../types'
 
 const PRIMARY = '#185FA5'
+const GREEN = '#1D9E75'
+const RED = '#E24B4A'
+const PURPLE = '#534AB7'
+
+type TxType = 'expense' | 'income' | 'transfer'
 
 type Wallet = {
   id: string
@@ -18,14 +23,91 @@ type Wallet = {
   current_balance: number
 }
 
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
+
+function DatePicker({ value, onChange }: { value: string, onChange: (d: string) => void }) {
+  const today = new Date()
+  const [viewYear, setViewYear] = useState(today.getFullYear())
+  const [viewMonth, setViewMonth] = useState(today.getMonth())
+
+  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate()
+  const getFirstDay = (y: number, m: number) => new Date(y, m, 1).getDay()
+
+  const prevMonth = () => {
+    if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
+    else setViewMonth(m => m - 1)
+  }
+  const nextMonth = () => {
+    if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1) }
+    else setViewMonth(m => m + 1)
+  }
+
+  const days = getDaysInMonth(viewYear, viewMonth)
+  const firstDay = getFirstDay(viewYear, viewMonth)
+  const cells = Array(firstDay).fill(null).concat(Array.from({ length: days }, (_, i) => i + 1))
+
+  return (
+    <View style={dpStyles.wrap}>
+      <View style={dpStyles.header}>
+        <TouchableOpacity onPress={prevMonth}><Text style={dpStyles.arrow}>‹</Text></TouchableOpacity>
+        <Text style={dpStyles.monthYear}>{MONTHS[viewMonth]} {viewYear}</Text>
+        <TouchableOpacity onPress={nextMonth}><Text style={dpStyles.arrow}>›</Text></TouchableOpacity>
+      </View>
+      <View style={dpStyles.dayNames}>
+        {['Min','Sen','Sel','Rab','Kam','Jum','Sab'].map(d => (
+          <Text key={d} style={dpStyles.dayName}>{d}</Text>
+        ))}
+      </View>
+      <View style={dpStyles.grid}>
+        {cells.map((day, i) => {
+          if (!day) return <View key={`e-${i}`} style={dpStyles.cell} />
+          const dateStr = `${viewYear}-${String(viewMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`
+          const isSelected = value === dateStr
+          const isToday = day === today.getDate() && viewMonth === today.getMonth() && viewYear === today.getFullYear()
+          return (
+            <TouchableOpacity
+              key={dateStr}
+              style={[dpStyles.cell, isSelected && dpStyles.cellSelected, isToday && !isSelected && dpStyles.cellToday]}
+              onPress={() => onChange(dateStr)}
+            >
+              <Text style={[dpStyles.cellText, isSelected && dpStyles.cellTextSelected, isToday && !isSelected && dpStyles.cellTextToday]}>
+                {day}
+              </Text>
+            </TouchableOpacity>
+          )
+        })}
+      </View>
+    </View>
+  )
+}
+
+const dpStyles = StyleSheet.create({
+  wrap: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12, marginBottom: 16 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  arrow: { fontSize: 22, color: PRIMARY, paddingHorizontal: 8 },
+  monthYear: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  dayNames: { flexDirection: 'row', marginBottom: 4 },
+  dayName: { flex: 1, textAlign: 'center', fontSize: 11, color: '#888780' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap' },
+  cell: { width: '14.28%', aspectRatio: 1, alignItems: 'center', justifyContent: 'center' },
+  cellSelected: { backgroundColor: PRIMARY, borderRadius: 20 },
+  cellToday: { borderWidth: 1, borderColor: PRIMARY, borderRadius: 20 },
+  cellText: { fontSize: 13, color: '#fff' },
+  cellTextSelected: { fontWeight: '700', color: '#fff' },
+  cellTextToday: { color: PRIMARY, fontWeight: '600' },
+})
+
 export default function TambahTransaksiScreen() {
-  const [type, setType] = useState<'expense' | 'income'>('expense')
+  const [type, setType] = useState<TxType>('expense')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [note, setNote] = useState('')
   const [loading, setLoading] = useState(false)
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [selectedWallet, setSelectedWallet] = useState<string>('')
+  const [toWallet, setToWallet] = useState<string>('')
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [showDatePicker, setShowDatePicker] = useState(false)
 
   useEffect(() => {
     fetchWallets()
@@ -41,16 +123,72 @@ export default function TambahTransaksiScreen() {
     if (data && data.length > 0) {
       setWallets(data)
       setSelectedWallet(data[0].id)
+      setToWallet(data.length > 1 ? data[1].id : data[0].id)
     }
   }
 
+  const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID')
+
+  const formatDateLabel = (d: string) => {
+    const [y, m, day] = d.split('-')
+    return `${day} ${MONTHS[parseInt(m) - 1]} ${y}`
+  }
+
+  const getBudgetWarning = async (userId: string): Promise<string | null> => {
+    const { data: prefs } = await supabase
+      .from('user_preferences')
+      .select('monthly_income, budget_method')
+      .eq('user_id', userId)
+      .single()
+
+    if (!prefs?.monthly_income) return null
+
+    const currentMonth = new Date().toISOString().slice(0, 7)
+    const { data: expenses } = await supabase
+      .from('transactions')
+      .select('amount')
+      .eq('user_id', userId)
+      .eq('type', 'expense')
+      .eq('is_wallet_transfer', false)
+      .gte('date', currentMonth + '-01')
+      .lte('date', currentMonth + '-31')
+
+    const totalExpense = (expenses || []).reduce((sum: number, t: { amount: number }) => sum + t.amount, 0)
+
+    let spendingBudget = prefs.monthly_income
+    const method = prefs.budget_method
+    if (method === '503020') spendingBudget = prefs.monthly_income * 0.8
+    else if (method === '703010') spendingBudget = prefs.monthly_income * 0.9
+    else if (method === 'payfirst') spendingBudget = prefs.monthly_income * 0.75
+    else if (method === 'zero' || method === 'envelope') spendingBudget = prefs.monthly_income * 0.9
+
+    const pct = Math.round((totalExpense / spendingBudget) * 100)
+
+    if (pct >= 100) return `🚨 Budget bulan ini sudah ${pct}%! Total pengeluaran: ${formatRupiah(totalExpense)}`
+    if (pct >= 90) return `⚠️ Budget sudah ${pct}%. Sisa: ${formatRupiah(spendingBudget - totalExpense)}`
+    if (pct >= 75) return `💡 Budget sudah ${pct}% bulan ini.`
+    return null
+  }
+
   const handleSave = async () => {
-    if (!amount || !category) {
-      Alert.alert('Oops', 'Nominal dan kategori harus diisi ya')
+    if (!amount) {
+      Alert.alert('Oops', 'Nominal harus diisi ya')
+      return
+    }
+    if (type !== 'transfer' && !category) {
+      Alert.alert('Oops', 'Kategori harus diisi ya')
       return
     }
     if (!selectedWallet) {
       Alert.alert('Oops', 'Pilih dompet dulu ya')
+      return
+    }
+    if (type === 'transfer' && wallets.length <= 1) {
+      Alert.alert('Oops', 'Butuh minimal 2 dompet untuk transfer')
+      return
+    }
+    if (type === 'transfer' && toWallet === selectedWallet) {
+      Alert.alert('Oops', 'Dompet asal dan tujuan tidak boleh sama')
       return
     }
 
@@ -58,41 +196,108 @@ export default function TambahTransaksiScreen() {
     const { data: { user } } = await supabase.auth.getUser()
     const nominal = parseFloat(amount.replace(/\./g, ''))
 
-    // Simpan transaksi
-    const { error } = await supabase.from('transactions').insert({
-      user_id: user?.id,
-      amount: nominal,
-      type,
-      category,
-      note,
-      source: 'manual',
-      is_categorized: true,
-      date: new Date().toISOString().split('T')[0],
-      wallet_source: selectedWallet,
-    })
+    if (type === 'transfer') {
+      const fromWalletData = wallets.find(w => w.id === selectedWallet)
+      const toWalletData = wallets.find(w => w.id === toWallet)
 
-    if (error) {
-      Alert.alert('Gagal', error.message)
+      if (!fromWalletData || !toWalletData) {
+        Alert.alert('Error', 'Data dompet tidak ditemukan')
+        setLoading(false)
+        return
+      }
+
+      if (fromWalletData.current_balance < nominal) {
+        Alert.alert('Saldo Tidak Cukup', `Saldo ${fromWalletData.wallet_name}: ${formatRupiah(fromWalletData.current_balance)}`)
+        setLoading(false)
+        return
+      }
+
+      // Buat ID unik untuk linking kedua transaksi
+      const chainId = `transfer-${Date.now()}`
+
+      const { data: expenseTxn, error: e1 } = await supabase.from('transactions').insert({
+        user_id: user?.id,
+        amount: nominal,
+        type: 'expense',
+        category: 'Transfer',
+        note: `Transfer ke ${toWalletData.wallet_name}${note ? ' · ' + note : ''}`,
+        source: 'manual',
+        is_categorized: true,
+        is_wallet_transfer: true,
+        transaction_chain: chainId,
+        wallet_source: selectedWallet,
+        wallet_id: selectedWallet,
+        date: selectedDate,
+      }).select().single()
+
+      if (e1) { Alert.alert('Gagal', e1.message); setLoading(false); return }
+
+      const { error: e2 } = await supabase.from('transactions').insert({
+        user_id: user?.id,
+        amount: nominal,
+        type: 'income',
+        category: 'Transfer',
+        note: `Transfer dari ${fromWalletData.wallet_name}${note ? ' · ' + note : ''}`,
+        source: 'manual',
+        is_categorized: true,
+        is_wallet_transfer: true,
+        transaction_chain: chainId,
+        parent_transaction_id: expenseTxn?.id || null,
+        wallet_source: toWallet,
+        wallet_id: toWallet,
+        date: selectedDate,
+      })
+
+      if (e2) { Alert.alert('Gagal', e2.message); setLoading(false); return }
+
+      await supabase.from('user_wallets').update({ current_balance: fromWalletData.current_balance - nominal }).eq('id', selectedWallet)
+      await supabase.from('user_wallets').update({ current_balance: toWalletData.current_balance + nominal }).eq('id', toWallet)
+
+      Alert.alert('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`, [
+        { text: 'OK', onPress: () => router.back() }
+      ])
+    } else {
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user?.id,
+        amount: nominal,
+        type,
+        category,
+        note,
+        source: 'manual',
+        is_categorized: true,
+        is_wallet_transfer: false,
+        wallet_source: selectedWallet,
+        wallet_id: selectedWallet,
+        date: selectedDate,
+      })
+
+      if (error) {
+        Alert.alert('Gagal', error.message)
+        setLoading(false)
+        return
+      }
+
+      const wallet = wallets.find(w => w.id === selectedWallet)
+      if (wallet) {
+        const newBalance = type === 'income'
+          ? wallet.current_balance + nominal
+          : wallet.current_balance - nominal
+        await supabase.from('user_wallets').update({ current_balance: newBalance }).eq('id', selectedWallet)
+      }
+
+      let budgetMsg = ''
+      if (type === 'expense' && user?.id) {
+        const warning = await getBudgetWarning(user.id)
+        if (warning) budgetMsg = '\n\n' + warning
+      }
+
       setLoading(false)
+      Alert.alert('Berhasil! ✅', `Transaksi berhasil dicatat${budgetMsg}`, [
+        { text: 'OK', onPress: () => router.back() }
+      ])
       return
     }
 
-    // Update current_balance di wallet
-    const wallet = wallets.find(w => w.id === selectedWallet)
-    if (wallet) {
-      const newBalance = type === 'income'
-        ? wallet.current_balance + nominal
-        : wallet.current_balance - nominal
-
-      await supabase
-        .from('user_wallets')
-        .update({ current_balance: newBalance })
-        .eq('id', selectedWallet)
-    }
-
-    Alert.alert('Berhasil! ✅', 'Transaksi berhasil dicatat', [
-      { text: 'OK', onPress: () => router.back() }
-    ])
     setLoading(false)
   }
 
@@ -102,7 +307,7 @@ export default function TambahTransaksiScreen() {
     setAmount(formatted)
   }
 
-  const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID')
+  const typeColor = type === 'expense' ? RED : type === 'income' ? GREEN : PURPLE
 
   return (
     <KeyboardAvoidingView
@@ -121,26 +326,24 @@ export default function TambahTransaksiScreen() {
 
         {/* Type Toggle */}
         <View style={styles.typeToggle}>
-          <TouchableOpacity
-            style={[styles.typeBtn, type === 'expense' && styles.typeBtnExpense]}
-            onPress={() => setType('expense')}
-          >
-            <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>
-              💸 Pengeluaran
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeBtn, type === 'income' && styles.typeBtnIncome]}
-            onPress={() => setType('income')}
-          >
-            <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>
-              💰 Pemasukan
-            </Text>
-          </TouchableOpacity>
+          {(['expense', 'income', 'transfer'] as TxType[]).map((t) => (
+            <TouchableOpacity
+              key={t}
+              style={[
+                styles.typeBtn,
+                type === t && { backgroundColor: t === 'expense' ? RED : t === 'income' ? GREEN : PURPLE }
+              ]}
+              onPress={() => setType(t)}
+            >
+              <Text style={[styles.typeText, type === t && styles.typeTextActive]}>
+                {t === 'expense' ? '💸 Keluar' : t === 'income' ? '💰 Masuk' : '🔄 Transfer'}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Amount */}
-        <View style={styles.amountWrap}>
+        <View style={[styles.amountWrap, { borderColor: typeColor }]}>
           <Text style={styles.amountPrefix}>Rp</Text>
           <TextInput
             style={styles.amountInput}
@@ -152,45 +355,97 @@ export default function TambahTransaksiScreen() {
           />
         </View>
 
+        {/* Date */}
+        <Text style={styles.label}>Tanggal</Text>
+        <TouchableOpacity
+          style={styles.dateBtn}
+          onPress={() => setShowDatePicker(!showDatePicker)}
+        >
+          <Text style={styles.dateBtnText}>📅 {formatDateLabel(selectedDate)}</Text>
+          <Text style={styles.dateBtnArrow}>{showDatePicker ? '▲' : '▼'}</Text>
+        </TouchableOpacity>
+        {showDatePicker && (
+          <DatePicker value={selectedDate} onChange={(d) => { setSelectedDate(d); setShowDatePicker(false) }} />
+        )}
+
         {/* Wallet */}
         {wallets.length > 0 && (
           <>
-            <Text style={styles.label}>Dompet</Text>
-            <View style={styles.walletRow}>
-              {wallets.map((w) => (
+            <Text style={styles.label}>{type === 'transfer' ? 'Dari Dompet' : 'Dompet'}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={styles.walletRow}>
+                {wallets.map((w) => (
+                  <TouchableOpacity
+                    key={w.id}
+                    style={[styles.walletBtn, selectedWallet === w.id && styles.walletBtnActive]}
+                    onPress={() => setSelectedWallet(w.id)}
+                  >
+                    <Text style={styles.walletIcon}>{w.icon}</Text>
+                    <View>
+                      <Text style={[styles.walletName, selectedWallet === w.id && styles.walletNameActive]}>
+                        {w.wallet_name}
+                      </Text>
+                      <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </>
+        )}
+
+        {/* To Wallet (transfer only) */}
+        {type === 'transfer' && wallets.length <= 1 && (
+          <View style={styles.transferWarning}>
+            <Text style={styles.transferWarningText}>
+              ⚠️ Butuh minimal 2 dompet untuk transfer. Tambah dompet baru dulu di tab Profil.
+            </Text>
+          </View>
+        )}
+        {type === 'transfer' && wallets.length > 1 && (
+          <>
+            <Text style={styles.label}>Ke Dompet</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+              <View style={styles.walletRow}>
+                {wallets.filter(w => w.id !== selectedWallet).map((w) => (
+                  <TouchableOpacity
+                    key={w.id}
+                    style={[styles.walletBtn, toWallet === w.id && { borderColor: PURPLE, borderWidth: 2 }]}
+                    onPress={() => setToWallet(w.id)}
+                  >
+                    <Text style={styles.walletIcon}>{w.icon}</Text>
+                    <View>
+                      <Text style={[styles.walletName, toWallet === w.id && { color: PURPLE }]}>
+                        {w.wallet_name}
+                      </Text>
+                      <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </>
+        )}
+
+        {/* Category (bukan transfer) */}
+        {type !== 'transfer' && (
+          <>
+            <Text style={styles.label}>Kategori</Text>
+            <View style={styles.categoryGrid}>
+              {CATEGORIES.map((cat) => (
                 <TouchableOpacity
-                  key={w.id}
-                  style={[styles.walletBtn, selectedWallet === w.id && styles.walletBtnActive]}
-                  onPress={() => setSelectedWallet(w.id)}
+                  key={cat}
+                  style={[styles.catBtn, category === cat && { backgroundColor: typeColor, borderColor: typeColor }]}
+                  onPress={() => setCategory(cat)}
                 >
-                  <Text style={styles.walletIcon}>{w.icon}</Text>
-                  <View>
-                    <Text style={[styles.walletName, selectedWallet === w.id && styles.walletNameActive]}>
-                      {w.wallet_name}
-                    </Text>
-                    <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
-                  </View>
+                  <Text style={[styles.catText, category === cat && styles.catTextActive]}>
+                    {cat}
+                  </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </>
         )}
-
-        {/* Category */}
-        <Text style={styles.label}>Kategori</Text>
-        <View style={styles.categoryGrid}>
-          {CATEGORIES.map((cat) => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.catBtn, category === cat && styles.catBtnActive]}
-              onPress={() => setCategory(cat)}
-            >
-              <Text style={[styles.catText, category === cat && styles.catTextActive]}>
-                {cat}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* Note */}
         <Text style={styles.label}>Catatan (opsional)</Text>
@@ -204,13 +459,15 @@ export default function TambahTransaksiScreen() {
         />
 
         <TouchableOpacity
-          style={styles.saveBtn}
+          style={[styles.saveBtn, { backgroundColor: typeColor }]}
           onPress={handleSave}
           disabled={loading}
         >
           {loading
             ? <ActivityIndicator color="#fff" />
-            : <Text style={styles.saveBtnText}>Simpan Transaksi</Text>
+            : <Text style={styles.saveBtnText}>
+                {type === 'transfer' ? '🔄 Simpan Transfer' : '✅ Simpan Transaksi'}
+              </Text>
           }
         </TouchableOpacity>
 
@@ -233,26 +490,31 @@ const styles = StyleSheet.create({
   scroll: { flex: 1, paddingHorizontal: 20 },
   typeToggle: {
     flexDirection: 'row', backgroundColor: '#1A1A1A',
-    borderRadius: 12, padding: 3, marginTop: 20, marginBottom: 24, gap: 3,
+    borderRadius: 12, padding: 3, marginTop: 20, marginBottom: 20, gap: 3,
   },
   typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  typeBtnExpense: { backgroundColor: '#E24B4A' },
-  typeBtnIncome: { backgroundColor: '#1D9E75' },
-  typeText: { fontSize: 13, color: '#888780', fontWeight: '500' },
+  typeText: { fontSize: 12, color: '#888780', fontWeight: '500' },
   typeTextActive: { color: '#fff', fontWeight: '600' },
   amountWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1A1A',
-    borderRadius: 16, paddingHorizontal: 20, marginBottom: 28,
-    borderWidth: 0.5, borderColor: '#2A2A2A',
+    borderRadius: 16, paddingHorizontal: 20, marginBottom: 20,
+    borderWidth: 1.5,
   },
   amountPrefix: { fontSize: 24, color: '#888780', marginRight: 8 },
   amountInput: { flex: 1, fontSize: 32, fontWeight: '600', color: '#fff', paddingVertical: 16 },
   label: { fontSize: 12, fontWeight: '600', color: '#888780', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
-  walletRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  dateBtn: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 12, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  dateBtnText: { fontSize: 14, color: '#fff' },
+  dateBtnArrow: { fontSize: 12, color: '#888780' },
+  walletRow: { flexDirection: 'row', gap: 10 },
   walletBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10,
+    flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12,
-    borderWidth: 0.5, borderColor: '#2A2A2A',
+    borderWidth: 0.5, borderColor: '#2A2A2A', minWidth: 140,
   },
   walletBtnActive: { borderColor: PRIMARY, borderWidth: 2 },
   walletIcon: { fontSize: 22 },
@@ -264,7 +526,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
     backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
-  catBtnActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
   catText: { fontSize: 12, color: '#888780' },
   catTextActive: { color: '#fff', fontWeight: '600' },
   noteInput: {
@@ -273,8 +534,13 @@ const styles = StyleSheet.create({
     minHeight: 80, marginBottom: 24, textAlignVertical: 'top',
   },
   saveBtn: {
-    height: 52, backgroundColor: PRIMARY, borderRadius: 14,
+    height: 52, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  transferWarning: {
+    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14,
+    borderWidth: 1, borderColor: '#BA7517', marginBottom: 16,
+  },
+  transferWarningText: { fontSize: 13, color: '#BA7517', lineHeight: 20 },
 })

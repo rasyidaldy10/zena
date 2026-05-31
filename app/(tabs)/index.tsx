@@ -1,289 +1,518 @@
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native'
+import {
+  View, Text, StyleSheet, ScrollView,
+  TouchableOpacity, ActivityIndicator, Alert,
+} from 'react-native'
 import { useState, useCallback } from 'react'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '../../lib/supabase'
-import { Transaction, UserWallet } from '../../types'
+import { Transaction, UserWallet, TIER_CONFIG, TierName } from '../../types'
+import { calculateFinancialScore, getNextTier } from '../../lib/scoring'
 
 const PRIMARY = '#185FA5'
 
-export default function DashboardScreen() {
-  const [mode, setMode] = useState<'personal' | 'business'>('personal')
-  const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [wallets, setWallets] = useState<UserWallet[]>([])
-  const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [totalBalance, setTotalBalance] = useState(0)
-  const [nickname, setNickname] = useState('')
+const CATEGORY_EMOJI: Record<string, string> = {
+  'Makan & Minum': '🍔', 'Transport': '🚗', 'Belanja': '🛍️',
+  'Tagihan': '📋', 'Hiburan': '🎮', 'Kesehatan': '💊',
+  'Bisnis': '💼', 'Investasi': '📈', 'Tabungan': '🏦',
+  'Biaya Admin & Fee': '💳', 'Lainnya': '📦', 'Transfer': '🔄',
+}
 
-  const fetchData = async (walletFilter: string | null = null) => {
+export default function DashboardScreen() {
+  const [loading, setLoading] = useState(true)
+  const [nickname, setNickname] = useState('')
+  const [totalBalance, setTotalBalance] = useState(0)
+  const [monthBalance, setMonthBalance] = useState(0)
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [score, setScore] = useState<ReturnType<typeof calculateFinancialScore> | null>(null)
+  const [streak, setStreak] = useState(0)
+  const [daysInBudget, setDaysInBudget] = useState(0)
+  const [monthlyIncome, setMonthlyIncome] = useState(0)
+
+  const fetchData = async () => {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { data: prefs } = await supabase
-      .from('user_preferences')
-      .select('nickname')
-      .eq('user_id', user?.id)
-      .single()
-    if (prefs?.nickname) setNickname(prefs.nickname)
+    const [
+      { data: prefs },
+      { data: walletsData },
+      { data: allTxnsData },
+      { data: monthTxnsData },
+    ] = await Promise.all([
+      supabase.from('user_preferences').select('*').eq('user_id', user?.id).single(),
+      supabase.from('user_wallets').select('*').eq('user_id', user?.id).eq('is_active', true).order('created_at', { ascending: true }),
+      supabase.from('transactions').select('*').eq('user_id', user?.id)
+        .gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 90); return d.toISOString().split('T')[0] })())
+        .order('date', { ascending: false }),
+      supabase.from('transactions').select('*').eq('user_id', user?.id)
+        .gte('date', new Date().toISOString().slice(0, 7) + '-01')
+        .lte('date', new Date().toISOString().slice(0, 7) + '-31')
+        .order('date', { ascending: false }),
+    ])
 
-    const { data: walletsData } = await supabase
-      .from('user_wallets')
-      .select('id, wallet_name, wallet_type, current_balance, color, icon, is_active')
-      .eq('user_id', user?.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: true })
+    if (prefs?.nickname) setNickname(prefs.nickname)
+    if (prefs?.monthly_income) setMonthlyIncome(prefs.monthly_income)
 
     if (walletsData) {
-      setWallets(walletsData as UserWallet[])
-      const total = walletsData.reduce((sum: number, w: any) => sum + (w.current_balance || 0), 0)
+      const total = walletsData.reduce((s: number, w: any) => s + (w.current_balance || 0), 0)
       setTotalBalance(total)
     }
 
-    let query = supabase
-      .from('transactions')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('created_at', { ascending: false })
-      .limit(10)
+    const allTxns = (allTxnsData || []) as Transaction[]
+    const monthTxns = (monthTxnsData || []) as Transaction[]
+    setTransactions(monthTxns)
 
-    if (walletFilter) {
-      query = query.eq('wallet_id', walletFilter)
-    }
+    const streakDays = calcStreak(allTxns)
+    setStreak(streakDays)
 
-    const { data } = await query
-    if (data) setTransactions(data)
+    const scoreData = calculateFinancialScore(allTxns, prefs?.monthly_income || 0, streakDays)
+    setScore(scoreData)
+
+    const income = monthTxns.filter(t => t.type === 'income' && !t.is_wallet_transfer).reduce((s, t) => s + t.amount, 0)
+    const expense = monthTxns.filter(t => t.type === 'expense' && !t.is_wallet_transfer).reduce((s, t) => s + t.amount, 0)
+    setMonthBalance(income - expense)
+
+    setDaysInBudget(calcDaysInBudget(monthTxns, prefs?.monthly_income || 0))
 
     setLoading(false)
   }
 
-  useFocusEffect(useCallback(() => { fetchData(selectedWalletId) }, []))
+  useFocusEffect(useCallback(() => { fetchData() }, []))
 
-  const handleSelectWallet = (walletId: string) => {
-    const newId = selectedWalletId === walletId ? null : walletId
-    setSelectedWalletId(newId)
-    fetchData(newId)
+  const calcStreak = (txns: Transaction[]): number => {
+    const dates = new Set(txns.filter(t => !t.is_wallet_transfer).map(t => t.date))
+    let s = 0
+    const today = new Date()
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today)
+      d.setDate(d.getDate() - i)
+      if (dates.has(d.toISOString().split('T')[0])) s++
+      else break
+    }
+    return s
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.replace('/(auth)/login')
+  const calcDaysInBudget = (txns: Transaction[], income: number): number => {
+    if (!income) return 0
+    const today = new Date()
+    const totalDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+    const dailyBudget = income / totalDays
+    const byDate: Record<string, number> = {}
+    txns.filter(t => t.type === 'expense' && !t.is_wallet_transfer).forEach(t => {
+      byDate[t.date] = (byDate[t.date] || 0) + t.amount
+    })
+    let ok = 0, checked = 0
+    for (let i = 1; i <= today.getDate(); i++) {
+      const d = new Date(today.getFullYear(), today.getMonth(), i)
+      if (d > today) break
+      checked++
+      const dateStr = d.toISOString().split('T')[0]
+      if ((byDate[dateStr] || 0) <= dailyBudget) ok++
+    }
+    return checked > 0 ? Math.round((ok / checked) * 100) : 100
   }
 
-  const formatRupiah = (amount: number) =>
-    'Rp ' + Math.abs(amount).toLocaleString('id-ID')
+  const fmt = (n: number, short = false) => {
+    if (short) {
+      const abs = Math.abs(n)
+      if (abs >= 1_000_000) return `Rp ${(abs / 1_000_000).toFixed(1)}jt`
+      if (abs >= 1_000) return `Rp ${(abs / 1_000).toFixed(0)}rb`
+      return `Rp ${abs}`
+    }
+    return 'Rp ' + Math.abs(n).toLocaleString('id-ID')
+  }
 
   const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Selamat pagi'
-    if (hour < 15) return 'Selamat siang'
-    if (hour < 18) return 'Selamat sore'
-    return 'Selamat malam'
+    const h = new Date().getHours()
+    if (h < 12) return 'Pagi'
+    if (h < 15) return 'Siang'
+    if (h < 18) return 'Sore'
+    return 'Malam'
   }
 
-  const getCategoryEmoji = (category: string) => {
-    const map: Record<string, string> = {
-      'Makan & Minum': '🍔', 'Transport': '🚗', 'Belanja': '🛍️',
-      'Tagihan': '📋', 'Hiburan': '🎮', 'Kesehatan': '💊',
-      'Bisnis': '💼', 'Investasi': '📈', 'Tabungan': '🏦',
-      'Biaya Admin & Fee': '💳', 'Lainnya': '📦',
-    }
-    return map[category] || '📦'
+  const tierName = (score?.tier || 'Starter') as TierName
+  const tierCfg = TIER_CONFIG[tierName]
+  const nextTierName = getNextTier(tierName)
+  const nextTierCfg = nextTierName ? TIER_CONFIG[nextTierName] : null
+  const xpPct = nextTierCfg
+    ? Math.min(100, Math.round(((score?.total || 0) - tierCfg.min) / (nextTierCfg.min - tierCfg.min) * 100))
+    : 100
+  const initials = nickname ? nickname.slice(0, 2).toUpperCase() : 'ZN'
+
+  const leaderboard = [
+    { rank: 1, name: 'Rizal P', tier: 'Platinum' as TierName, score: 88, isMe: false },
+    { rank: 2, name: nickname || 'Kamu', tier: tierName, score: score?.total || 0, isMe: true },
+    { rank: 3, name: 'Dani K', tier: 'Silver' as TierName, score: 61, isMe: false },
+  ].sort((a, b) => b.score - a.score).map((item, i) => ({ ...item, rank: i + 1 }))
+
+  const handleLogout = () => {
+    Alert.alert('Keluar', 'Yakin mau keluar?', [
+      { text: 'Batal', style: 'cancel' },
+      { text: 'Keluar', style: 'destructive', onPress: async () => {
+        await supabase.auth.signOut()
+        router.replace('/(auth)/login')
+      }},
+    ])
   }
 
-  const selectedWallet = wallets.find(w => w.id === selectedWalletId)
+  if (loading) return (
+    <View style={styles.loadingWrap}>
+      <ActivityIndicator color={PRIMARY} size="large" />
+      <Text style={styles.loadingText}>Memuat data keuanganmu...</Text>
+    </View>
+  )
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
+
+      {/* ── HEADER ── */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>{getGreeting()}, {nickname || 'Kamu'} 👋</Text>
-          <Text style={styles.appName}>Zena</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profil')}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </TouchableOpacity>
+          <View>
+            <Text style={styles.greeting}>Selamat {getGreeting()}</Text>
+            <Text style={styles.name}>{nickname || 'Kamu'} 👋</Text>
+          </View>
         </View>
-        <TouchableOpacity onPress={handleLogout}>
-          <Text style={styles.logoutText}>Keluar</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/(tabs)/reminder')}>
+            <Text style={styles.iconBtnText}>🔔</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconBtn} onPress={handleLogout}>
+            <Text style={styles.iconBtnText}>↪️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.toggleWrap}>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'personal' && styles.toggleBtnActive]}
-          onPress={() => setMode('personal')}
-        >
-          <Text style={[styles.toggleText, mode === 'personal' && styles.toggleTextActive]}>Pribadi</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.toggleBtn, mode === 'business' && styles.toggleBtnActive]}
-          onPress={() => setMode('business')}
-        >
-          <Text style={[styles.toggleText, mode === 'business' && styles.toggleTextActive]}>Bisnis</Text>
-        </TouchableOpacity>
-      </View>
+      {/* ── TIER CARD ── */}
+      <View style={[styles.tierCard, { borderColor: tierCfg.color + '60' }]}>
+        <View style={styles.tierGlow} pointerEvents="none" />
 
-      <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
-        {/* Balance Card */}
-        <View style={styles.balanceCard}>
-          <Text style={styles.balanceLabel}>
-            {mode === 'personal' ? 'Total saldo pribadi' : 'Total saldo bisnis'}
-          </Text>
-          <Text style={styles.balanceAmount}>{formatRupiah(totalBalance)}</Text>
-          <Text style={styles.balanceSub}>
-            {wallets.length} dompet aktif
-          </Text>
-        </View>
-
-        {/* Dompet Saya */}
-        {wallets.length > 0 && (
-          <>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Dompet Saya</Text>
-              <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
-                <Text style={styles.sectionAction}>+ Tambah</Text>
-              </TouchableOpacity>
+        <View style={styles.tierTopRow}>
+          <View style={styles.tierBadge}>
+            <View style={[styles.tierEmojiWrap, { backgroundColor: tierCfg.color + '20' }]}>
+              <Text style={styles.tierEmoji}>{tierCfg.icon}</Text>
             </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.walletScroll}
-              contentContainerStyle={styles.walletScrollContent}
-            >
-              {wallets.map((wallet) => {
-                const isSelected = selectedWalletId === wallet.id
-                return (
-                  <TouchableOpacity
-                    key={wallet.id}
-                    style={[
-                      styles.walletCard,
-                      { borderColor: wallet.color || PRIMARY },
-                      isSelected && { backgroundColor: wallet.color || PRIMARY },
-                    ]}
-                    onPress={() => handleSelectWallet(wallet.id)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.walletIcon}>{wallet.icon || '💰'}</Text>
-                    <Text style={[styles.walletName, isSelected && styles.walletNameSelected]} numberOfLines={1}>
-                      {wallet.wallet_name}
-                    </Text>
-                    <Text style={[styles.walletBalance, isSelected && styles.walletBalanceSelected]}>
-                      {formatRupiah(wallet.current_balance)}
-                    </Text>
-                  </TouchableOpacity>
-                )
-              })}
-            </ScrollView>
-          </>
-        )}
-
-        {/* Quick Actions */}
-        <Text style={styles.sectionTitle}>Aksi cepat</Text>
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/tambah-transaksi')}>
-            <Text style={styles.qaIcon}>➕</Text>
-            <Text style={styles.qaLabel}>Catat</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.qaBtn} onPress={() => router.push('/chat')}>
-            <Text style={styles.qaIcon}>🤖</Text>
-            <Text style={styles.qaLabel}>AI Chat</Text>
-          </TouchableOpacity>
+            <View>
+              <Text style={[styles.tierRankName, { color: tierCfg.color }]}>{tierName}</Text>
+              <Text style={styles.tierRankLabel}>Financial Rank</Text>
+            </View>
+          </View>
+          <View style={styles.tierScoreWrap}>
+            <Text style={[styles.tierScoreNum, { color: tierCfg.color }]}>{score?.total ?? 0}</Text>
+            <Text style={styles.tierScoreUnit}>/ 100 XP</Text>
+          </View>
         </View>
 
-        {/* Transaksi */}
-        <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>
-            {selectedWallet ? `Transaksi: ${selectedWallet.wallet_name}` : 'Transaksi terakhir'}
-          </Text>
-          {selectedWalletId && (
-            <TouchableOpacity onPress={() => { setSelectedWalletId(null); fetchData(null) }}>
-              <Text style={styles.sectionAction}>Semua</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {loading ? (
-          <ActivityIndicator color={PRIMARY} style={{ marginTop: 20 }} />
-        ) : transactions.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>💸</Text>
-            <Text style={styles.emptyText}>Belum ada transaksi</Text>
-            <Text style={styles.emptySubtext}>
-              {selectedWalletId ? 'Di dompet ini belum ada transaksi' : 'Mulai catat pengeluaran pertamamu!'}
+        <View style={styles.tierBalanceRow}>
+          <View>
+            <Text style={styles.tierBalLabel}>Total Saldo</Text>
+            <Text style={styles.tierBalAmount}>{fmt(totalBalance)}</Text>
+          </View>
+          <View style={styles.tierChangePill}>
+            <Text style={[styles.tierChangeText, { color: monthBalance >= 0 ? '#1D9E75' : '#E24B4A' }]}>
+              {monthBalance >= 0 ? '↑' : '↓'} {fmt(monthBalance, true)} bulan ini
             </Text>
           </View>
-        ) : (
-          transactions.map((txn) => (
-            <View key={txn.id} style={styles.txnItem}>
-              <View style={styles.txnIcon}>
-                <Text style={styles.txnEmoji}>{getCategoryEmoji(txn.category)}</Text>
-              </View>
-              <View style={styles.txnInfo}>
-                <Text style={styles.txnCategory}>{txn.category}</Text>
-                <Text style={styles.txnDate}>{txn.date}</Text>
-              </View>
-              <Text style={[styles.txnAmount, txn.type === 'income' ? styles.income : styles.expense]}>
-                {txn.type === 'income' ? '+' : '-'}{formatRupiah(txn.amount)}
-              </Text>
+        </View>
+
+        <View style={styles.xpSection}>
+          <View style={styles.xpBar}>
+            <View style={[styles.xpFill, { width: `${Math.max(2, xpPct)}%`, backgroundColor: tierCfg.color }]} />
+          </View>
+          <View style={styles.xpLabels}>
+            <Text style={styles.xpPct}>{xpPct}% XP</Text>
+            <Text style={styles.xpNext}>
+              {nextTierName ? `→ ${nextTierName}` : '🏆 MAX TIER'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* ── SCORE GRID 2×2 ── */}
+      <Text style={styles.sectionTitle}>Financial Score</Text>
+      <View style={styles.scoreGrid}>
+        {[
+          { label: 'Konsistensi', value: score?.consistency ?? 0, emoji: '📅', color: PRIMARY, desc: 'Streak harian' },
+          { label: 'Budget', value: score?.budget_adherence ?? 0, emoji: '💰', color: '#1D9E75', desc: 'Pengeluaran vs income' },
+          { label: 'Tabungan', value: score?.saving_rate ?? 0, emoji: '🐷', color: '#534AB7', desc: 'Saving rate' },
+          { label: 'Target', value: score?.goal_completion ?? 0, emoji: '🎯', color: '#BA7517', desc: 'Goal completion' },
+        ].map(item => (
+          <View key={item.label} style={styles.scoreCard}>
+            <View style={styles.scoreCardHeader}>
+              <Text style={styles.scoreEmoji}>{item.emoji}</Text>
+              <Text style={[styles.scoreNum, { color: item.color }]}>{item.value}</Text>
             </View>
-          ))
-        )}
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
+            <View style={styles.scoreBarBg}>
+              <View style={[styles.scoreBarFill, { width: `${item.value}%`, backgroundColor: item.color }]} />
+            </View>
+            <Text style={styles.scoreLabel}>{item.label}</Text>
+            <Text style={styles.scoreDesc}>{item.desc}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* ── STREAK CARDS ── */}
+      <Text style={styles.sectionTitle}>Statistik Bulan Ini</Text>
+      <View style={styles.streakRow}>
+        <View style={styles.streakCard}>
+          <Text style={styles.streakEmoji}>🔥</Text>
+          <Text style={styles.streakNum}>{streak}</Text>
+          <Text style={styles.streakLabel}>Hari Streak</Text>
+        </View>
+        <View style={styles.streakCard}>
+          <Text style={styles.streakEmoji}>📊</Text>
+          <Text style={styles.streakNum}>{transactions.filter(t => !t.is_wallet_transfer).length}</Text>
+          <Text style={styles.streakLabel}>Transaksi</Text>
+        </View>
+        <View style={styles.streakCard}>
+          <Text style={styles.streakEmoji}>🎯</Text>
+          <Text style={styles.streakNum}>{daysInBudget}%</Text>
+          <Text style={styles.streakLabel}>Dalam Budget</Text>
+        </View>
+      </View>
+
+      {/* ── LEADERBOARD ── */}
+      <Text style={styles.sectionTitle}>Leaderboard Teman</Text>
+      <View style={styles.leaderboard}>
+        {leaderboard.map(item => {
+          const tc = TIER_CONFIG[item.tier]
+          return (
+            <View key={item.rank} style={[styles.leaderRow, item.isMe && styles.leaderRowMe]}>
+              <Text style={styles.leaderRankEmoji}>
+                {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : '🥉'}
+              </Text>
+              <View style={[styles.leaderAvatar, { backgroundColor: item.isMe ? PRIMARY : '#2A2A2A' }]}>
+                <Text style={styles.leaderAvatarText}>{item.name.slice(0, 2).toUpperCase()}</Text>
+              </View>
+              <View style={styles.leaderInfo}>
+                <Text style={styles.leaderName}>{item.name}{item.isMe ? ' (Kamu)' : ''}</Text>
+                <Text style={[styles.leaderTier, { color: tc?.color || '#888780' }]}>
+                  {tc?.icon} {item.tier}
+                </Text>
+              </View>
+              <View style={styles.leaderScoreWrap}>
+                <Text style={[styles.leaderScore, item.isMe && { color: PRIMARY }]}>{item.score}</Text>
+                <Text style={styles.leaderScoreUnit}>XP</Text>
+              </View>
+            </View>
+          )
+        })}
+        <Text style={styles.leaderNote}>✨ Fitur teman segera hadir</Text>
+      </View>
+
+      {/* ── QUICK ACTIONS ── */}
+      <Text style={styles.sectionTitle}>Aksi Cepat</Text>
+      <View style={styles.quickRow}>
+        {[
+          { icon: '➕', label: 'Catat', onPress: () => router.push('/tambah-transaksi') },
+          { icon: '🔄', label: 'Transfer', onPress: () => router.push('/tambah-transaksi') },
+          { icon: '🤖', label: 'AI Chat', onPress: () => router.push('/chat') },
+          { icon: '👛', label: 'Dompet', onPress: () => router.push('/tambah-wallet') },
+        ].map(item => (
+          <TouchableOpacity key={item.label} style={styles.qaBtn} onPress={item.onPress}>
+            <Text style={styles.qaIcon}>{item.icon}</Text>
+            <Text style={styles.qaLabel}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* ── TRANSAKSI TERAKHIR ── */}
+      <View style={styles.sectionRow}>
+        <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
+        <TouchableOpacity onPress={() => router.push('/(tabs)/laporan')}>
+          <Text style={styles.seeAll}>Lihat semua →</Text>
+        </TouchableOpacity>
+      </View>
+
+      {transactions.slice(0, 5).length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>💸</Text>
+          <Text style={styles.emptyText}>Belum ada transaksi bulan ini</Text>
+          <TouchableOpacity onPress={() => router.push('/tambah-transaksi')}>
+            <Text style={styles.emptyAction}>+ Catat transaksi pertama</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        transactions.slice(0, 5).map(txn => (
+          <TouchableOpacity
+            key={txn.id}
+            style={styles.txnItem}
+            onPress={() => {
+              if (!txn.is_wallet_transfer) router.push(`/edit-transaksi?id=${txn.id}`)
+            }}
+          >
+            <View style={[styles.txnIconWrap, txn.is_wallet_transfer && { backgroundColor: '#1E1A2E' }]}>
+              <Text style={styles.txnEmoji}>{CATEGORY_EMOJI[txn.category] || '📦'}</Text>
+            </View>
+            <View style={styles.txnInfo}>
+              <Text style={styles.txnCat}>
+                {txn.is_wallet_transfer
+                  ? (txn.type === 'expense' ? 'Transfer Keluar' : 'Transfer Masuk')
+                  : txn.category}
+              </Text>
+              <Text style={styles.txnDate}>{txn.date}{txn.note ? ' · ' + txn.note : ''}</Text>
+            </View>
+            <Text style={[
+              styles.txnAmount,
+              txn.type === 'income' ? styles.txnIncome : styles.txnExpense,
+              txn.is_wallet_transfer && { color: '#888780' },
+            ]}>
+              {txn.type === 'income' ? '+' : '-'}{fmt(txn.amount, true)}
+            </Text>
+          </TouchableOpacity>
+        ))
+      )}
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F0F' },
+  loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center', gap: 12 },
+  loadingText: { fontSize: 13, color: '#888780' },
+
+  // Header
   header: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 20,
+  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerRight: { flexDirection: 'row', gap: 8 },
+  avatar: {
+    width: 44, height: 44, borderRadius: 14, backgroundColor: PRIMARY,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarText: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  greeting: { fontSize: 12, color: '#888780' },
+  name: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  iconBtn: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  iconBtnText: { fontSize: 16 },
+
+  // Tier Card
+  tierCard: {
+    marginHorizontal: 20, marginBottom: 24, backgroundColor: '#141420',
+    borderRadius: 20, padding: 20, borderWidth: 1.5, overflow: 'hidden',
+  },
+  tierGlow: {
+    position: 'absolute', top: -40, right: -40,
+    width: 120, height: 120, borderRadius: 60,
+    backgroundColor: PRIMARY, opacity: 0.06,
+  },
+  tierTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
+  tierBadge: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  tierEmojiWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  tierEmoji: { fontSize: 22 },
+  tierRankName: { fontSize: 18, fontWeight: '700' },
+  tierRankLabel: { fontSize: 11, color: '#888780', marginTop: 2 },
+  tierScoreWrap: { alignItems: 'flex-end' },
+  tierScoreNum: { fontSize: 32, fontWeight: '800', lineHeight: 36 },
+  tierScoreUnit: { fontSize: 11, color: '#888780' },
+  tierBalanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 },
+  tierBalLabel: { fontSize: 12, color: '#888780', marginBottom: 4 },
+  tierBalAmount: { fontSize: 26, fontWeight: '700', color: '#fff' },
+  tierChangePill: { backgroundColor: '#1A1A1A', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+  tierChangeText: { fontSize: 12, fontWeight: '600' },
+  xpSection: { gap: 6 },
+  xpBar: { height: 6, backgroundColor: '#2A2A2A', borderRadius: 3, overflow: 'hidden' },
+  xpFill: { height: '100%', borderRadius: 3 },
+  xpLabels: { flexDirection: 'row', justifyContent: 'space-between' },
+  xpPct: { fontSize: 11, color: '#888780' },
+  xpNext: { fontSize: 11, color: '#888780' },
+
+  // Section
+  sectionTitle: {
+    fontSize: 12, fontWeight: '700', color: '#888780',
+    textTransform: 'uppercase', letterSpacing: 1,
+    marginBottom: 12, paddingHorizontal: 20,
+  },
+  sectionRow: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
+    paddingRight: 20,
   },
-  greeting: { fontSize: 13, color: '#888780' },
-  appName: { fontSize: 24, fontWeight: '600', color: '#FFFFFF', letterSpacing: -0.5 },
-  logoutText: { fontSize: 13, color: '#888780' },
-  toggleWrap: {
-    flexDirection: 'row', backgroundColor: '#1A1A1A',
-    marginHorizontal: 20, borderRadius: 12, padding: 3, marginBottom: 16, gap: 3,
+  seeAll: { fontSize: 13, color: PRIMARY, fontWeight: '500', paddingBottom: 12 },
+
+  // Score Grid
+  scoreGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+    paddingHorizontal: 20, marginBottom: 24,
   },
-  toggleBtn: { flex: 1, paddingVertical: 8, borderRadius: 10, alignItems: 'center' },
-  toggleBtnActive: { backgroundColor: PRIMARY },
-  toggleText: { fontSize: 13, color: '#888780', fontWeight: '500' },
-  toggleTextActive: { color: '#fff', fontWeight: '600' },
-  scroll: { flex: 1, paddingHorizontal: 20 },
-  balanceCard: { backgroundColor: PRIMARY, borderRadius: 16, padding: 20, marginBottom: 24 },
-  balanceLabel: { fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 4 },
-  balanceAmount: { fontSize: 32, fontWeight: '600', color: '#fff', letterSpacing: -1 },
-  balanceSub: { fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 4 },
-  sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  sectionTitle: { fontSize: 13, fontWeight: '600', color: '#888780', textTransform: 'uppercase', letterSpacing: 0.5 },
-  sectionAction: { fontSize: 13, color: PRIMARY, fontWeight: '500' },
-  walletScroll: { marginBottom: 24, marginHorizontal: -20 },
-  walletScrollContent: { paddingHorizontal: 20, gap: 10 },
-  walletCard: {
-    width: 130, backgroundColor: '#1A1A1A', borderRadius: 14,
-    padding: 14, borderWidth: 1.5,
+  scoreCard: {
+    width: '47%', backgroundColor: '#1A1A1A', borderRadius: 16,
+    padding: 14, borderWidth: 0.5, borderColor: '#2A2A2A',
   },
-  walletIcon: { fontSize: 22, marginBottom: 8 },
-  walletName: { fontSize: 12, color: '#888780', fontWeight: '500', marginBottom: 4 },
-  walletNameSelected: { color: '#fff' },
-  walletBalance: { fontSize: 13, color: '#fff', fontWeight: '600' },
-  walletBalanceSelected: { color: '#fff' },
-  quickActions: { flexDirection: 'row', gap: 10, marginBottom: 24 },
-  qaBtn: { flex: 1, backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A' },
-  qaIcon: { fontSize: 20, marginBottom: 6 },
-  qaLabel: { fontSize: 11, color: '#888780', fontWeight: '500' },
-  emptyState: { alignItems: 'center', paddingVertical: 40 },
-  emptyIcon: { fontSize: 40, marginBottom: 12 },
-  emptyText: { fontSize: 15, color: '#FFFFFF', fontWeight: '500', marginBottom: 4 },
-  emptySubtext: { fontSize: 13, color: '#888780' },
+  scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  scoreEmoji: { fontSize: 20 },
+  scoreNum: { fontSize: 24, fontWeight: '800' },
+  scoreBarBg: { height: 4, backgroundColor: '#2A2A2A', borderRadius: 2, overflow: 'hidden', marginBottom: 8 },
+  scoreBarFill: { height: '100%', borderRadius: 2 },
+  scoreLabel: { fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 },
+  scoreDesc: { fontSize: 10, color: '#888780' },
+
+  // Streak
+  streakRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 24 },
+  streakCard: {
+    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 16, padding: 14,
+    alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  streakEmoji: { fontSize: 22, marginBottom: 6 },
+  streakNum: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 2 },
+  streakLabel: { fontSize: 10, color: '#888780', textAlign: 'center' },
+
+  // Leaderboard
+  leaderboard: {
+    marginHorizontal: 20, backgroundColor: '#1A1A1A',
+    borderRadius: 16, overflow: 'hidden', marginBottom: 24,
+    borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  leaderRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+  },
+  leaderRowMe: { backgroundColor: '#0D1A2E' },
+  leaderRankEmoji: { fontSize: 18, width: 24, textAlign: 'center' },
+  leaderAvatar: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  leaderAvatarText: { fontSize: 12, fontWeight: '700', color: '#fff' },
+  leaderInfo: { flex: 1 },
+  leaderName: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  leaderTier: { fontSize: 11, marginTop: 2 },
+  leaderScoreWrap: { alignItems: 'flex-end' },
+  leaderScore: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  leaderScoreUnit: { fontSize: 10, color: '#888780' },
+  leaderNote: { fontSize: 11, color: '#888780', textAlign: 'center', padding: 10 },
+
+  // Quick Actions
+  quickRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 24 },
+  qaBtn: {
+    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 14, padding: 14,
+    alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  qaIcon: { fontSize: 22, marginBottom: 6 },
+  qaLabel: { fontSize: 10, color: '#888780', fontWeight: '600', textAlign: 'center' },
+
+  // Transactions
+  emptyState: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
+  emptyIcon: { fontSize: 36, marginBottom: 10 },
+  emptyText: { fontSize: 14, color: '#888780', marginBottom: 12 },
+  emptyAction: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
   txnItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#1A1A1A',
+    paddingVertical: 12, paddingHorizontal: 20,
+    borderBottomWidth: 0.5, borderBottomColor: '#1A1A1A',
   },
-  txnIcon: { width: 40, height: 40, borderRadius: 10, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center' },
+  txnIconWrap: {
+    width: 40, height: 40, borderRadius: 12, backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center',
+  },
   txnEmoji: { fontSize: 18 },
   txnInfo: { flex: 1 },
-  txnCategory: { fontSize: 14, fontWeight: '500', color: '#fff' },
-  txnDate: { fontSize: 12, color: '#888780', marginTop: 2 },
-  txnAmount: { fontSize: 14, fontWeight: '600' },
-  income: { color: '#1D9E75' },
-  expense: { color: '#E24B4A' },
+  txnCat: { fontSize: 14, fontWeight: '500', color: '#fff' },
+  txnDate: { fontSize: 11, color: '#888780', marginTop: 2 },
+  txnAmount: { fontSize: 13, fontWeight: '700' },
+  txnIncome: { color: '#1D9E75' },
+  txnExpense: { color: '#E24B4A' },
 })

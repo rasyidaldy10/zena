@@ -1,6 +1,7 @@
 import { supabase } from './supabase'
 
 const PROXY_URL = 'https://lcvenmsxauasaemjjxtc.supabase.co/functions/v1/claude-proxy'
+const MODEL = 'claude-sonnet-4-6'
 
 const getAuthHeader = async () => {
   const { data: { session } } = await supabase.auth.getSession()
@@ -16,13 +17,28 @@ export const claudeChat = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      model: MODEL,
+      max_tokens: 1024,
       system: systemPrompt,
       messages,
     }),
   })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`HTTP ${response.status}: ${errText}`)
+  }
+
   const data = await response.json()
+
+  if (data.type === 'error' || data.error) {
+    throw new Error(data.error?.message || 'API error')
+  }
+
+  if (!data.content || !data.content[0]?.text) {
+    throw new Error('Respons AI tidak valid')
+  }
+
   return data.content[0].text
 }
 
@@ -36,8 +52,8 @@ export const claudeVision = async (
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
-      max_tokens: 1000,
+      model: MODEL,
+      max_tokens: 1024,
       messages: [
         {
           role: 'user',
@@ -52,6 +68,21 @@ export const claudeVision = async (
       ],
     }),
   })
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`HTTP ${response.status}: ${errText}`)
+  }
+
   const data = await response.json()
+
+  if (data.type === 'error' || data.error) {
+    throw new Error(data.error?.message || 'API error')
+  }
+
+  if (!data.content || !data.content[0]?.text) {
+    throw new Error('Respons AI tidak valid')
+  }
+
   return data.content[0].text
 }

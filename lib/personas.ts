@@ -1,4 +1,5 @@
-import { Persona, Language } from '../types'
+import { Persona, Language, Transaction, BudgetMethod } from '../types'
+import { BUDGET_METHODS } from '../constants'
 
 export const getSystemPrompt = (
   persona: Persona,
@@ -10,7 +11,7 @@ export const getSystemPrompt = (
   const income = monthlyIncome.toLocaleString('id-ID')
 
   const prompts: Record<Persona, string> = {
-    bestie: `Kamu adalah Si Bestie, teman gaul ${name} yang kebetulan jago banget soal keuangan. 
+    bestie: `Kamu adalah Si Bestie, teman gaul ${name} yang kebetulan jago banget soal keuangan.
 Gaya bicara: santai, pakai "lo/gue", boleh pakai emoji, sesekali bercanda tapi tetap kasih info yang beneran berguna.
 Panggil user dengan "${name}" atau "Bro/Sis".
 Penghasilan bulanan user: Rp ${income}.
@@ -60,6 +61,82 @@ Jawab dalam Bahasa Indonesia kecuali user pakai bahasa lain.`,
   }
 
   return prompts[persona]
+}
+
+export const getContextualSystemPrompt = (
+  persona: Persona,
+  language: Language,
+  nickname: string,
+  monthlyIncome: number,
+  recentTransactions: Transaction[],
+  budgetMethod: BudgetMethod
+): string => {
+  const base = getSystemPrompt(persona, language, nickname, monthlyIncome)
+
+  if (!recentTransactions.length && !monthlyIncome) return base
+
+  const realTxns = recentTransactions.filter(t => !t.is_wallet_transfer)
+  const currentMonth = new Date().toISOString().slice(0, 7)
+  const thisMonthTxns = realTxns.filter(t => t.date?.startsWith(currentMonth))
+
+  const totalExpense = thisMonthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+  const totalIncome = thisMonthTxns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const netBalance = totalIncome - totalExpense
+
+  const categoryTotals = thisMonthTxns
+    .filter(t => t.type === 'expense')
+    .reduce((acc: Record<string, number>, t) => {
+      acc[t.category] = (acc[t.category] || 0) + t.amount
+      return acc
+    }, {})
+
+  const topCategories = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([cat, amt]) => `${cat}: Rp ${amt.toLocaleString('id-ID')}`)
+    .join(', ')
+
+  // Budget calculation
+  let spendingBudget = monthlyIncome
+  let savingTarget = 0
+  if (budgetMethod === '503020') { spendingBudget = monthlyIncome * 0.8; savingTarget = monthlyIncome * 0.2 }
+  else if (budgetMethod === '703010') { spendingBudget = monthlyIncome * 0.9; savingTarget = monthlyIncome * 0.3 }
+  else if (budgetMethod === 'payfirst') { spendingBudget = monthlyIncome * 0.75; savingTarget = monthlyIncome * 0.25 }
+  else if (budgetMethod === 'zero' || budgetMethod === 'envelope') { spendingBudget = monthlyIncome; savingTarget = 0 }
+
+  const budgetUsedPct = spendingBudget > 0 ? Math.round((totalExpense / spendingBudget) * 100) : 0
+  const savingRate = monthlyIncome > 0 ? Math.max(0, Math.round((netBalance / monthlyIncome) * 100)) : 0
+
+  const today = new Date()
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+  const daysPassed = today.getDate()
+  const daysLeft = daysInMonth - daysPassed
+  const dailyAvgExpense = daysPassed > 0 ? totalExpense / daysPassed : 0
+  const projectedExpense = dailyAvgExpense * daysInMonth
+
+  const methodName = BUDGET_METHODS[budgetMethod]?.name || budgetMethod
+
+  const context = `
+
+═══ DATA KEUANGAN REAL-TIME ${nickname.toUpperCase()} (${currentMonth}) ═══
+• Penghasilan bulanan: Rp ${monthlyIncome.toLocaleString('id-ID')}
+• Metode budgeting: ${methodName}
+• Pemasukan bulan ini: Rp ${totalIncome.toLocaleString('id-ID')}
+• Pengeluaran bulan ini: Rp ${totalExpense.toLocaleString('id-ID')} (${budgetUsedPct}% dari budget)
+• Saldo bersih bulan ini: Rp ${netBalance.toLocaleString('id-ID')} ${netBalance >= 0 ? '✅' : '🔴'}
+• Saving rate: ${savingRate}%
+• Top pengeluaran: ${topCategories || 'belum ada data'}
+• Hari ke-${daysPassed} dari ${daysInMonth} | Sisa ${daysLeft} hari
+• Proyeksi pengeluaran akhir bulan: Rp ${Math.round(projectedExpense).toLocaleString('id-ID')}
+• Jumlah transaksi bulan ini: ${thisMonthTxns.length}
+• Budget spending (${methodName}): Rp ${spendingBudget.toLocaleString('id-ID')} | Target tabungan: Rp ${savingTarget.toLocaleString('id-ID')}
+
+INSTRUKSI: Gunakan data di atas untuk memberikan insight yang SPESIFIK dan PERSONAL.
+Ketika user tanya tentang pengeluaran, budget, atau kondisi keuangan — jawab berdasarkan data nyata ini.
+Jika ada anomali (pengeluaran kategori tertentu terlalu tinggi, budget hampir habis, dll) — highlight.
+Proyeksi akhir bulan tersedia — gunakan untuk prediksi dan saran konkret.`
+
+  return base + context
 }
 
 export const getReceiptPrompt = (): string => `
