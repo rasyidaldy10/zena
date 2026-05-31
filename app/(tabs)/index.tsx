@@ -146,7 +146,11 @@ export default function DashboardScreen() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.replace('/(auth)/login')
+    if (typeof window !== 'undefined') {
+      window.location.href = '/'
+    } else {
+      router.replace('/(auth)/login')
+    }
   }
 
   if (loading) return (
