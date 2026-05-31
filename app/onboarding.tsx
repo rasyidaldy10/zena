@@ -113,30 +113,31 @@ export default function OnboardingScreen() {
 
   const handleFinish = async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    // getSession() baca dari localStorage, tidak perlu network call
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
 
     const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+    const userId = user?.id
 
-    // Jalankan kedua query paralel, bukan sequential
-    await Promise.all([
-      supabase.from('user_preferences').upsert({
-        user_id: user?.id,
-        nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
-        persona,
-        language,
-        budget_method: budgetMethod,
-        monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-        updated_at: new Date().toISOString(),
-      }),
-      supabase.from('user_wallets').insert([
-        { user_id: user?.id, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
-        { user_id: user?.id, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
-      ]),
-    ])
-
+    // Navigate dulu, DB writes jalan di background
     router.replace('/(tabs)')
-    setLoading(false)
+
+    supabase.from('user_preferences').upsert({
+      user_id: userId,
+      nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
+      persona,
+      language,
+      budget_method: budgetMethod,
+      monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+      updated_at: new Date().toISOString(),
+    }).then(() => {})
+
+    supabase.from('user_wallets').insert([
+      { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
+      { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
+    ]).then(() => {})
   }
 
   const renderStep = () => {
