@@ -24,6 +24,10 @@ export default function LoginScreen() {
             redirectTo: window.location.origin,
             scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
             skipBrowserRedirect: false,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent', // Force consent screen
+            },
           },
         })
         if (error) throw error
@@ -36,6 +40,10 @@ export default function LoginScreen() {
             redirectTo,
             skipBrowserRedirect: true,
             scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent',
+            },
           },
         })
         if (error) throw error
