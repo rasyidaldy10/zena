@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { timeAgo } from '../lib/date-utils'
 import { ZenaNotification, NotificationType } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -16,14 +17,6 @@ const TYPE_CONFIG: Record<NotificationType, { icon: string; color: string }> = {
   daily_summary:  { icon: '📋', color: '#185FA5' },
   gmail:          { icon: '📧', color: '#1D9E75' },
   categorization: { icon: '🏷️', color: '#888780' },
-}
-
-const timeAgo = (dateStr: string): string => {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (diff < 60) return 'baru saja'
-  if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`
-  return `${Math.floor(diff / 86400)} hari lalu`
 }
 
 export default function NotificationsScreen() {
@@ -52,20 +45,37 @@ export default function NotificationsScreen() {
   useFocusEffect(useCallback(() => { fetchNotifications() }, []))
 
   const markRead = async (id: string) => {
-    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n))
+    const prev = notifications.find(n => n.id === id)
+    setNotifications(list => list.map(n => n.id === id ? { ...n, is_read: true } : n))
+
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id)
+    if (error && prev) {
+      setNotifications(list => list.map(n => n.id === id ? prev : n))
+    }
   }
 
   const markAllRead = async () => {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
-    await supabase.from('notifications').update({ is_read: true }).eq('user_id', session.user.id).eq('is_read', false)
+
+    const prevNotifs = [...notifications]
     setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
+
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('user_id', session.user.id).eq('is_read', false)
+    if (error) {
+      setNotifications(prevNotifs)
+    }
   }
 
   const deleteNotif = async (id: string) => {
-    await supabase.from('notifications').delete().eq('id', id)
+    const prevNotifs = [...notifications]
     setNotifications(prev => prev.filter(n => n.id !== id))
+
+    const { error } = await supabase.from('notifications').delete().eq('id', id)
+    if (error) {
+      setNotifications(prevNotifs)
+      Alert.alert('Error', 'Gagal menghapus notifikasi')
+    }
   }
 
   const handlePress = (notif: ZenaNotification) => {

@@ -33,7 +33,8 @@ export default function DashboardScreen() {
 
   const fetchData = async () => {
     setLoading(true)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { session } } = await supabase.auth.getSession()
+    const user = session?.user
 
     const [
       { data: prefs },

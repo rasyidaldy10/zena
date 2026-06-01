@@ -7,13 +7,13 @@ import { router, useFocusEffect } from 'expo-router'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import { speak, stopSpeaking } from '../lib/speech'
+import { timeAgo } from '../lib/date-utils'
 import { ZenaNotification, AIInsight, AgentLog, NotificationType } from '../types'
 
 const CYAN = '#00D4FF'
 const CYAN_DIM = '#006688'
 const GREEN = '#00FF88'
 const RED = '#FF4444'
-const AMBER = '#FFB300'
 const DARK = '#050B18'
 const CARD = '#080F1E'
 const BORDER = '#0A2040'
@@ -27,20 +27,11 @@ const AGENTS = [
   { id: 'smart-categorization', name: 'Smart Categorize',     icon: '🏷️', shortName: 'SMART' },
 ] as const
 
-type AgentId = typeof AGENTS[number]['id']
 type AgentStatus = 'active' | 'standby' | 'processing'
 
 const TYPE_ICON: Record<NotificationType, string> = {
   budget_alert: '💰', anomaly: '🔍', weekly_insight: '📊',
   daily_summary: '📋', gmail: '📧', categorization: '🏷️',
-}
-
-const timeAgo = (d: string) => {
-  const s = Math.floor((Date.now() - new Date(d).getTime()) / 1000)
-  if (s < 60) return `${s}s ago`
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`
-  return `${Math.floor(s / 86400)}d ago`
 }
 
 const getStatus = (logs: AgentLog[], id: string): AgentStatus => {
@@ -165,6 +156,7 @@ export default function ZenaIntelligenceScreen() {
   const [alerts, setAlerts] = useState<ZenaNotification[]>([])
   const [insights, setInsights] = useState<AIInsight[]>([])
   const [voiceOn, setVoiceOn] = useState(false)
+  const voiceOnRef = useRef(false)
   const channelRef = useRef<RealtimeChannel | null>(null)
   const headerAnim = useRef(new Animated.Value(0)).current
 
@@ -189,6 +181,10 @@ export default function ZenaIntelligenceScreen() {
   }, [headerAnim]))
 
   useEffect(() => {
+    voiceOnRef.current = voiceOn
+  }, [voiceOn])
+
+  useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
       channelRef.current = supabase
@@ -196,7 +192,7 @@ export default function ZenaIntelligenceScreen() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, (p) => {
           const notif = p.new as ZenaNotification
           setAlerts(prev => [notif, ...prev.slice(0, 14)])
-          if (voiceOn) speak(`Alert baru: ${notif.title}. ${notif.message}`)
+          if (voiceOnRef.current) speak(`Alert baru: ${notif.title}. ${notif.message}`)
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_logs', filter: `user_id=eq.${session.user.id}` }, (p) => {
           setLogs(prev => [p.new as AgentLog, ...prev.slice(0, 29)])
@@ -204,7 +200,7 @@ export default function ZenaIntelligenceScreen() {
         .subscribe()
     })
     return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
-  }, [voiceOn])
+  }, [])
 
   const activeCount = AGENTS.filter(a => getStatus(logs, a.id) !== 'standby').length
 
@@ -273,7 +269,7 @@ export default function ZenaIntelligenceScreen() {
                 <View style={[s.agentDivider, { backgroundColor: statusColor + '40' }]} />
                 {last ? (
                   <>
-                    <Text style={s.agentLastRun}>⟳ {timeAgo(last.created_at)}</Text>
+                    <Text style={s.agentLastRun}>⟳ {timeAgo(last.created_at, 'en')}</Text>
                     {agentLogs.map((l, i) => (
                       <Text key={i} style={s.agentLog} numberOfLines={1}>› {l.result ?? l.action}</Text>
                     ))}
@@ -307,7 +303,7 @@ export default function ZenaIntelligenceScreen() {
               <View key={notif.id} style={[s.alertRow, isUnread && s.alertRowUnread]}>
                 <Text style={s.alertIcon}>{icon}</Text>
                 <View style={s.alertBody}>
-                  <Text style={s.alertTime}>[{timeAgo(notif.created_at)}]</Text>
+                  <Text style={s.alertTime}>[{timeAgo(notif.created_at, 'en')}]</Text>
                   <Text style={[s.alertTitle, isUnread && { color: CYAN }]}>{notif.title}</Text>
                   <Text style={s.alertMsg} numberOfLines={2}>{notif.message}</Text>
                 </View>

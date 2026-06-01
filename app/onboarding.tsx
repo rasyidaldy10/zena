@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform
+  StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, Alert
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
@@ -115,31 +115,41 @@ export default function OnboardingScreen() {
     setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
-
-    const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
     const userId = user?.id
 
-    // HARUS selesai dulu sebelum navigate — kalau fire-and-forget,
-    // _layout.tsx cek user_preferences dan tidak ketemu → redirect ke onboarding lagi
-    await Promise.all([
-      supabase.from('user_preferences').upsert({
-        user_id: userId,
-        nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
-        persona,
-        language,
-        budget_method: budgetMethod,
-        monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-        updated_at: new Date().toISOString(),
-      }),
-      supabase.from('user_wallets').insert([
-        { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
-        { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
-      ]),
-    ])
+    // Guard: session null atau userId undefined
+    if (!session || !userId) {
+      setLoading(false)
+      Alert.alert('Error', 'Sesi login tidak valid. Silakan login kembali.')
+      router.replace('/(auth)/login')
+      return
+    }
 
-    router.replace('/(tabs)')
-    setLoading(false)
+    const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
+
+    try {
+      await Promise.all([
+        supabase.from('user_preferences').upsert({
+          user_id: userId,
+          nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
+          persona,
+          language,
+          budget_method: budgetMethod,
+          monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+          updated_at: new Date().toISOString(),
+        }),
+        supabase.from('user_wallets').insert([
+          { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
+          { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
+        ]),
+      ])
+
+      router.replace('/(tabs)')
+    } catch (error) {
+      setLoading(false)
+      Alert.alert('Error', 'Gagal menyimpan data. Silakan coba lagi.')
+    }
   }
 
   const renderStep = () => {

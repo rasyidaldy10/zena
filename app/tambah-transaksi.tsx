@@ -146,41 +146,8 @@ export default function TambahTransaksiScreen() {
     return `${day} ${MONTHS[parseInt(m) - 1]} ${y}`
   }
 
-  const getBudgetWarning = async (userId: string): Promise<string | null> => {
-    const { data: prefs } = await supabase
-      .from('user_preferences')
-      .select('monthly_income, budget_method')
-      .eq('user_id', userId)
-      .single()
-
-    if (!prefs?.monthly_income) return null
-
-    const currentMonth = new Date().toISOString().slice(0, 7)
-    const { data: expenses } = await supabase
-      .from('transactions')
-      .select('amount')
-      .eq('user_id', userId)
-      .eq('type', 'expense')
-      .eq('is_wallet_transfer', false)
-      .gte('date', currentMonth + '-01')
-      .lte('date', currentMonth + '-31')
-
-    const totalExpense = (expenses || []).reduce((sum: number, t: { amount: number }) => sum + t.amount, 0)
-
-    let spendingBudget = prefs.monthly_income
-    const method = prefs.budget_method
-    if (method === '503020') spendingBudget = prefs.monthly_income * 0.8
-    else if (method === '703010') spendingBudget = prefs.monthly_income * 0.9
-    else if (method === 'payfirst') spendingBudget = prefs.monthly_income * 0.75
-    else if (method === 'zero' || method === 'envelope') spendingBudget = prefs.monthly_income * 0.9
-
-    const pct = Math.round((totalExpense / spendingBudget) * 100)
-
-    if (pct >= 100) return `🚨 Budget bulan ini sudah ${pct}%! Total pengeluaran: ${formatRupiah(totalExpense)}`
-    if (pct >= 90) return `⚠️ Budget sudah ${pct}%. Sisa: ${formatRupiah(spendingBudget - totalExpense)}`
-    if (pct >= 75) return `💡 Budget sudah ${pct}% bulan ini.`
-    return null
-  }
+  // getBudgetWarning() dihapus — duplicate dengan budget-monitor edge function
+  // Budget alert sekarang datang dari notifications table via Realtime
 
   const handleSave = async () => {
     if (!amount) {
@@ -304,14 +271,8 @@ export default function TambahTransaksiScreen() {
         }
       })
 
-      let budgetMsg = ''
-      if (type === 'expense' && user?.id) {
-        const warning = await getBudgetWarning(user.id)
-        if (warning) budgetMsg = '\n\n' + warning
-      }
-
       setLoading(false)
-      Alert.alert('Berhasil! ✅', `Transaksi berhasil dicatat${budgetMsg}`, [
+      Alert.alert('Berhasil! ✅', 'Transaksi berhasil dicatat', [
         { text: 'OK', onPress: () => router.back() }
       ])
       return

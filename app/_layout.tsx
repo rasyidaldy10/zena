@@ -9,12 +9,17 @@ export default function RootLayout() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let cancelled = false
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLoading(false)
+      if (!cancelled) {
+        setSession(session)
+        setLoading(false)
+      }
     })
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return
       setSession(session)
       if (session) {
         const { data } = await supabase
@@ -50,6 +55,11 @@ export default function RootLayout() {
         }
       }
     })
+
+    return () => {
+      cancelled = true
+      subscription.unsubscribe()
+    }
   }, [])
 
   if (loading) return null
