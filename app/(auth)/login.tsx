@@ -23,9 +23,11 @@ export default function LoginScreen() {
           options: {
             redirectTo: window.location.origin,
             scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            skipBrowserRedirect: false,
           },
         })
         if (error) throw error
+        // Web will auto-redirect to Google, no need to setLoading(false)
       } else {
         const redirectTo = Linking.createURL('/')
         const { data, error } = await supabase.auth.signInWithOAuth({
@@ -48,8 +50,8 @@ export default function LoginScreen() {
       }
     } catch (error: any) {
       Alert.alert('Login Gagal', error.message || 'Terjadi kesalahan saat login dengan Google')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   return (
@@ -70,7 +72,10 @@ export default function LoginScreen() {
           activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <>
+              <ActivityIndicator color="#fff" />
+              <Text style={styles.googleTextLoading}>Membuka Google...</Text>
+            </>
           ) : (
             <>
               <Text style={styles.googleIcon}>G</Text>
@@ -103,6 +108,7 @@ const styles = StyleSheet.create({
   },
   googleIcon: { fontSize: 24, fontWeight: '900', color: '#fff' },
   googleText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  googleTextLoading: { fontSize: 14, fontWeight: '600', color: '#fff', marginLeft: 12 },
   disclaimer: {
     fontSize: 11, color: '#555', textAlign: 'center', marginTop: 24,
     lineHeight: 16, paddingHorizontal: 12,

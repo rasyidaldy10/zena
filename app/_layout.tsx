@@ -1,65 +1,33 @@
 import { useEffect, useState } from 'react'
 import { Platform, ActivityIndicator, View } from 'react-native'
-import { Stack, router, useSegments, usePathname } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
-  const [initialized, setInitialized] = useState(false)
-  const segments = useSegments()
-  const pathname = usePathname()
+  const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    // Initial check: fast, no DB query
+    supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
-
-      if (session) {
-        // Cek apakah user sudah onboarding
-        const { data } = await supabase
-          .from('user_preferences')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .single()
-
-        if (data) {
-          // User sudah onboarding → dashboard
-          if (pathname === '/' || pathname.includes('auth')) {
-            router.replace('/(tabs)')
-          }
-        } else {
-          // User baru → onboarding
-          if (!pathname.includes('onboarding')) {
-            router.replace('/onboarding')
-          }
-        }
-      } else {
-        // No session → login
-        const isOAuthCallback =
-          Platform.OS === 'web' &&
-          typeof window !== 'undefined' &&
-          window.location.search.includes('code=')
-
-        if (!isOAuthCallback && !pathname.includes('auth')) {
-          router.replace('/(auth)/login')
-        }
-      }
-
-      setInitialized(true)
+      setInitializing(false)
     })
 
-    // Listen auth changes (login/logout only, bukan setiap state change)
+    // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth event:', event)
       setSession(session)
 
-      // Hanya handle event login/logout, bukan INITIAL_SESSION atau TOKEN_REFRESHED
+      // Handle only login/logout events
       if (event === 'SIGNED_IN' && session) {
+        // Check onboarding status (non-blocking)
         const { data } = await supabase
           .from('user_preferences')
           .select('id')
           .eq('user_id', session.user.id)
-          .single()
+          .maybeSingle()
 
         if (data) {
           router.replace('/(tabs)')
@@ -71,12 +39,11 @@ export default function RootLayout() {
       }
     })
 
-    return () => {
-      subscription.unsubscribe()
-    }
+    return () => subscription.unsubscribe()
   }, [])
 
-  if (!initialized) {
+  // Show loader only during first initialization
+  if (initializing) {
     return (
       <View style={{ flex: 1, backgroundColor: '#0F0F0F', justifyContent: 'center', alignItems: 'center' }}>
         <ActivityIndicator size="large" color="#185FA5" />
@@ -86,9 +53,9 @@ export default function RootLayout() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(tabs)" />
-      <Stack.Screen name="onboarding" />
+      <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
+      <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
+      <Stack.Screen name="onboarding" options={{ animation: 'none' }} />
       <Stack.Screen name="tambah-transaksi" />
       <Stack.Screen name="edit-transaksi" />
       <Stack.Screen name="tambah-wallet" />
