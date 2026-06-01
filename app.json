@@ -8,16 +8,21 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.rasyid.zena",
+      "buildNumber": "1",
       "supportsTablet": true
     },
     "android": {
+      "package": "com.rasyid.zena",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": []
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -28,9 +33,10 @@
       "themeColor": "#185FA5",
       "lang": "id",
       "scope": "/",
-      "startUrl": "/",
+      "startUrl": "/(tabs)",
       "display": "standalone",
-      "orientation": "portrait"
+      "orientation": "portrait",
+      "preferRelatedApplications": false
     },
     "plugins": [
       "expo-web-browser"
