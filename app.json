@@ -20,7 +20,17 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Zena",
+      "shortName": "Zena",
+      "description": "Keuanganmu, selaras.",
+      "backgroundColor": "#0F0F0F",
+      "themeColor": "#185FA5",
+      "lang": "id",
+      "scope": "/",
+      "startUrl": "/",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "plugins": [
       "expo-web-browser"
