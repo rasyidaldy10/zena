@@ -76,6 +76,7 @@ export default function RootLayout() {
       <Stack.Screen name="chat" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="zena-intelligence" />
+      <Stack.Screen name="gmail-setup" />
     </Stack>
   )
 }

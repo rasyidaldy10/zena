@@ -120,6 +120,16 @@ export default function ProfilScreen() {
         </View>
       </TouchableOpacity>
 
+      {/* Gmail Auto-Import Banner */}
+      <TouchableOpacity style={styles.gmailBanner} onPress={() => router.push('/gmail-setup')} activeOpacity={0.8}>
+        <Text style={styles.gmailIcon}>📧</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.gmailTitle}>Gmail Auto-Import</Text>
+          <Text style={styles.gmailSub}>Auto-catat transaksi dari email bank</Text>
+        </View>
+        <Text style={styles.gmailArrow}>→</Text>
+      </TouchableOpacity>
+
       {/* Tier Card */}
       <View style={[styles.tierCard, { borderTopColor: tierConfig?.color || PRIMARY }]}>
         <View style={styles.tierLeft}>
@@ -283,6 +293,15 @@ const styles = StyleSheet.create({
   zenaBannerRight: { alignItems: 'flex-end' },
   zenaBannerAgents: { fontSize: 12, color: '#1D9E75', fontWeight: '600', marginBottom: 4 },
   zenaBannerArrow: { fontSize: 18, color: PRIMARY },
+  gmailBanner: {
+    marginHorizontal: 20, marginBottom: 16, backgroundColor: '#1A1A1A',
+    borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center',
+    gap: 12, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  gmailIcon: { fontSize: 28 },
+  gmailTitle: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 2 },
+  gmailSub: { fontSize: 11, color: '#888780' },
+  gmailArrow: { fontSize: 16, color: '#888780' },
   loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
   headerTitle: { fontSize: 24, fontWeight: '600', color: '#fff' },
