@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, TextInput, ActivityIndicator
+  TouchableOpacity, TextInput, ActivityIndicator, Alert, Platform
 } from 'react-native'
 import { useFocusEffect, router } from 'expo-router'
 
@@ -23,6 +23,7 @@ export default function ProfilScreen() {
   const [score, setScore] = useState(0)
   const [tier, setTier] = useState('Starter')
   const [wallets, setWallets] = useState<UserWallet[]>([])
+  const [gmailConnected, setGmailConnected] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -59,6 +60,12 @@ export default function ProfilScreen() {
       .order('created_at', { ascending: true })
     if (walletsData) setWallets(walletsData)
 
+    // Check Gmail connection (provider_refresh_token = Gmail scope granted)
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.provider_refresh_token) {
+      setGmailConnected(true)
+    }
+
     setLoading(false)
   }
 
@@ -94,6 +101,45 @@ export default function ProfilScreen() {
     fetchData()
   }
 
+  const handleDisconnectGmail = () => {
+    Alert.alert(
+      'Putuskan Koneksi Gmail?',
+      'Transaksi tidak akan auto-import lagi. Kamu perlu logout → login ulang untuk reconnect.',
+      [
+        { text: 'Batal', style: 'cancel' },
+        {
+          text: 'Putuskan',
+          style: 'destructive',
+          onPress: async () => {
+            // Hapus semua mapping
+            const { data: { session } } = await supabase.auth.getSession()
+            if (session) {
+              await supabase.from('gmail_wallet_mappings').delete().eq('user_id', session.user.id)
+              setGmailConnected(false)
+              Alert.alert('Berhasil', 'Koneksi Gmail diputus. Mapping dihapus.')
+            }
+          },
+        },
+      ]
+    )
+  }
+
+  const handleLogout = () => {
+    Alert.alert('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', [
+      { text: 'Batal', style: 'cancel' },
+      {
+        text: 'Keluar',
+        style: 'destructive',
+        onPress: async () => {
+          await supabase.auth.signOut()
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.location.href = '/'
+          }
+        },
+      },
+    ])
+  }
+
   const tierConfig = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
 
   if (loading) return (
@@ -121,14 +167,27 @@ export default function ProfilScreen() {
       </TouchableOpacity>
 
       {/* Gmail Auto-Import Banner */}
-      <TouchableOpacity style={styles.gmailBanner} onPress={() => router.push('/gmail-setup')} activeOpacity={0.8}>
+      <View style={[styles.gmailBanner, gmailConnected && styles.gmailBannerConnected]}>
         <Text style={styles.gmailIcon}>📧</Text>
         <View style={{ flex: 1 }}>
-          <Text style={styles.gmailTitle}>Gmail Auto-Import</Text>
-          <Text style={styles.gmailSub}>Auto-catat transaksi dari email bank</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Text style={styles.gmailTitle}>Gmail Auto-Import</Text>
+            {gmailConnected && <View style={styles.connectedDot} />}
+          </View>
+          <Text style={[styles.gmailSub, gmailConnected && { color: '#1D9E75' }]}>
+            {gmailConnected ? '✓ Terhubung' : 'Auto-catat transaksi dari email bank'}
+          </Text>
         </View>
-        <Text style={styles.gmailArrow}>→</Text>
-      </TouchableOpacity>
+        {gmailConnected ? (
+          <TouchableOpacity onPress={handleDisconnectGmail} style={styles.disconnectBtn}>
+            <Text style={styles.disconnectText}>Putus</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity onPress={() => router.push('/gmail-setup')}>
+            <Text style={styles.gmailArrow}>→</Text>
+          </TouchableOpacity>
+        )}
+      </View>
 
       {/* Tier Card */}
       <View style={[styles.tierCard, { borderTopColor: tierConfig?.color || PRIMARY }]}>
@@ -275,6 +334,11 @@ export default function ProfilScreen() {
         )}
       </View>
 
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <Text style={styles.logoutText}>🚪 Keluar dari Akun</Text>
+      </TouchableOpacity>
+
       <View style={{ height: 40 }} />
     </ScrollView>
   )
@@ -302,6 +366,16 @@ const styles = StyleSheet.create({
   gmailTitle: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 2 },
   gmailSub: { fontSize: 11, color: '#888780' },
   gmailArrow: { fontSize: 16, color: '#888780' },
+  gmailBannerConnected: { borderColor: '#1D9E75', backgroundColor: '#0A1A14' },
+  connectedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1D9E75' },
+  disconnectBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#2A1A1A', borderRadius: 8 },
+  disconnectText: { fontSize: 12, color: '#E24B4A', fontWeight: '600' },
+  logoutBtn: {
+    marginHorizontal: 20, marginTop: 32, backgroundColor: '#2A1A1A',
+    borderRadius: 12, paddingVertical: 16, alignItems: 'center',
+    borderWidth: 0.5, borderColor: '#E24B4A30',
+  },
+  logoutText: { fontSize: 15, color: '#E24B4A', fontWeight: '600' },
   loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
   headerTitle: { fontSize: 24, fontWeight: '600', color: '#fff' },

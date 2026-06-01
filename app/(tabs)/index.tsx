@@ -179,14 +179,7 @@ export default function DashboardScreen() {
     { rank: 3, name: 'Dani K', tier: 'Silver' as TierName, score: 61, isMe: false },
   ].sort((a, b) => b.score - a.score).map((item, i) => ({ ...item, rank: i + 1 }))
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    if (typeof window !== 'undefined') {
-      window.location.href = '/'
-    } else {
-      router.replace('/(auth)/login')
-    }
-  }
+  // handleLogout dipindah ke Profil screen
 
   if (loading) return (
     <View style={styles.loadingWrap}>
@@ -217,9 +210,6 @@ export default function DashboardScreen() {
                 <Text style={styles.badgeText}>{notifCount > 99 ? '99+' : String(notifCount)}</Text>
               </View>
             )}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutBtnText}>Keluar</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -438,8 +428,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
-  logoutBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A' },
-  logoutBtnText: { fontSize: 13, color: '#888780', fontWeight: '500' },
 
   // Tier Card
   tierCard: {
