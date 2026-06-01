@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert,
+  TouchableOpacity, ActivityIndicator, Alert, Platform,
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
@@ -27,6 +27,7 @@ export default function GmailSetupScreen() {
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [mappings, setMappings] = useState<Mapping[]>([])
   const [loading, setLoading] = useState(true)
+  const [connecting, setConnecting] = useState(false)
 
   useEffect(() => {
     fetchData()
@@ -44,6 +45,32 @@ export default function GmailSetupScreen() {
     setWallets((w ?? []) as Wallet[])
     setMappings((m ?? []) as Mapping[])
     setLoading(false)
+  }
+
+  const handleConnect = async () => {
+    setConnecting(true)
+    try {
+      if (Platform.OS === 'web') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + '/gmail-setup',
+            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            skipBrowserRedirect: false,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent',
+            },
+          },
+        })
+        if (error) throw error
+      } else {
+        Alert.alert('Info', 'Gmail auto-import hanya tersedia di web/PWA.')
+      }
+    } catch (error: any) {
+      Alert.alert('Gagal', error.message)
+      setConnecting(false)
+    }
   }
 
   const handleDelete = async (id: string) => {
@@ -94,18 +121,25 @@ export default function GmailSetupScreen() {
           </Text>
         </View>
 
-        {/* Cara Setup */}
-        <View style={styles.stepCard}>
-          <Text style={styles.stepTitle}>📋 Cara Setup:</Text>
-          <Text style={styles.stepText}>
-            1. Logout → Login lagi via Google{'\n'}
-            2. Approve akses Gmail saat diminta{'\n'}
-            3. Tunggu email bank masuk (atau kirim test){'\n'}
-            4. Zena akan deteksi otomatis dan kirim notifikasi{'\n'}
-            5. Tap notifikasi → pilih wallet untuk bank tersebut{'\n'}
-            6. Selesai! Transaksi selanjutnya auto-masuk
-          </Text>
-        </View>
+        {/* Connect Button */}
+        {mappings.length === 0 && (
+          <TouchableOpacity
+            style={styles.connectBtnLarge}
+            onPress={handleConnect}
+            disabled={connecting}
+            activeOpacity={0.8}
+          >
+            {connecting ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.connectBtnIcon}>🔗</Text>
+                <Text style={styles.connectBtnText}>Hubungkan Gmail Sekarang</Text>
+                <Text style={styles.connectBtnSub}>Approve akses Gmail untuk auto-import</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Mapping Aktif */}
         {mappings.length > 0 && (
@@ -212,4 +246,13 @@ const styles = StyleSheet.create({
   },
   noteTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 8 },
   noteText: { fontSize: 12, color: '#888780', lineHeight: 18 },
+  connectBtnLarge: {
+    marginHorizontal: 20, marginTop: 24, backgroundColor: PRIMARY,
+    borderRadius: 16, paddingVertical: 20, paddingHorizontal: 24,
+    alignItems: 'center', shadowColor: PRIMARY, shadowOpacity: 0.3,
+    shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
+  },
+  connectBtnIcon: { fontSize: 32, marginBottom: 8 },
+  connectBtnText: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  connectBtnSub: { fontSize: 12, color: '#B8D4F1', textAlign: 'center' },
 })

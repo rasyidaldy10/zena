@@ -101,10 +101,35 @@ export default function ProfilScreen() {
     fetchData()
   }
 
+  const handleConnectGmail = async () => {
+    try {
+      if (Platform.OS === 'web') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + '/(tabs)/profil',
+            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            skipBrowserRedirect: false,
+            queryParams: {
+              access_type: 'offline',
+              prompt: 'consent', // Force consent screen untuk Gmail scope
+            },
+          },
+        })
+        if (error) throw error
+        // Akan redirect ke Google consent screen
+      } else {
+        Alert.alert('Info', 'Fitur Gmail auto-import hanya tersedia di web/PWA untuk saat ini.')
+      }
+    } catch (error: any) {
+      Alert.alert('Gagal', error.message || 'Tidak bisa connect ke Gmail')
+    }
+  }
+
   const handleDisconnectGmail = () => {
     Alert.alert(
       'Putuskan Koneksi Gmail?',
-      'Transaksi tidak akan auto-import lagi. Kamu perlu logout → login ulang untuk reconnect.',
+      'Transaksi tidak akan auto-import lagi. Kamu bisa hubungkan ulang kapan saja.',
       [
         { text: 'Batal', style: 'cancel' },
         {
@@ -116,7 +141,7 @@ export default function ProfilScreen() {
             if (session) {
               await supabase.from('gmail_wallet_mappings').delete().eq('user_id', session.user.id)
               setGmailConnected(false)
-              Alert.alert('Berhasil', 'Koneksi Gmail diputus. Mapping dihapus.')
+              Alert.alert('Berhasil', 'Koneksi Gmail diputus. Hubungkan lagi kapan saja dari Profil.')
             }
           },
         },
@@ -183,8 +208,8 @@ export default function ProfilScreen() {
             <Text style={styles.disconnectText}>Putus</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity onPress={() => router.push('/gmail-setup')}>
-            <Text style={styles.gmailArrow}>→</Text>
+          <TouchableOpacity onPress={handleConnectGmail} style={styles.connectBtn}>
+            <Text style={styles.connectText}>Hubungkan</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -368,6 +393,8 @@ const styles = StyleSheet.create({
   gmailArrow: { fontSize: 16, color: '#888780' },
   gmailBannerConnected: { borderColor: '#1D9E75', backgroundColor: '#0A1A14' },
   connectedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1D9E75' },
+  connectBtn: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: PRIMARY, borderRadius: 8 },
+  connectText: { fontSize: 12, color: '#fff', fontWeight: '700' },
   disconnectBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#2A1A1A', borderRadius: 8 },
   disconnectText: { fontSize: 12, color: '#E24B4A', fontWeight: '600' },
   logoutBtn: {
