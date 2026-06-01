@@ -10,6 +10,7 @@ import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { claudeChat, claudeVision } from '../lib/claude'
 import { getContextualSystemPrompt } from '../lib/personas'
+import { speak, stopSpeaking } from '../lib/speech'
 import { Persona, Language, BudgetMethod, Transaction } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -41,6 +42,7 @@ export default function ChatScreen() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
@@ -135,6 +137,7 @@ export default function ChatScreen() {
       const systemPrompt = buildSystemPrompt()
       const response = await claudeChat(systemPrompt, newMessages)
       setMessages(prev => [...prev, { role: 'assistant', content: response }])
+      if (voiceEnabled) speak(response, persona, language === 'en' ? 'en-US' : language === 'zh' ? 'zh-CN' : language === 'my' ? 'ms-MY' : 'id-ID')
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, lagi gangguan bentar. Coba lagi ya!' }])
     }
@@ -270,7 +273,12 @@ Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
           <Text style={styles.headerTitle}>Zena AI</Text>
           <Text style={styles.headerSub}>{getPersonaLabel()} · Online</Text>
         </View>
-        <View style={{ width: 80 }} />
+        <TouchableOpacity
+          style={[styles.voiceToggle, voiceEnabled && styles.voiceToggleActive]}
+          onPress={() => { setVoiceEnabled(v => !v); if (voiceEnabled) stopSpeaking() }}
+        >
+          <Text style={styles.voiceToggleText}>{voiceEnabled ? '🔊' : '🔇'}</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Messages */}
@@ -415,4 +423,10 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { backgroundColor: '#2A2A2A' },
   sendIcon: { fontSize: 16, color: '#fff', fontWeight: '700' },
+  voiceToggle: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  voiceToggleActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  voiceToggleText: { fontSize: 16 },
 })
