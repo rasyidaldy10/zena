@@ -1,68 +1,88 @@
 import { useEffect, useState } from 'react'
-import { Platform } from 'react-native'
-import { Stack, router } from 'expo-router'
+import { Platform, ActivityIndicator, View } from 'react-native'
+import { Stack, router, useSegments, usePathname } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
 
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [initialized, setInitialized] = useState(false)
+  const segments = useSegments()
+  const pathname = usePathname()
 
   useEffect(() => {
-    let cancelled = false
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!cancelled) {
-        setSession(session)
-        setLoading(false)
-      }
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      if (cancelled) return
+    // Initial session check
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
+
       if (session) {
+        // Cek apakah user sudah onboarding
         const { data } = await supabase
           .from('user_preferences')
-          .select('id, avatar_url')
+          .select('id')
           .eq('user_id', session.user.id)
           .single()
 
         if (data) {
-          const googleAvatar =
-            session.user.user_metadata?.avatar_url ||
-            session.user.user_metadata?.picture
-          if (googleAvatar && !data.avatar_url) {
-            await supabase
-              .from('user_preferences')
-              .update({ avatar_url: googleAvatar })
-              .eq('user_id', session.user.id)
+          // User sudah onboarding → dashboard
+          if (pathname === '/' || pathname.includes('auth')) {
+            router.replace('/(tabs)')
           }
-          router.replace('/(tabs)')
         } else {
-          router.replace('/onboarding')
+          // User baru → onboarding
+          if (!pathname.includes('onboarding')) {
+            router.replace('/onboarding')
+          }
         }
       } else {
-        // Jangan redirect ke login kalau lagi proses OAuth callback
-        // (URL punya ?code= dari Supabase redirect)
+        // No session → login
         const isOAuthCallback =
           Platform.OS === 'web' &&
           typeof window !== 'undefined' &&
           window.location.search.includes('code=')
 
-        if (!isOAuthCallback) {
+        if (!isOAuthCallback && !pathname.includes('auth')) {
           router.replace('/(auth)/login')
         }
+      }
+
+      setInitialized(true)
+    })
+
+    // Listen auth changes (login/logout only, bukan setiap state change)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      setSession(session)
+
+      // Hanya handle event login/logout, bukan INITIAL_SESSION atau TOKEN_REFRESHED
+      if (event === 'SIGNED_IN' && session) {
+        const { data } = await supabase
+          .from('user_preferences')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .single()
+
+        if (data) {
+          router.replace('/(tabs)')
+        } else {
+          router.replace('/onboarding')
+        }
+      } else if (event === 'SIGNED_OUT') {
+        router.replace('/(auth)/login')
       }
     })
 
     return () => {
-      cancelled = true
       subscription.unsubscribe()
     }
   }, [])
 
-  if (loading) return null
+  if (!initialized) {
+    return (
+      <View style={{ flex: 1, backgroundColor: '#0F0F0F', justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#185FA5" />
+      </View>
+    )
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
