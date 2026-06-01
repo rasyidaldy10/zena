@@ -26,7 +26,7 @@ export default function LoginScreen() {
             skipBrowserRedirect: false,
             queryParams: {
               access_type: 'offline',
-              prompt: 'consent', // Force consent screen
+              // prompt: 'consent' removed - hanya pakai saat pertama kali atau di profile
             },
           },
         })
@@ -42,7 +42,7 @@ export default function LoginScreen() {
             scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
             queryParams: {
               access_type: 'offline',
-              prompt: 'consent',
+              // prompt: 'consent' removed
             },
           },
         })

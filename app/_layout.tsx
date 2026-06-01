@@ -9,9 +9,28 @@ export default function RootLayout() {
   const [initializing, setInitializing] = useState(true)
 
   useEffect(() => {
-    // Initial check: fast, no DB query
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Initial check with routing
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session)
+
+      // Route based on session
+      if (session) {
+        // Check onboarding status
+        const { data } = await supabase
+          .from('user_preferences')
+          .select('id')
+          .eq('user_id', session.user.id)
+          .maybeSingle()
+
+        if (data) {
+          router.replace('/(tabs)')
+        } else {
+          router.replace('/onboarding')
+        }
+      } else {
+        router.replace('/(auth)/login')
+      }
+
       setInitializing(false)
     })
 
@@ -20,9 +39,8 @@ export default function RootLayout() {
       console.log('Auth event:', event)
       setSession(session)
 
-      // Handle only login/logout events
+      // Handle only login/logout events (not TOKEN_REFRESHED)
       if (event === 'SIGNED_IN' && session) {
-        // Check onboarding status (non-blocking)
         const { data } = await supabase
           .from('user_preferences')
           .select('id')
@@ -37,6 +55,7 @@ export default function RootLayout() {
       } else if (event === 'SIGNED_OUT') {
         router.replace('/(auth)/login')
       }
+      // Ignore TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
     })
 
     return () => subscription.unsubscribe()
