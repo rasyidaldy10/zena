@@ -1,34 +1,21 @@
 import { useState } from 'react'
 import {
-  View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator, KeyboardAvoidingView, Platform
+  View, Text, TouchableOpacity,
+  StyleSheet, Alert, ActivityIndicator, Platform, Image
 } from 'react-native'
-import { router } from 'expo-router'
 import * as WebBrowser from 'expo-web-browser'
 import * as Linking from 'expo-linking'
 import { supabase } from '../../lib/supabase'
 
 WebBrowser.maybeCompleteAuthSession()
 
-export default function LoginScreen() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [googleLoading, setGoogleLoading] = useState(false)
+const PRIMARY = '#185FA5'
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Oops', 'Email dan password harus diisi ya')
-      return
-    }
-    setLoading(true)
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) Alert.alert('Gagal login', error.message)
-    setLoading(false)
-  }
+export default function LoginScreen() {
+  const [loading, setLoading] = useState(false)
 
   const handleGoogleLogin = async () => {
-    setGoogleLoading(true)
+    setLoading(true)
     try {
       if (Platform.OS === 'web') {
         const { error } = await supabase.auth.signInWithOAuth({
@@ -48,140 +35,77 @@ export default function LoginScreen() {
           },
         })
         if (error) throw error
-        if (!data?.url) throw new Error('Tidak ada URL OAuth')
-
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
-        if (result.type === 'success') {
-          const { error: sessionError } = await supabase.auth.exchangeCodeForSession(result.url)
-          if (sessionError) throw sessionError
+        if (data?.url) {
+          const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+          if (result.type === 'success' && result.url) {
+            const url = Linking.parse(result.url)
+            const sessionUrl = `${redirectTo}${url.path ?? ''}?${url.queryParams ? new URLSearchParams(url.queryParams as Record<string, string>).toString() : ''}`
+            await Linking.openURL(sessionUrl)
+          }
         }
       }
-    } catch (err: any) {
-      Alert.alert('Gagal login Google', err.message || 'Coba lagi ya')
-    } finally {
-      setGoogleLoading(false)
+    } catch (error: any) {
+      Alert.alert('Login Gagal', error.message || 'Terjadi kesalahan saat login dengan Google')
     }
+    setLoading(false)
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <View style={styles.inner}>
-        <View style={styles.logoWrap}>
-          <Text style={styles.logo}>Zena</Text>
+    <View style={styles.container}>
+      <View style={styles.content}>
+        {/* Logo/Icon */}
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>💰</Text>
+          <Text style={styles.appName}>Zena</Text>
           <Text style={styles.tagline}>Keuanganmu, selaras.</Text>
         </View>
 
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#888780"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#888780"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-          />
+        {/* Google Login Button */}
+        <TouchableOpacity
+          style={styles.googleBtn}
+          onPress={handleGoogleLogin}
+          disabled={loading}
+          activeOpacity={0.8}
+        >
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.googleIcon}>G</Text>
+              <Text style={styles.googleText}>Masuk dengan Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.btnPrimary}
-            onPress={handleLogin}
-            disabled={loading || googleLoading}
-          >
-            {loading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.btnPrimaryText}>Masuk</Text>
-            }
-          </TouchableOpacity>
-
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>atau</Text>
-            <View style={styles.dividerLine} />
-          </View>
-
-          <TouchableOpacity
-            style={styles.btnGoogle}
-            onPress={handleGoogleLogin}
-            disabled={loading || googleLoading}
-          >
-            {googleLoading
-              ? <ActivityIndicator color="#fff" />
-              : <>
-                  <Text style={styles.googleIcon}>G</Text>
-                  <Text style={styles.btnGoogleText}>Masuk dengan Google</Text>
-                </>
-            }
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.btnSecondary}
-            onPress={() => router.push('/(auth)/register')}
-          >
-            <Text style={styles.btnSecondaryText}>Belum punya akun? Daftar</Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.disclaimer}>
+          Dengan masuk, kamu menyetujui penggunaan data untuk personalisasi pengalaman keuangan
+        </Text>
       </View>
-    </KeyboardAvoidingView>
+
+      <Text style={styles.footer}>Made with 🤍 by Zena AI</Text>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F' },
-  inner: { flex: 1, justifyContent: 'center', paddingHorizontal: 28 },
-  logoWrap: { alignItems: 'center', marginBottom: 48 },
-  logo: { fontSize: 48, fontWeight: '600', color: '#1D9E75', letterSpacing: -1 },
-  tagline: { fontSize: 14, color: '#888780', marginTop: 6 },
-  form: { gap: 12 },
-  input: {
-    height: 52,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 15,
-    color: '#FFFFFF',
-    borderWidth: 0.5,
-    borderColor: '#2A2A2A',
+  container: { flex: 1, backgroundColor: '#0F0F0F', justifyContent: 'space-between' },
+  content: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
+  logoContainer: { alignItems: 'center', marginBottom: 60 },
+  logoText: { fontSize: 72, marginBottom: 12 },
+  appName: { fontSize: 42, fontWeight: '900', color: '#fff', letterSpacing: 4, marginBottom: 8 },
+  tagline: { fontSize: 14, color: '#888780', letterSpacing: 1 },
+  googleBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: PRIMARY, borderRadius: 16, paddingVertical: 16,
+    gap: 12, shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 },
   },
-  btnPrimary: {
-    height: 52,
-    backgroundColor: '#1D9E75',
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
+  googleIcon: { fontSize: 24, fontWeight: '900', color: '#fff' },
+  googleText: { fontSize: 16, fontWeight: '700', color: '#fff', letterSpacing: 0.5 },
+  disclaimer: {
+    fontSize: 11, color: '#555', textAlign: 'center', marginTop: 24,
+    lineHeight: 16, paddingHorizontal: 12,
   },
-  btnPrimaryText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 4 },
-  dividerLine: { flex: 1, height: 0.5, backgroundColor: '#2A2A2A' },
-  dividerText: { fontSize: 12, color: '#888780' },
-  btnGoogle: {
-    height: 52,
-    backgroundColor: '#1A1A1A',
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 0.5,
-    borderColor: '#2A2A2A',
-    gap: 10,
+  footer: {
+    fontSize: 12, color: '#333', textAlign: 'center', paddingBottom: 32,
   },
-  googleIcon: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#4285F4',
-  },
-  btnGoogleText: { color: '#fff', fontSize: 15, fontWeight: '500' },
-  btnSecondary: { alignItems: 'center', paddingVertical: 12 },
-  btnSecondaryText: { color: '#888780', fontSize: 14 },
 })

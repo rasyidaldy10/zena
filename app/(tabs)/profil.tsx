@@ -227,10 +227,12 @@ export default function ProfilScreen() {
       {/* Dompet Saya */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Dompet Saya</Text>
-          <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
-            <Text style={styles.editBtn}>+ Tambah</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionTitle}>Dompet Saya ({wallets.length}/8)</Text>
+          {wallets.length < 8 && (
+            <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
+              <Text style={styles.editBtn}>+ Tambah</Text>
+            </TouchableOpacity>
+          )}
         </View>
         {wallets.length === 0 ? (
           <Text style={styles.emptyWallet}>Belum ada dompet</Text>
@@ -238,7 +240,12 @@ export default function ProfilScreen() {
           wallets.map((w) => {
             const typeLabel = WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type
             return (
-              <View key={w.id} style={styles.walletItem}>
+              <TouchableOpacity
+                key={w.id}
+                style={styles.walletItem}
+                onPress={() => router.push(`/edit-wallet?id=${w.id}`)}
+                activeOpacity={0.7}
+              >
                 <View style={[styles.walletDot, { backgroundColor: w.color || PRIMARY }]}>
                   <Text style={styles.walletDotIcon}>{w.icon}</Text>
                 </View>
@@ -246,10 +253,13 @@ export default function ProfilScreen() {
                   <Text style={styles.walletName}>{w.wallet_name}</Text>
                   <Text style={styles.walletType}>{typeLabel}</Text>
                 </View>
-                <Text style={styles.walletBalance}>
-                  Rp {w.current_balance.toLocaleString('id-ID')}
-                </Text>
-              </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.walletBalance}>
+                    Rp {w.current_balance.toLocaleString('id-ID')}
+                  </Text>
+                  <Text style={styles.walletEdit}>Edit →</Text>
+                </View>
+              </TouchableOpacity>
             )
           })
         )}
@@ -337,4 +347,5 @@ const styles = StyleSheet.create({
   walletName: { fontSize: 14, fontWeight: '500', color: '#fff' },
   walletType: { fontSize: 11, color: '#888780', marginTop: 2 },
   walletBalance: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  walletEdit: { fontSize: 11, color: PRIMARY, marginTop: 4 },
 })

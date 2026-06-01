@@ -38,6 +38,21 @@ export default function TambahWalletScreen() {
       return
     }
 
+    // Cek jumlah wallet user saat ini
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return
+
+    const { count } = await supabase
+      .from('user_wallets')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', session.user.id)
+      .eq('is_active', true)
+
+    if (count && count >= 8) {
+      Alert.alert('Batas Maksimal', 'Kamu hanya bisa memiliki maksimal 8 dompet aktif. Hapus dulu salah satu dompet lama untuk menambah yang baru.')
+      return
+    }
+
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
     const balance = parseFloat(initialBalance.replace(/\./g, '')) || 0

@@ -71,6 +71,8 @@ export default function RootLayout() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="tambah-transaksi" />
       <Stack.Screen name="edit-transaksi" />
+      <Stack.Screen name="tambah-wallet" />
+      <Stack.Screen name="edit-wallet" />
       <Stack.Screen name="chat" />
       <Stack.Screen name="notifications" />
       <Stack.Screen name="zena-intelligence" />
