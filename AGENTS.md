@@ -4,7 +4,21 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## STATUS SESI TERAKHIR (2026-06-01)
+## STATUS SESI TERAKHIR (2026-06-01 Evening)
+
+**🐛 BUG FIX:**
+- ✅ Auth loop bug FIXED: user gak perlu login Google terus-menerus
+- ✅ Session persists: remove `prompt: 'consent'` dari login (cuma di profile connect Gmail)
+- ✅ Initial routing: redirect otomatis ke dashboard/onboarding setelah login
+
+**🎨 REDESIGN IN PROGRESS:**
+- 🚧 Home screen → Livin' style dengan tab horizontal (Tabungan, Deposito, Investasi, dll)
+- 🚧 Bottom nav center button → AI Chat dengan logo Zena
+- 🚧 Compact layout dengan tier badge di header
+
+---
+
+## STATUS SESI SEBELUMNYA (2026-06-01)
 
 - ✅ TypeScript: semua error bersih (`npx tsc --noEmit` 0 error)
 - ✅ Bug fix: wallet filter di Home sekarang pakai `wallet_id OR wallet_source` (filter sebelumnya broken)

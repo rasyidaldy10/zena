@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router'
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native'
 import { router } from 'expo-router'
 
 const PRIMARY = '#185FA5'
@@ -41,19 +41,20 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="tambah-tab"
         options={{
-          tabBarIcon: () => (
-            <View style={styles.addBtn}>
-              <Text style={styles.addBtnText}>+</Text>
-            </View>
-          ),
+          tabBarIcon: () => null,
           tabBarButton: (props) => (
             <TouchableOpacity
               style={styles.addBtnWrap}
               onPress={() => router.push('/tambah-transaksi')}
             >
               <View style={styles.addBtn}>
-                <Text style={styles.addBtnText}>+</Text>
+                <Image
+                  source={require('../../assets/icon.png')}
+                  style={styles.zenaBtnIcon}
+                  resizeMode="contain"
+                />
               </View>
+              <Text style={styles.zenaBtnLabel}>Catat</Text>
             </TouchableOpacity>
           ),
         }}
@@ -69,9 +70,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profil"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="👤" label="Profil" />
-          ),
+          href: null, // Hide from tab bar
+          tabBarButton: () => null,
         }}
       />
     </Tabs>
@@ -80,27 +80,46 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   tabBar: {
-    backgroundColor: '#111111',
-    borderTopColor: '#2A2A2A',
-    borderTopWidth: 0.5,
-    height: 72,
+    backgroundColor: '#FFFFFF',
+    borderTopColor: '#F0F4F8',
+    borderTopWidth: 1,
+    height: 80,
     paddingBottom: 8,
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 8,
   },
-  tabItem: { alignItems: 'center', justifyContent: 'center', paddingTop: 6 },
-  tabIcon: { fontSize: 20, opacity: 0.4 },
+  tabItem: { alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
+  tabIcon: { fontSize: 22, opacity: 0.4 },
   tabIconActive: { opacity: 1 },
-  tabLabel: { fontSize: 10, color: '#888780', marginTop: 2 },
+  tabLabel: { fontSize: 10, color: '#888888', marginTop: 4 },
   tabLabelActive: { color: PRIMARY, fontWeight: '600' },
   addBtnWrap: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginTop: -30,
   },
   addBtn: {
-    width: 52, height: 52, borderRadius: 26,
-    backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center',
-    shadowColor: PRIMARY, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: PRIMARY,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: PRIMARY,
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 12,
   },
-  addBtnText: { fontSize: 28, color: '#fff', fontWeight: '300', lineHeight: 32 },
+  zenaBtnIcon: { width: 36, height: 36 },
+  zenaBtnLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: PRIMARY,
+    marginTop: 6,
+  },
 })

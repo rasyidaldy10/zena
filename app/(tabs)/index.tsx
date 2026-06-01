@@ -1,98 +1,62 @@
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert,
+  View, Text, ScrollView, TouchableOpacity, StyleSheet,
+  ActivityIndicator, Alert, Image, Dimensions
 } from 'react-native'
-import { useState, useCallback, useEffect, useRef } from 'react'
 import { router, useFocusEffect } from 'expo-router'
-import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
-import { Transaction, UserWallet, TIER_CONFIG, TierName } from '../../types'
-import { calculateFinancialScore, getNextTier } from '../../lib/scoring'
+import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
+import { calculateFinancialScore } from '../../lib/scoring'
+import { TIER_CONFIG } from '../../types'
 
 const PRIMARY = '#185FA5'
+const BG_APP = '#F4F7FA'
+const CARD_BG = '#FFFFFF'
+const TEXT_MAIN = '#0D1B3E'
+const TEXT_SECONDARY = '#888888'
+const INCOME_COLOR = '#16A34A'
+const EXPENSE_COLOR = '#E24B4A'
 
-const CATEGORY_EMOJI: Record<string, string> = {
-  'Makan & Minum': '🍔', 'Transport': '🚗', 'Belanja': '🛍️',
-  'Tagihan': '📋', 'Hiburan': '🎮', 'Kesehatan': '💊',
-  'Bisnis': '💼', 'Investasi': '📈', 'Tabungan': '🏦',
-  'Biaya Admin & Fee': '💳', 'Lainnya': '📦', 'Transfer': '🔄',
-}
+const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-export default function DashboardScreen() {
-  const [notifCount, setNotifCount] = useState(0)
-  const channelRef = useRef<RealtimeChannel | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [nickname, setNickname] = useState('')
-  const [totalBalance, setTotalBalance] = useState(0)
-  const [monthBalance, setMonthBalance] = useState(0)
+type TabMode = 'personal' | 'business' | 'all'
+
+export default function HomeScreen() {
+  const [prefs, setPrefs] = useState<UserPreferences | null>(null)
+  const [wallets, setWallets] = useState<UserWallet[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
-  const [score, setScore] = useState<ReturnType<typeof calculateFinancialScore> | null>(null)
-  const [streak, setStreak] = useState(0)
-  const [daysInBudget, setDaysInBudget] = useState(0)
-  const [monthlyIncome, setMonthlyIncome] = useState(0)
+  const [notifCount, setNotifCount] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [tabMode, setTabMode] = useState<TabMode>('all')
+  const [balanceVisible, setBalanceVisible] = useState(true)
+  const [rincianExpanded, setRincianExpanded] = useState(false)
+  const channelRef = useRef<any>(null)
 
   const fetchData = async () => {
-    setLoading(true)
     const { data: { session } } = await supabase.auth.getSession()
-    const user = session?.user
+    if (!session) return
 
     const [
-      { data: prefs },
-      { data: walletsData },
-      { data: recentTxns },
-      { data: monthTxnsData },
+      { data: p },
+      { data: w },
+      { data: t },
+      { data: n }
     ] = await Promise.all([
-      supabase.from('user_preferences').select('*').eq('user_id', user?.id).single(),
-      supabase.from('user_wallets').select('*').eq('user_id', user?.id).eq('is_active', true).order('created_at', { ascending: true }),
-      supabase.from('transactions').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(10),
-      supabase.from('transactions').select('*').eq('user_id', user?.id)
-        .gte('date', new Date().toISOString().slice(0, 7) + '-01')
-        .lte('date', new Date().toISOString().slice(0, 7) + '-31')
-        .order('date', { ascending: false }).limit(50),
+      supabase.from('user_preferences').select('*').eq('user_id', session.user.id).single(),
+      supabase.from('user_wallets').select('*').eq('user_id', session.user.id).eq('is_active', true),
+      supabase.from('transactions').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
+      supabase.from('notifications').select('id').eq('user_id', session.user.id).eq('is_read', false)
     ])
 
-    if (prefs?.nickname) setNickname(prefs.nickname)
-    if (prefs?.monthly_income) setMonthlyIncome(prefs.monthly_income)
-
-    // Fetch unread notification count (graceful — table mungkin belum ada)
-    try {
-      const { data: unread } = await supabase
-        .from('notifications')
-        .select('id')
-        .eq('user_id', user?.id)
-        .eq('is_read', false)
-      setNotifCount(unread?.length ?? 0)
-    } catch {
-      setNotifCount(0)
-    }
-
-    if (walletsData) {
-      const total = walletsData.reduce((s: number, w: any) => s + (w.current_balance || 0), 0)
-      setTotalBalance(total)
-    }
-
-    const recent = (recentTxns || []) as Transaction[]
-    const monthTxns = (monthTxnsData || []) as Transaction[]
-    setTransactions(recent.slice(0, 10))
-
-    const streakDays = calcStreak(monthTxns)
-    setStreak(streakDays)
-
-    const scoreData = calculateFinancialScore(monthTxns, prefs?.monthly_income || 0, streakDays)
-    setScore(scoreData)
-
-    const income = monthTxns.filter(t => t.type === 'income' && !t.is_wallet_transfer).reduce((s, t) => s + t.amount, 0)
-    const expense = monthTxns.filter(t => t.type === 'expense' && !t.is_wallet_transfer).reduce((s, t) => s + t.amount, 0)
-    setMonthBalance(income - expense)
-
-    setDaysInBudget(calcDaysInBudget(monthTxns, prefs?.monthly_income || 0))
-
+    setPrefs(p as UserPreferences)
+    setWallets((w ?? []) as UserWallet[])
+    setTransactions((t ?? []) as Transaction[])
+    setNotifCount(n?.length ?? 0)
     setLoading(false)
   }
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
 
-  // Realtime subscription untuk badge notifikasi
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
@@ -113,6 +77,13 @@ export default function DashboardScreen() {
     }
   }, [])
 
+  const getBalance = () => {
+    if (tabMode === 'personal') return wallets.filter(w => w.wallet_type === 'personal').reduce((s, w) => s + w.current_balance, 0)
+    if (tabMode === 'business') return wallets.filter(w => w.wallet_type === 'business').reduce((s, w) => s + w.current_balance, 0)
+    return wallets.reduce((s, w) => s + w.current_balance, 0)
+  }
+
+  // Calculate streak
   const calcStreak = (txns: Transaction[]): number => {
     const dates = new Set(txns.filter(t => !t.is_wallet_transfer).map(t => t.date))
     let s = 0
@@ -126,491 +97,340 @@ export default function DashboardScreen() {
     return s
   }
 
-  const calcDaysInBudget = (txns: Transaction[], income: number): number => {
-    if (!income) return 0
-    const today = new Date()
-    const totalDays = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-    const dailyBudget = income / totalDays
-    const byDate: Record<string, number> = {}
-    txns.filter(t => t.type === 'expense' && !t.is_wallet_transfer).forEach(t => {
-      byDate[t.date] = (byDate[t.date] || 0) + t.amount
-    })
-    let ok = 0, checked = 0
-    for (let i = 1; i <= today.getDate(); i++) {
-      const d = new Date(today.getFullYear(), today.getMonth(), i)
-      if (d > today) break
-      checked++
-      const dateStr = d.toISOString().split('T')[0]
-      if ((byDate[dateStr] || 0) <= dailyBudget) ok++
-    }
-    return checked > 0 ? Math.round((ok / checked) * 100) : 100
-  }
-
-  const fmt = (n: number, short = false) => {
-    if (short) {
-      const abs = Math.abs(n)
-      if (abs >= 1_000_000) return `Rp ${(abs / 1_000_000).toFixed(1)}jt`
-      if (abs >= 1_000) return `Rp ${(abs / 1_000).toFixed(0)}rb`
-      return `Rp ${abs}`
-    }
-    return 'Rp ' + Math.abs(n).toLocaleString('id-ID')
-  }
-
-  const getGreeting = () => {
-    const h = new Date().getHours()
-    if (h < 12) return 'Pagi'
-    if (h < 15) return 'Siang'
-    if (h < 18) return 'Sore'
-    return 'Malam'
-  }
-
+  const streak = calcStreak(transactions)
+  const score = prefs ? calculateFinancialScore(transactions, prefs.monthly_income, streak) : null
   const tierName = (score?.tier || 'Starter') as TierName
-  const tierCfg = TIER_CONFIG[tierName]
-  const nextTierName = getNextTier(tierName)
-  const nextTierCfg = nextTierName ? TIER_CONFIG[nextTierName] : null
-  const xpPct = nextTierCfg
-    ? Math.min(100, Math.round(((score?.total || 0) - tierCfg.min) / (nextTierCfg.min - tierCfg.min) * 100))
-    : 100
-  const initials = nickname ? nickname.slice(0, 2).toUpperCase() : 'ZN'
+  const tierConfig = TIER_CONFIG[tierName]
+  const initials = prefs?.nickname ? prefs.nickname.slice(0, 2).toUpperCase() : 'U'
+  const balance = getBalance()
 
-  const leaderboard = [
-    { rank: 1, name: 'Rizal P', tier: 'Platinum' as TierName, score: 88, isMe: false },
-    { rank: 2, name: nickname || 'Kamu', tier: tierName, score: score?.total || 0, isMe: true },
-    { rank: 3, name: 'Dani K', tier: 'Silver' as TierName, score: 61, isMe: false },
-  ].sort((a, b) => b.score - a.score).map((item, i) => ({ ...item, rank: i + 1 }))
-
-  // handleLogout dipindah ke Profil screen
-
-  if (loading) return (
-    <View style={styles.loadingWrap}>
-      <ActivityIndicator color={PRIMARY} size="large" />
-      <Text style={styles.loadingText}>Memuat data keuanganmu...</Text>
-    </View>
-  )
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color={PRIMARY} style={{ marginTop: 100 }} />
+      </View>
+    )
+  }
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
-
-      {/* ── HEADER ── */}
+    <View style={styles.container}>
+      {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <TouchableOpacity style={styles.avatar} onPress={() => router.push('/(tabs)/profil')}>
+          <View style={styles.avatar}>
             <Text style={styles.avatarText}>{initials}</Text>
-          </TouchableOpacity>
+          </View>
           <View>
-            <Text style={styles.greeting}>Selamat {getGreeting()}</Text>
-            <Text style={styles.name}>{nickname || 'Kamu'} 👋</Text>
+            <Text style={styles.headerName}>{prefs?.nickname || 'User'}</Text>
+            <Text style={styles.headerTier}>{tierName} • {score?.total ?? 0} XP</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
-            <Text style={styles.iconBtnText}>🔔</Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/notifications')}>
+            <Text style={styles.headerBtnIcon}>🔔</Text>
             {notifCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{notifCount > 99 ? '99+' : String(notifCount)}</Text>
+              <View style={styles.headerBadge}>
+                <Text style={styles.headerBadgeText}>{notifCount > 9 ? '9+' : notifCount}</Text>
               </View>
             )}
           </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* ── TIER CARD ── */}
-      <View style={[styles.tierCard, { borderColor: tierCfg.color + '60' }]}>
-        <View style={styles.tierGlow} pointerEvents="none" />
-
-        <View style={styles.tierTopRow}>
-          <View style={styles.tierBadge}>
-            <View style={[styles.tierEmojiWrap, { backgroundColor: tierCfg.color + '20' }]}>
-              <Text style={styles.tierEmoji}>{tierCfg.icon}</Text>
-            </View>
-            <View>
-              <Text style={[styles.tierRankName, { color: tierCfg.color }]}>{tierName}</Text>
-              <Text style={styles.tierRankLabel}>Financial Rank</Text>
-            </View>
-          </View>
-          <View style={styles.tierScoreWrap}>
-            <Text style={[styles.tierScoreNum, { color: tierCfg.color }]}>{score?.total ?? 0}</Text>
-            <Text style={styles.tierScoreUnit}>/ 100 XP</Text>
-          </View>
-        </View>
-
-        <View style={styles.tierBalanceRow}>
-          <View>
-            <Text style={styles.tierBalLabel}>Total Saldo</Text>
-            <Text style={styles.tierBalAmount}>{fmt(totalBalance)}</Text>
-          </View>
-          <View style={styles.tierChangePill}>
-            <Text style={[styles.tierChangeText, { color: monthBalance >= 0 ? '#1D9E75' : '#E24B4A' }]}>
-              {monthBalance >= 0 ? '↑' : '↓'} {fmt(monthBalance, true)} bulan ini
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.xpSection}>
-          <View style={styles.xpBar}>
-            <View style={[styles.xpFill, { width: `${Math.max(2, xpPct)}%`, backgroundColor: tierCfg.color }]} />
-          </View>
-          <View style={styles.xpLabels}>
-            <Text style={styles.xpPct}>{xpPct}% XP</Text>
-            <Text style={styles.xpNext}>
-              {nextTierName ? `→ ${nextTierName}` : '🏆 MAX TIER'}
-            </Text>
-          </View>
-        </View>
-      </View>
-
-      {/* ── RINCIAN SALDO SEMUA DOMPET ── */}
-      <View style={styles.walletBreakdownCard}>
-        <View style={styles.walletBreakdownHeader}>
-          <Text style={styles.walletBreakdownTitle}>Rincian Saldo</Text>
-          <TouchableOpacity onPress={() => router.push('/detail-wallet')}>
-            <Text style={styles.walletBreakdownLink}>Lihat Detail →</Text>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(tabs)/profil')}>
+            <Text style={styles.headerBtnIcon}>⚙️</Text>
           </TouchableOpacity>
         </View>
-        {wallets.slice(0, 5).map((w) => (
-          <View key={w.id} style={styles.walletBreakdownItem}>
-            <View style={styles.walletBreakdownLeft}>
-              <View style={[styles.walletBreakdownDot, { backgroundColor: w.color }]}>
-                <Text style={styles.walletBreakdownIcon}>{w.icon}</Text>
+      </View>
+
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* BALANCE CARD */}
+        <View style={styles.balanceCard}>
+          {/* Tabs */}
+          <View style={styles.balanceTabs}>
+            {(['all', 'personal', 'business'] as TabMode[]).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.balanceTab, tabMode === tab && styles.balanceTabActive]}
+                onPress={() => setTabMode(tab)}
+              >
+                <Text style={[styles.balanceTabText, tabMode === tab && styles.balanceTabTextActive]}>
+                  {tab === 'all' ? 'Semua' : tab === 'personal' ? 'Pribadi' : 'Bisnis'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Balance */}
+          <View style={styles.balanceContent}>
+            <View style={styles.balanceLeft}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={styles.balanceLabel}>Total Saldo</Text>
+                <TouchableOpacity onPress={() => setBalanceVisible(!balanceVisible)}>
+                  <Text style={{ fontSize: 16 }}>{balanceVisible ? '👁️' : '👁️‍🗨️'}</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.walletBreakdownName}>{w.wallet_name}</Text>
-            </View>
-            <Text style={styles.walletBreakdownBalance}>
-              Rp {w.current_balance.toLocaleString('id-ID')}
-            </Text>
-          </View>
-        ))}
-        {wallets.length > 5 && (
-          <TouchableOpacity
-            style={styles.walletBreakdownMore}
-            onPress={() => router.push('/detail-wallet')}
-          >
-            <Text style={styles.walletBreakdownMoreText}>
-              +{wallets.length - 5} dompet lainnya
-            </Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* ── SCORE GRID 2×2 ── */}
-      <Text style={styles.sectionTitle}>Financial Score</Text>
-      <View style={styles.scoreGrid}>
-        {[
-          { label: 'Konsistensi', value: score?.consistency ?? 0, emoji: '📅', color: PRIMARY, desc: 'Streak harian' },
-          { label: 'Budget', value: score?.budget_adherence ?? 0, emoji: '💰', color: '#1D9E75', desc: 'Pengeluaran vs income' },
-          { label: 'Tabungan', value: score?.saving_rate ?? 0, emoji: '🐷', color: '#534AB7', desc: 'Saving rate' },
-          { label: 'Target', value: score?.goal_completion ?? 0, emoji: '🎯', color: '#BA7517', desc: 'Goal completion' },
-        ].map(item => (
-          <View key={item.label} style={styles.scoreCard}>
-            <View style={styles.scoreCardHeader}>
-              <Text style={styles.scoreEmoji}>{item.emoji}</Text>
-              <Text style={[styles.scoreNum, { color: item.color }]}>{item.value}</Text>
-            </View>
-            <View style={styles.scoreBarBg}>
-              <View style={[styles.scoreBarFill, { width: `${item.value}%`, backgroundColor: item.color }]} />
-            </View>
-            <Text style={styles.scoreLabel}>{item.label}</Text>
-            <Text style={styles.scoreDesc}>{item.desc}</Text>
-          </View>
-        ))}
-      </View>
-
-      {/* ── STREAK CARDS ── */}
-      <Text style={styles.sectionTitle}>Statistik Bulan Ini</Text>
-      <View style={styles.streakRow}>
-        <View style={styles.streakCard}>
-          <Text style={styles.streakEmoji}>🔥</Text>
-          <Text style={styles.streakNum}>{streak}</Text>
-          <Text style={styles.streakLabel}>Hari Streak</Text>
-        </View>
-        <View style={styles.streakCard}>
-          <Text style={styles.streakEmoji}>📊</Text>
-          <Text style={styles.streakNum}>{transactions.filter(t => !t.is_wallet_transfer).length}</Text>
-          <Text style={styles.streakLabel}>Transaksi</Text>
-        </View>
-        <View style={styles.streakCard}>
-          <Text style={styles.streakEmoji}>🎯</Text>
-          <Text style={styles.streakNum}>{daysInBudget}%</Text>
-          <Text style={styles.streakLabel}>Dalam Budget</Text>
-        </View>
-      </View>
-
-      {/* ── LEADERBOARD ── */}
-      <Text style={styles.sectionTitle}>Leaderboard Teman</Text>
-      <View style={styles.leaderboard}>
-        {leaderboard.map(item => {
-          const tc = TIER_CONFIG[item.tier]
-          return (
-            <View key={item.rank} style={[styles.leaderRow, item.isMe && styles.leaderRowMe]}>
-              <Text style={styles.leaderRankEmoji}>
-                {item.rank === 1 ? '🥇' : item.rank === 2 ? '🥈' : '🥉'}
+              <Text style={styles.balanceAmount}>
+                {balanceVisible ? `Rp ${balance.toLocaleString('id-ID')}` : 'Rp ••••••'}
               </Text>
-              <View style={[styles.leaderAvatar, { backgroundColor: item.isMe ? PRIMARY : '#2A2A2A' }]}>
-                <Text style={styles.leaderAvatarText}>{item.name.slice(0, 2).toUpperCase()}</Text>
+              <Text style={styles.balanceChange}>↑ +12% bulan ini</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.rincianBtn}
+              onPress={() => setRincianExpanded(!rincianExpanded)}
+            >
+              <Text style={styles.rincianBtnText}>Rincian</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Expanded Wallet List */}
+          {rincianExpanded && (
+            <View style={styles.walletList}>
+              {wallets.map(w => (
+                <View key={w.id} style={styles.walletItem}>
+                  <Text style={styles.walletIcon}>{w.icon}</Text>
+                  <View style={styles.walletInfo}>
+                    <Text style={styles.walletName}>{w.wallet_name}</Text>
+                    <Text style={styles.walletType}>{w.wallet_type}</Text>
+                  </View>
+                  <Text style={styles.walletBalance}>Rp {w.current_balance.toLocaleString('id-ID')}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* XP Progress */}
+          <View style={styles.xpSection}>
+            <View style={styles.xpBar}>
+              <View style={[styles.xpFill, { width: `${(score?.total ?? 0)}%`, backgroundColor: tierConfig.color }]} />
+            </View>
+            <Text style={styles.xpText}>{score?.total ?? 0}% XP</Text>
+          </View>
+        </View>
+
+        {/* QUICK ACTIONS */}
+        <View style={styles.quickActions}>
+          {/* Row 1 */}
+          <View style={styles.quickRow}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
+                <Text style={{ fontSize: 24 }}>💬</Text>
               </View>
-              <View style={styles.leaderInfo}>
-                <Text style={styles.leaderName}>{item.name}{item.isMe ? ' (Kamu)' : ''}</Text>
-                <Text style={[styles.leaderTier, { color: tc?.color || '#888780' }]}>
-                  {tc?.icon} {item.tier}
+              <Text style={styles.quickLabel}>Zena AI</Text>
+              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                <Text style={{ fontSize: 24 }}>📸</Text>
+              </View>
+              <Text style={styles.quickLabel}>Scan Struk</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                <Text style={{ fontSize: 24 }}>📊</Text>
+              </View>
+              <Text style={styles.quickLabel}>Laporan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
+                <Text style={{ fontSize: 24 }}>🎯</Text>
+              </View>
+              <Text style={styles.quickLabel}>Budget</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Row 2 */}
+          <View style={styles.quickRow}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
+                <Text style={{ fontSize: 24 }}>🧠</Text>
+              </View>
+              <Text style={styles.quickLabel}>ZENA Intel</Text>
+              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
+                <Text style={{ fontSize: 24 }}>💰</Text>
+              </View>
+              <Text style={styles.quickLabel}>Tabungan</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => Alert.alert('Segera hadir! 🏆')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                <Text style={{ fontSize: 24 }}>🏆</Text>
+              </View>
+              <Text style={styles.quickLabel}>Leaderboard</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
+              <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                <Text style={{ fontSize: 24 }}>🔔</Text>
+              </View>
+              <Text style={styles.quickLabel}>Reminder</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* FINANCIAL SCORE */}
+        <Text style={styles.sectionTitle}>Financial Score</Text>
+        <View style={styles.scoreGrid}>
+          {[
+            { label: 'Konsistensi', value: score?.consistency ?? 0, color: INCOME_COLOR },
+            { label: 'Budget', value: score?.budget_adherence ?? 0, color: PRIMARY },
+            { label: 'Tabungan', value: score?.saving_rate ?? 0, color: '#B45309' },
+            { label: 'Goal', value: score?.goal_completion ?? 0, color: '#7C3AED' },
+          ].map(item => (
+            <View key={item.label} style={styles.scoreCard}>
+              <Text style={styles.scoreLabel}>{item.label}</Text>
+              <Text style={[styles.scoreValue, { color: item.color }]}>{item.value}</Text>
+              <View style={styles.scoreBar}>
+                <View style={[styles.scoreBarFill, { width: `${item.value}%`, backgroundColor: item.color }]} />
+              </View>
+              <Text style={styles.scoreStatus}>
+                {item.value >= 80 ? 'Sangat Baik' : item.value >= 60 ? 'Baik' : item.value >= 40 ? 'Cukup' : 'Perlu Perbaikan'}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* TRANSAKSI TERAKHIR */}
+        <View style={styles.txnHeader}>
+          <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/laporan')}>
+            <Text style={styles.txnSeeAll}>Semua →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {transactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={{ fontSize: 36 }}>📝</Text>
+            <Text style={styles.emptyText}>Belum ada transaksi</Text>
+          </View>
+        ) : (
+          <View style={styles.txnList}>
+            {transactions.map(txn => (
+              <View key={txn.id} style={styles.txnItem}>
+                <View style={[styles.txnIcon, { backgroundColor: txn.type === 'income' ? '#F0FDF4' : '#FEF2F2' }]}>
+                  <Text style={{ fontSize: 20 }}>
+                    {txn.type === 'income' ? '💰' : '💸'}
+                  </Text>
+                </View>
+                <View style={styles.txnInfo}>
+                  <Text style={styles.txnCategory}>{txn.category}</Text>
+                  <Text style={styles.txnDate}>{new Date(txn.date).toLocaleDateString('id-ID')}</Text>
+                </View>
+                <Text style={[styles.txnAmount, { color: txn.type === 'income' ? INCOME_COLOR : EXPENSE_COLOR }]}>
+                  {txn.type === 'income' ? '+' : '-'}Rp {txn.amount.toLocaleString('id-ID')}
                 </Text>
               </View>
-              <View style={styles.leaderScoreWrap}>
-                <Text style={[styles.leaderScore, item.isMe && { color: PRIMARY }]}>{item.score}</Text>
-                <Text style={styles.leaderScoreUnit}>XP</Text>
-              </View>
-            </View>
-          )
-        })}
-        <Text style={styles.leaderNote}>✨ Fitur teman segera hadir</Text>
-      </View>
-
-      {/* ── QUICK ACTIONS ── */}
-      <Text style={styles.sectionTitle}>Aksi Cepat</Text>
-      <View style={styles.quickRow}>
-        {[
-          { icon: '➕', label: 'Catat', onPress: () => router.push('/tambah-transaksi') },
-          { icon: '🔄', label: 'Transfer', onPress: () => router.push('/tambah-transaksi') },
-          { icon: '🤖', label: 'AI Chat', onPress: () => router.push('/chat') },
-          { icon: '👛', label: 'Dompet', onPress: () => router.push('/tambah-wallet') },
-        ].map(item => (
-          <TouchableOpacity key={item.label} style={styles.qaBtn} onPress={item.onPress}>
-            <Text style={styles.qaIcon}>{item.icon}</Text>
-            <Text style={styles.qaLabel}>{item.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* ── TRANSAKSI TERAKHIR ── */}
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
-        <TouchableOpacity onPress={() => router.push('/(tabs)/laporan')}>
-          <Text style={styles.seeAll}>Lihat semua →</Text>
-        </TouchableOpacity>
-      </View>
-
-      {transactions.slice(0, 5).length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyIcon}>💸</Text>
-          <Text style={styles.emptyText}>Belum ada transaksi bulan ini</Text>
-          <TouchableOpacity onPress={() => router.push('/tambah-transaksi')}>
-            <Text style={styles.emptyAction}>+ Catat transaksi pertama</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        transactions.slice(0, 5).map(txn => (
-          <TouchableOpacity
-            key={txn.id}
-            style={styles.txnItem}
-            onPress={() => {
-              if (!txn.is_wallet_transfer) router.push(`/edit-transaksi?id=${txn.id}`)
-            }}
-          >
-            <View style={[styles.txnIconWrap, txn.is_wallet_transfer && { backgroundColor: '#1E1A2E' }]}>
-              <Text style={styles.txnEmoji}>{CATEGORY_EMOJI[txn.category] || '📦'}</Text>
-            </View>
-            <View style={styles.txnInfo}>
-              <Text style={styles.txnCat}>
-                {txn.is_wallet_transfer
-                  ? (txn.type === 'expense' ? 'Transfer Keluar' : 'Transfer Masuk')
-                  : txn.category}
-              </Text>
-              <Text style={styles.txnDate}>{txn.date}{txn.note ? ' · ' + txn.note : ''}</Text>
-            </View>
-            <Text style={[
-              styles.txnAmount,
-              txn.type === 'income' ? styles.txnIncome : styles.txnExpense,
-              txn.is_wallet_transfer && { color: '#888780' },
-            ]}>
-              {txn.type === 'income' ? '+' : '-'}{fmt(txn.amount, true)}
-            </Text>
-          </TouchableOpacity>
-        ))
-      )}
-    </ScrollView>
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F' },
-  loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontSize: 13, color: '#888780' },
-
-  // Header
+  container: { flex: 1, backgroundColor: BG_APP },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 20,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: PRIMARY, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 32,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerRight: { flexDirection: 'row', gap: 8 },
   avatar: {
-    width: 44, height: 44, borderRadius: 14, backgroundColor: PRIMARY,
+    width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  greeting: { fontSize: 12, color: '#888780' },
-  name: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  iconBtn: {
-    width: 36, height: 36, borderRadius: 10, backgroundColor: '#1A1A1A',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  headerTier: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  headerRight: { flexDirection: 'row', gap: 8 },
+  headerBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', position: 'relative' },
+  headerBtnIcon: { fontSize: 20 },
+  headerBadge: {
+    position: 'absolute', top: 2, right: 2, backgroundColor: '#E24B4A',
+    borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center',
   },
-  iconBtnText: { fontSize: 16 },
-  badge: {
-    position: 'absolute', top: -4, right: -4,
-    backgroundColor: '#E24B4A', borderRadius: 8,
-    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
+  headerBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
-  // Tier Card
-  tierCard: {
-    marginHorizontal: 20, marginBottom: 24, backgroundColor: '#141420',
-    borderRadius: 20, padding: 20, borderWidth: 1.5, overflow: 'hidden',
+  balanceCard: {
+    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: -18,
+    borderRadius: 24, padding: 20,
+    shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 32, shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  tierGlow: {
-    position: 'absolute', top: -40, right: -40,
-    width: 120, height: 120, borderRadius: 60,
-    backgroundColor: PRIMARY, opacity: 0.06,
+  balanceTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  balanceTab: { paddingVertical: 8, paddingHorizontal: 16 },
+  balanceTabActive: { borderBottomWidth: 2, borderBottomColor: PRIMARY },
+  balanceTabText: { fontSize: 13, color: TEXT_SECONDARY },
+  balanceTabTextActive: { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  balanceContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  balanceLeft: { flex: 1 },
+  balanceLabel: { fontSize: 13, color: TEXT_SECONDARY },
+  balanceAmount: { fontSize: 28, fontWeight: '800', color: TEXT_MAIN, marginTop: 4 },
+  balanceChange: { fontSize: 12, color: INCOME_COLOR, marginTop: 4 },
+  rincianBtn: {
+    backgroundColor: PRIMARY + '10', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16,
   },
-  tierTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
-  tierBadge: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tierEmojiWrap: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  tierEmoji: { fontSize: 22 },
-  tierRankName: { fontSize: 18, fontWeight: '700' },
-  tierRankLabel: { fontSize: 11, color: '#888780', marginTop: 2 },
-  tierScoreWrap: { alignItems: 'flex-end' },
-  tierScoreNum: { fontSize: 32, fontWeight: '800', lineHeight: 36 },
-  tierScoreUnit: { fontSize: 11, color: '#888780' },
-  tierBalanceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 16 },
-  tierBalLabel: { fontSize: 12, color: '#888780', marginBottom: 4 },
-  tierBalAmount: { fontSize: 26, fontWeight: '700', color: '#fff' },
-  tierChangePill: { backgroundColor: '#1A1A1A', borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tierChangeText: { fontSize: 12, fontWeight: '600' },
-  xpSection: { gap: 6 },
-  xpBar: { height: 6, backgroundColor: '#2A2A2A', borderRadius: 3, overflow: 'hidden' },
-  xpFill: { height: '100%', borderRadius: 3 },
-  xpLabels: { flexDirection: 'row', justifyContent: 'space-between' },
-  xpPct: { fontSize: 11, color: '#888780' },
-  xpNext: { fontSize: 11, color: '#888780' },
+  rincianBtnText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
+  walletList: { marginTop: 16, gap: 12 },
+  walletItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  walletIcon: { fontSize: 24 },
+  walletInfo: { flex: 1 },
+  walletName: { fontSize: 14, fontWeight: '600', color: TEXT_MAIN },
+  walletType: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 },
+  walletBalance: { fontSize: 13, fontWeight: '600', color: TEXT_MAIN },
+  xpSection: { marginTop: 16 },
+  xpBar: { height: 6, backgroundColor: '#F0F4F8', borderRadius: 3, overflow: 'hidden' },
+  xpFill: { height: '100%' },
+  xpText: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 6, textAlign: 'center' },
 
-  // Section
+  quickActions: { marginHorizontal: 20, marginTop: 24, gap: 16 },
+  quickRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  quickBtn: { alignItems: 'center', width: (SCREEN_WIDTH - 60) / 4, position: 'relative' },
+  quickIcon: {
+    width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+  },
+  quickLabel: { fontSize: 11, color: TEXT_MAIN, marginTop: 6, textAlign: 'center' },
+  quickBadge: {
+    position: 'absolute', top: -4, right: 4, backgroundColor: '#E24B4A',
+    borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
+  },
+  quickBadgeText: { fontSize: 8, fontWeight: '700', color: '#fff' },
+
   sectionTitle: {
-    fontSize: 12, fontWeight: '700', color: '#888780',
-    textTransform: 'uppercase', letterSpacing: 1,
-    marginBottom: 12, paddingHorizontal: 20,
+    fontSize: 16, fontWeight: '700', color: TEXT_MAIN,
+    marginHorizontal: 20, marginTop: 24, marginBottom: 12,
   },
-  sectionRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingRight: 20,
-  },
-  seeAll: { fontSize: 13, color: PRIMARY, fontWeight: '500', paddingBottom: 12 },
-
-  // Score Grid
   scoreGrid: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
-    paddingHorizontal: 20, marginBottom: 24,
+    flexDirection: 'row', flexWrap: 'wrap', gap: 12,
+    marginHorizontal: 20,
   },
   scoreCard: {
-    width: '47%', backgroundColor: '#1A1A1A', borderRadius: 16,
-    padding: 14, borderWidth: 0.5, borderColor: '#2A2A2A',
+    width: (SCREEN_WIDTH - 52) / 2, backgroundColor: '#F8FAFC',
+    borderRadius: 14, padding: 16,
   },
-  scoreCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
-  scoreEmoji: { fontSize: 20 },
-  scoreNum: { fontSize: 24, fontWeight: '800' },
-  scoreBarBg: { height: 4, backgroundColor: '#2A2A2A', borderRadius: 2, overflow: 'hidden', marginBottom: 8 },
-  scoreBarFill: { height: '100%', borderRadius: 2 },
-  scoreLabel: { fontSize: 13, fontWeight: '600', color: '#fff', marginBottom: 2 },
-  scoreDesc: { fontSize: 10, color: '#888780' },
+  scoreLabel: { fontSize: 12, color: TEXT_SECONDARY, marginBottom: 8 },
+  scoreValue: { fontSize: 24, fontWeight: '800' },
+  scoreBar: {
+    height: 4, backgroundColor: '#E5E7EB', borderRadius: 2, marginTop: 8, overflow: 'hidden',
+  },
+  scoreBarFill: { height: '100%' },
+  scoreStatus: { fontSize: 10, color: TEXT_SECONDARY, marginTop: 6 },
 
-  // Streak
-  streakRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 24 },
-  streakCard: {
-    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 16, padding: 14,
-    alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  streakEmoji: { fontSize: 22, marginBottom: 6 },
-  streakNum: { fontSize: 22, fontWeight: '800', color: '#fff', marginBottom: 2 },
-  streakLabel: { fontSize: 10, color: '#888780', textAlign: 'center' },
-
-  // Leaderboard
-  leaderboard: {
-    marginHorizontal: 20, backgroundColor: '#1A1A1A',
-    borderRadius: 16, overflow: 'hidden', marginBottom: 24,
-    borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  leaderRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    padding: 14, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
-  },
-  leaderRowMe: { backgroundColor: '#0D1A2E' },
-  leaderRankEmoji: { fontSize: 18, width: 24, textAlign: 'center' },
-  leaderAvatar: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  leaderAvatarText: { fontSize: 12, fontWeight: '700', color: '#fff' },
-  leaderInfo: { flex: 1 },
-  leaderName: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  leaderTier: { fontSize: 11, marginTop: 2 },
-  leaderScoreWrap: { alignItems: 'flex-end' },
-  leaderScore: { fontSize: 16, fontWeight: '800', color: '#fff' },
-  leaderScoreUnit: { fontSize: 10, color: '#888780' },
-  leaderNote: { fontSize: 11, color: '#888780', textAlign: 'center', padding: 10 },
-
-  // Wallet Breakdown
-  walletBreakdownCard: {
-    marginHorizontal: 20, marginTop: 16, backgroundColor: '#1A1A1A',
-    borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  walletBreakdownHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
-  },
-  walletBreakdownTitle: {
-    fontSize: 12, fontWeight: '700', color: '#888780',
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  walletBreakdownLink: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-  walletBreakdownItem: {
+  txnHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+    marginHorizontal: 20, marginTop: 24,
   },
-  walletBreakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  walletBreakdownDot: {
-    width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
-  },
-  walletBreakdownIcon: { fontSize: 16 },
-  walletBreakdownName: { fontSize: 13, fontWeight: '500', color: '#fff' },
-  walletBreakdownBalance: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  walletBreakdownMore: {
-    alignItems: 'center', paddingVertical: 10,
-  },
-  walletBreakdownMoreText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
-
-  // Quick Actions
-  quickRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 24 },
-  qaBtn: {
-    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 14, padding: 14,
-    alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  qaIcon: { fontSize: 22, marginBottom: 6 },
-  qaLabel: { fontSize: 10, color: '#888780', fontWeight: '600', textAlign: 'center' },
-
-  // Transactions
-  emptyState: { alignItems: 'center', paddingVertical: 32, paddingHorizontal: 20 },
-  emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyText: { fontSize: 14, color: '#888780', marginBottom: 12 },
-  emptyAction: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
+  txnSeeAll: { fontSize: 13, fontWeight: '600', color: PRIMARY },
+  txnList: { marginHorizontal: 20, marginTop: 12, gap: 12 },
   txnItem: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 12, paddingHorizontal: 20,
-    borderBottomWidth: 0.5, borderBottomColor: '#1A1A1A',
+    backgroundColor: CARD_BG, borderRadius: 14, padding: 14,
   },
-  txnIconWrap: {
-    width: 40, height: 40, borderRadius: 12, backgroundColor: '#1A1A1A',
-    alignItems: 'center', justifyContent: 'center',
+  txnIcon: {
+    width: 48, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
   },
-  txnEmoji: { fontSize: 18 },
   txnInfo: { flex: 1 },
-  txnCat: { fontSize: 14, fontWeight: '500', color: '#fff' },
-  txnDate: { fontSize: 11, color: '#888780', marginTop: 2 },
-  txnAmount: { fontSize: 13, fontWeight: '700' },
-  txnIncome: { color: '#1D9E75' },
-  txnExpense: { color: '#E24B4A' },
+  txnCategory: { fontSize: 14, fontWeight: '600', color: TEXT_MAIN },
+  txnDate: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 },
+  txnAmount: { fontSize: 14, fontWeight: '700' },
+  emptyState: { alignItems: 'center', paddingVertical: 40 },
+  emptyText: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 8 },
 })
