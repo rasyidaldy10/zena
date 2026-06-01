@@ -127,8 +127,14 @@ export default function OnboardingScreen() {
 
     const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
 
+    // Cek apakah user sudah punya wallet (avoid duplicate kalau onboarding dipanggil 2x)
+    const { count: walletCount } = await supabase
+      .from('user_wallets')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+
     try {
-      await Promise.all([
+      const tasks = [
         supabase.from('user_preferences').upsert({
           user_id: userId,
           nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
@@ -138,12 +144,20 @@ export default function OnboardingScreen() {
           monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
           ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           updated_at: new Date().toISOString(),
-        }),
-        supabase.from('user_wallets').insert([
-          { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
-          { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
-        ]),
-      ])
+        })
+      ]
+
+      // Hanya insert wallet kalau belum ada (count = 0)
+      if (walletCount === 0) {
+        tasks.push(
+          supabase.from('user_wallets').insert([
+            { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵', current_balance: 0 },
+            { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦', current_balance: 0 },
+          ])
+        )
+      }
+
+      await Promise.all(tasks)
 
       router.replace('/(tabs)')
     } catch (error) {
