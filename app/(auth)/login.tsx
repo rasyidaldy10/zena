@@ -22,6 +22,7 @@ export default function LoginScreen() {
           provider: 'google',
           options: {
             redirectTo: window.location.origin,
+            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
           },
         })
         if (error) throw error
@@ -32,6 +33,7 @@ export default function LoginScreen() {
           options: {
             redirectTo,
             skipBrowserRedirect: true,
+            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
           },
         })
         if (error) throw error
