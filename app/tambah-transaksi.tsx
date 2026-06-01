@@ -12,6 +12,18 @@ const PRIMARY = '#185FA5'
 const GREEN = '#1D9E75'
 const RED = '#E24B4A'
 const PURPLE = '#534AB7'
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
+
+const triggerAgents = (
+  token: string,
+  payload: { amount: number; type: string; category: string; note: string }
+) => {
+  if (!SUPABASE_URL || !token) return
+  const headers = { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
+  const body = JSON.stringify(payload)
+  fetch(`${SUPABASE_URL}/functions/v1/budget-monitor`, { method: 'POST', headers, body }).catch(() => {})
+  fetch(`${SUPABASE_URL}/functions/v1/anomaly-detector`, { method: 'POST', headers, body }).catch(() => {})
+}
 
 type TxType = 'expense' | 'income' | 'transfer'
 
@@ -284,6 +296,13 @@ export default function TambahTransaksiScreen() {
           : wallet.current_balance - nominal
         await supabase.from('user_wallets').update({ current_balance: newBalance }).eq('id', selectedWallet)
       }
+
+      // Trigger agents (fire and forget — tidak blok UI)
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          triggerAgents(session.access_token, { amount: nominal, type, category, note: note || '' })
+        }
+      })
 
       let budgetMsg = ''
       if (type === 'expense' && user?.id) {

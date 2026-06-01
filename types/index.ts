@@ -109,6 +109,36 @@ export const CATEGORIES = [
   'Lainnya',
 ]
 
+export type NotificationType = 'budget_alert' | 'anomaly' | 'weekly_insight' | 'daily_summary' | 'gmail' | 'categorization'
+
+export interface ZenaNotification {
+  id: string
+  user_id: string
+  type: NotificationType
+  title: string
+  message: string
+  is_read: boolean
+  metadata: Record<string, unknown>
+  created_at: string
+}
+
+export interface AIInsight {
+  id: string
+  user_id: string
+  insight_text: string
+  week_start: string
+  created_at: string
+}
+
+export interface AgentLog {
+  id: string
+  agent_name: string
+  user_id: string | null
+  action: string
+  result: string | null
+  created_at: string
+}
+
 export const TIER_CONFIG: Record<TierName, { min: number; max: number; color: string; icon: string }> = {
   Starter:   { min: 0,  max: 24,  color: '#B4B2A9', icon: '💸' },
   Bronze:    { min: 25, max: 44,  color: '#EF9F27', icon: '🟡' },

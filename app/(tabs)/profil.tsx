@@ -4,6 +4,7 @@ import {
   TouchableOpacity, TextInput, ActivityIndicator
 } from 'react-native'
 import { useFocusEffect, router } from 'expo-router'
+
 import { supabase } from '../../lib/supabase'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
@@ -106,6 +107,18 @@ export default function ProfilScreen() {
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profil</Text>
       </View>
+
+      {/* ZENA Intelligence Banner */}
+      <TouchableOpacity style={styles.zenaBanner} onPress={() => router.push('/zena-intelligence')} activeOpacity={0.8}>
+        <View style={styles.zenaBannerLeft}>
+          <Text style={styles.zenaBannerTitle}>ZENA</Text>
+          <Text style={styles.zenaBannerSub}>Intelligence System</Text>
+        </View>
+        <View style={styles.zenaBannerRight}>
+          <Text style={styles.zenaBannerAgents}>6 Agents Active</Text>
+          <Text style={styles.zenaBannerArrow}>→</Text>
+        </View>
+      </TouchableOpacity>
 
       {/* Tier Card */}
       <View style={[styles.tierCard, { borderTopColor: tierConfig?.color || PRIMARY }]}>
@@ -249,6 +262,17 @@ export default function ProfilScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F0F' },
+  zenaBanner: {
+    marginHorizontal: 20, marginBottom: 20, backgroundColor: '#0D1A2E',
+    borderRadius: 16, padding: 16, flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', borderWidth: 1, borderColor: PRIMARY + '60',
+  },
+  zenaBannerLeft: {},
+  zenaBannerTitle: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: 3 },
+  zenaBannerSub: { fontSize: 11, color: '#888780', letterSpacing: 1, marginTop: 2 },
+  zenaBannerRight: { alignItems: 'flex-end' },
+  zenaBannerAgents: { fontSize: 12, color: '#1D9E75', fontWeight: '600', marginBottom: 4 },
+  zenaBannerArrow: { fontSize: 18, color: PRIMARY },
   loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center' },
   header: { paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16 },
   headerTitle: { fontSize: 24, fontWeight: '600', color: '#fff' },

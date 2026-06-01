@@ -4,7 +4,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## STATUS SESI TERAKHIR (2026-05-31)
+## STATUS SESI TERAKHIR (2026-06-01)
 
 - ✅ TypeScript: semua error bersih (`npx tsc --noEmit` 0 error)
 - ✅ Bug fix: wallet filter di Home sekarang pakai `wallet_id OR wallet_source` (filter sebelumnya broken)
@@ -139,18 +139,31 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 36. **Bug fix**: wallet filter di Home sekarang pakai `wallet_id OR wallet_source`
 37. **Bug fix**: tsconfig.json exclude `supabase/functions` agar Deno types tidak crash TypeScript
 
+38. **ZENA Intelligence System** — 6 agents otomatis:
+    - Agent 1: Budget Monitor (`supabase/functions/budget-monitor/`) — cek 75%/90%/100% budget setiap transaksi
+    - Agent 2: Anomaly Detector (`supabase/functions/anomaly-detector/`) — deteksi pengeluaran > 3x rata-rata + smart categorization
+    - Agent 3: Weekly Insight (`supabase/functions/weekly-insight/`) — generate insight mingguan via Claude (cron Sabtu 09.00 WIB)
+    - Agent 4: Gmail Parser (`supabase/functions/gmail-parser/`) — placeholder, siap saat Google OAuth aktif
+    - Agent 5: Daily Summary (`supabase/functions/daily-summary/`) — ringkasan harian + motivasi Claude (cron 21.00 WIB)
+    - Agent 6: Smart Categorization — bagian dari anomaly-detector, notif jika kategori "Lainnya"
+39. **Tabel DB baru**: `notifications`, `ai_insights`, `agent_logs` (SQL migration: `supabase/migrations/001_zena_intelligence.sql`)
+40. **app/zena-intelligence.tsx** — visualisasi 6 agent cards, status pulse animation, Live Alerts realtime, AI Insights
+41. **app/notifications.tsx** — list semua alert, mark as read, delete, realtime update
+42. **Notification bell dengan badge** di dashboard — badge count realtime via Supabase Realtime
+43. **Profil page** — ZENA Intelligence banner dengan navigasi ke intelligence screen
+44. **Trigger agents otomatis** dari tambah-transaksi.tsx setelah save (fire and forget)
+45. TypeScript 0 error di semua file baru
+
 ### Belum Dikerjakan
-1. Hapus data transaksi test (skip dulu)
-2. Gmail parsing - auto-detect transaksi dari notif email bank (butuh Google OAuth scope gmail.readonly)
-3. Push notification server-side - notif real-time via Expo Push atau FCM (butuh EAS build)
-4. Voice Note - integrasi Whisper OpenAI (butuh API key + upload audio ke server)
-5. Couple mode - shared wallet dengan pasangan (butuh schema DB baru)
-6. Referral reward - ajak teman dapat 1 bulan Pro gratis
-7. AdSense (web) / AdMob (mobile) untuk free tier
-8. In-app purchase - Pro Rp 39k/bln, Bisnis Rp 79k/bln (butuh RevenueCat/StoreKit)
-9. PDF export laporan (fitur Bisnis) - butuh expo-print atau react-native-pdf
-10. Share laporan sebagai gambar IG story (butuh react-native-view-shot)
-11. Submit Play Store & App Store (butuh EAS build + developer account)
+1. Jalankan SQL migration di Supabase Dashboard (supabase/migrations/001_zena_intelligence.sql)
+2. Setup cron jobs di Supabase Dashboard untuk Weekly Insight (Sabtu 09:00 WIB) dan Daily Summary (21:00 WIB)
+3. Deploy edge functions ke Supabase: `supabase functions deploy budget-monitor anomaly-detector weekly-insight gmail-parser daily-summary`
+4. Gmail parsing aktif — butuh Google OAuth scope gmail.readonly
+5. Voice Note Whisper — butuh API key + upload audio ke server
+6. Couple mode — shared wallet dengan pasangan
+7. In-app purchase — Pro Rp 39k/bln, Bisnis Rp 79k/bln (butuh RevenueCat/StoreKit)
+8. PDF export laporan
+9. Submit Play Store & App Store (butuh EAS build)
 
 ### Setup yang Sudah Selesai (Manual)
 - ✅ **Google SSO**: Provider Google aktif di Supabase, Client ID/Secret dari Google Cloud terhubung, redirect URL `zena://` dan `https://zena-mu.vercel.app` sudah dikonfigurasi

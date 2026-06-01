@@ -2,8 +2,9 @@ import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native'
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { router, useFocusEffect } from 'expo-router'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 import { supabase } from '../../lib/supabase'
 import { Transaction, UserWallet, TIER_CONFIG, TierName } from '../../types'
 import { calculateFinancialScore, getNextTier } from '../../lib/scoring'
@@ -18,6 +19,8 @@ const CATEGORY_EMOJI: Record<string, string> = {
 }
 
 export default function DashboardScreen() {
+  const [notifCount, setNotifCount] = useState(0)
+  const channelRef = useRef<RealtimeChannel | null>(null)
   const [loading, setLoading] = useState(true)
   const [nickname, setNickname] = useState('')
   const [totalBalance, setTotalBalance] = useState(0)
@@ -52,6 +55,18 @@ export default function DashboardScreen() {
     if (prefs?.nickname) setNickname(prefs.nickname)
     if (prefs?.monthly_income) setMonthlyIncome(prefs.monthly_income)
 
+    // Fetch unread notification count (graceful — table mungkin belum ada)
+    try {
+      const { data: unread } = await supabase
+        .from('notifications')
+        .select('id')
+        .eq('user_id', user?.id)
+        .eq('is_read', false)
+      setNotifCount(unread?.length ?? 0)
+    } catch {
+      setNotifCount(0)
+    }
+
     if (walletsData) {
       const total = walletsData.reduce((s: number, w: any) => s + (w.current_balance || 0), 0)
       setTotalBalance(total)
@@ -77,6 +92,27 @@ export default function DashboardScreen() {
   }
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
+
+  // Realtime subscription untuk badge notifikasi
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      channelRef.current = supabase
+        .channel(`notif-badge-${session.user.id}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notifications',
+          filter: `user_id=eq.${session.user.id}`,
+        }, () => {
+          setNotifCount(prev => prev + 1)
+        })
+        .subscribe()
+    })
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current)
+    }
+  }, [])
 
   const calcStreak = (txns: Transaction[]): number => {
     const dates = new Set(txns.filter(t => !t.is_wallet_transfer).map(t => t.date))
@@ -175,8 +211,13 @@ export default function DashboardScreen() {
           </View>
         </View>
         <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/(tabs)/reminder')}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.push('/notifications')}>
             <Text style={styles.iconBtnText}>🔔</Text>
+            {notifCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{notifCount > 99 ? '99+' : String(notifCount)}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutBtnText}>Keluar</Text>
@@ -391,6 +432,13 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
   iconBtnText: { fontSize: 16 },
+  badge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: '#E24B4A', borderRadius: 8,
+    minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: { fontSize: 9, color: '#fff', fontWeight: '800' },
   logoutBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A' },
   logoutBtnText: { fontSize: 13, color: '#888780', fontWeight: '500' },
 
