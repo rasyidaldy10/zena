@@ -39,18 +39,16 @@ export default function DashboardScreen() {
     const [
       { data: prefs },
       { data: walletsData },
-      { data: allTxnsData },
+      { data: recentTxns },
       { data: monthTxnsData },
     ] = await Promise.all([
       supabase.from('user_preferences').select('*').eq('user_id', user?.id).single(),
       supabase.from('user_wallets').select('*').eq('user_id', user?.id).eq('is_active', true).order('created_at', { ascending: true }),
-      supabase.from('transactions').select('*').eq('user_id', user?.id)
-        .gte('date', (() => { const d = new Date(); d.setDate(d.getDate() - 90); return d.toISOString().split('T')[0] })())
-        .order('date', { ascending: false }),
+      supabase.from('transactions').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(10),
       supabase.from('transactions').select('*').eq('user_id', user?.id)
         .gte('date', new Date().toISOString().slice(0, 7) + '-01')
         .lte('date', new Date().toISOString().slice(0, 7) + '-31')
-        .order('date', { ascending: false }),
+        .order('date', { ascending: false }).limit(50),
     ])
 
     if (prefs?.nickname) setNickname(prefs.nickname)
@@ -73,14 +71,14 @@ export default function DashboardScreen() {
       setTotalBalance(total)
     }
 
-    const allTxns = (allTxnsData || []) as Transaction[]
+    const recent = (recentTxns || []) as Transaction[]
     const monthTxns = (monthTxnsData || []) as Transaction[]
-    setTransactions(monthTxns)
+    setTransactions(recent.slice(0, 10))
 
-    const streakDays = calcStreak(allTxns)
+    const streakDays = calcStreak(monthTxns)
     setStreak(streakDays)
 
-    const scoreData = calculateFinancialScore(allTxns, prefs?.monthly_income || 0, streakDays)
+    const scoreData = calculateFinancialScore(monthTxns, prefs?.monthly_income || 0, streakDays)
     setScore(scoreData)
 
     const income = monthTxns.filter(t => t.type === 'income' && !t.is_wallet_transfer).reduce((s, t) => s + t.amount, 0)

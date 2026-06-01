@@ -12,15 +12,32 @@ const cors = {
 }
 
 // Parse email bank format (BCA, Mandiri, dll.)
-function parseEmailBody(body: string, sender: string): { amount: number; merchant: string; type: 'income' | 'expense' } | null {
-  // BCA format: "Trx: ... Rp 50.000"
-  // Mandiri format: "Mutasi Debit/Kredit: Rp 100.000"
-
+function parseEmailBody(body: string, sender: string): {
+  amount: number;
+  merchant: string;
+  type: 'income' | 'expense';
+  bankName: string;
+  last4Digits: string;
+} | null {
+  // Extract amount
   const amountMatch = body.match(/Rp\s?([\d.,]+)/i)
   if (!amountMatch) return null
 
   const amount = parseFloat(amountMatch[1].replace(/\.|,/g, ''))
   if (isNaN(amount)) return null
+
+  // Detect bank name dari sender email
+  let bankName = 'Unknown'
+  if (sender.includes('bca.co.id')) bankName = 'BCA'
+  else if (sender.includes('bankmandiri')) bankName = 'Mandiri'
+  else if (sender.includes('bri.co.id')) bankName = 'BRI'
+  else if (sender.includes('bni.co.id')) bankName = 'BNI'
+  else if (sender.includes('cimbniaga')) bankName = 'CIMB Niaga'
+
+  // Extract 4 digit terakhir rekening dari email body
+  // Format: "Rek: 1234567890" atau "No.Rek: xxx-xxx-1234" atau "a/n 1234"
+  const rekMatch = body.match(/(?:rek(?:ening)?[:\s]*.*?|a\/n[:\s]*)(\d{4})(?:\D|$)/i)
+  const last4Digits = rekMatch ? rekMatch[1] : '0000'
 
   // Detect debit vs kredit
   const isDebit = /debit|keluar|pembayaran|pembelian|tarik tunai/i.test(body)
@@ -32,7 +49,7 @@ function parseEmailBody(body: string, sender: string): { amount: number; merchan
   const merchantMatch = body.match(/(?:di|at|ke|dari)\s+([A-Z\s]+)/i)
   const merchant = merchantMatch ? merchantMatch[1].trim() : 'Transaksi Bank'
 
-  return { amount, merchant, type }
+  return { amount, merchant, type, bankName, last4Digits }
 }
 
 serve(async (req) => {
@@ -59,61 +76,79 @@ serve(async (req) => {
     let parsed = 0
     let failed = 0
 
-    // Loop setiap user mapping
-    for (const mapping of mappings) {
+    // Group users yang punya mapping
+    const uniqueUsers = [...new Set(mappings.map(m => m.user_id))]
+
+    // Loop per user
+    for (const userId of uniqueUsers) {
       try {
         // TODO: Fetch Gmail API untuk user ini
-        // const gmail = await fetchGmailAPI(mapping.user_id, mapping.sender_email)
+        // const emails = await fetchGmailAPI(userId)
 
         // SIMULATION: untuk testing tanpa Gmail API
-        const simulatedEmail = {
-          from: mapping.sender_email,
-          body: `Transaksi di INDOMARET Rp 50.000 - Debit`,
+        const simulatedEmails = [
+          { from: 'noreply@bca.co.id', body: 'Debit Rek 1234567890 di INDOMARET Rp 50.000' },
+        ]
+
+        for (const email of simulatedEmails) {
+          const parsed = parseEmailBody(email.body, email.from)
+          if (!parsed) continue
+
+          // Cari mapping yang cocok: bank + 4 digit
+          const matchKey = `${email.from}:${parsed.last4Digits}`
+          const mapping = mappings.find(m => m.user_id === userId && m.sender_email === matchKey)
+
+          if (!mapping) {
+            // Tidak ada mapping → kirim notif minta setup
+            await admin.from('notifications').insert({
+              user_id: userId,
+              type: 'gmail',
+              title: `📧 Email Bank Terdeteksi`,
+              message: `Transaksi ${parsed.bankName} (...${parsed.last4Digits}) Rp ${parsed.amount.toLocaleString('id-ID')} belum ter-mapping. Setup di Gmail Auto-Import.`,
+              metadata: { bank: parsed.bankName, last4: parsed.last4Digits },
+            })
+            continue
+          }
+
+          // Insert transaksi
+          const { error } = await admin.from('transactions').insert({
+            user_id: userId,
+            wallet_id: mapping.wallet_id,
+            type: parsed.type,
+            amount: parsed.amount,
+            category: parsed.type === 'expense' ? 'Belanja' : 'Pemasukan',
+            note: `📧 ${parsed.merchant}`,
+            date: new Date().toISOString().split('T')[0],
+            source: 'gmail',
+            is_wallet_transfer: false,
+          })
+
+          if (error) {
+            failed++
+            continue
+          }
+
+          // Update wallet balance
+          const { data: wallet } = await admin.from('user_wallets').select('current_balance').eq('id', mapping.wallet_id).single()
+          if (wallet) {
+            const newBalance = wallet.current_balance + (parsed.type === 'income' ? parsed.amount : -parsed.amount)
+            await admin.from('user_wallets').update({ current_balance: newBalance }).eq('id', mapping.wallet_id)
+          }
+
+          // Kirim notif sukses
+          await admin.from('notifications').insert({
+            user_id: userId,
+            type: 'gmail',
+            title: `📧 ${parsed.bankName} (...${parsed.last4Digits})`,
+            message: `${parsed.merchant}: Rp ${parsed.amount.toLocaleString('id-ID')} dicatat otomatis.`,
+            metadata: { source: 'gmail', bank: parsed.bankName },
+          })
+
+          parsed++
         }
-
-        const parsed_data = parseEmailBody(simulatedEmail.body, simulatedEmail.from)
-        if (!parsed_data) {
-          failed++
-          continue
-        }
-
-        // Insert transaksi ke wallet yang dimapping
-        const { error } = await admin.from('transactions').insert({
-          user_id: mapping.user_id,
-          wallet_id: mapping.wallet_id,
-          type: parsed_data.type,
-          amount: parsed_data.amount,
-          category: parsed_data.type === 'expense' ? 'Belanja' : 'Pemasukan',
-          note: `Auto-import dari ${mapping.bank_name}: ${parsed_data.merchant}`,
-          date: new Date().toISOString().split('T')[0],
-          source: 'gmail',
-          is_wallet_transfer: false,
-        })
-
-        if (error) {
-          failed++
-          continue
-        }
-
-        // Update wallet balance
-        await admin.rpc('update_wallet_balance', {
-          p_wallet_id: mapping.wallet_id,
-          p_amount: parsed_data.type === 'income' ? parsed_data.amount : -parsed_data.amount,
-        })
-
-        // Kirim notif ke user
-        await admin.from('notifications').insert({
-          user_id: mapping.user_id,
-          type: 'gmail',
-          title: `📧 Transaksi dari ${mapping.bank_name}`,
-          message: `${parsed_data.merchant}: Rp ${parsed_data.amount.toLocaleString('id-ID')} dicatat otomatis.`,
-          metadata: { source: 'gmail', bank: mapping.bank_name },
-        })
-
-        parsed++
       } catch (err) {
         failed++
-        console.error(`Failed to parse email for user ${mapping.user_id}:`, err)
+        console.error(`Failed for user ${userId}:`, err)
       }
     }
 

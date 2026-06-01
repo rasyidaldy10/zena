@@ -1,20 +1,12 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, Modal, TextInput,
+  TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 
 const PRIMARY = '#185FA5'
-
-const BANK_EMAILS = [
-  { bank: 'BCA', baseEmail: 'bca.co.id', icon: '🏦' },
-  { bank: 'Mandiri', baseEmail: 'bankmandiri.co.id', icon: '🏦' },
-  { bank: 'BRI', baseEmail: 'bri.co.id', icon: '🏦' },
-  { bank: 'BNI', baseEmail: 'bni.co.id', icon: '🏦' },
-  { bank: 'CIMB Niaga', baseEmail: 'cimbniaga.co.id', icon: '🏦' },
-]
 
 interface Wallet {
   id: string
@@ -35,10 +27,6 @@ export default function GmailSetupScreen() {
   const [wallets, setWallets] = useState<Wallet[]>([])
   const [mappings, setMappings] = useState<Mapping[]>([])
   const [loading, setLoading] = useState(true)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [selectedBank, setSelectedBank] = useState<{ bank: string; baseEmail: string } | null>(null)
-  const [last4Digits, setLast4Digits] = useState('')
-  const [selectedWalletId, setSelectedWalletId] = useState('')
 
   useEffect(() => {
     fetchData()
@@ -56,51 +44,6 @@ export default function GmailSetupScreen() {
     setWallets((w ?? []) as Wallet[])
     setMappings((m ?? []) as Mapping[])
     setLoading(false)
-  }
-
-  const openModal = (bank: string, baseEmail: string) => {
-    if (wallets.length === 0) {
-      Alert.alert('Belum Ada Dompet', 'Buat dompet dulu di tab Profil')
-      return
-    }
-    setSelectedBank({ bank, baseEmail })
-    setLast4Digits('')
-    setSelectedWalletId(wallets[0]?.id || '')
-    setModalVisible(true)
-  }
-
-  const handleSave = async () => {
-    if (!selectedBank || !selectedWalletId) return
-
-    const digits = last4Digits.trim()
-    if (!digits || digits.length !== 4 || !/^\d+$/.test(digits)) {
-      Alert.alert('Oops', '4 digit terakhir rekening harus diisi (misal: 1234)')
-      return
-    }
-
-    const senderEmail = `noreply@${selectedBank.baseEmail}`
-    const uniqueKey = `${senderEmail}:${digits}`
-
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) return
-
-    const wallet = wallets.find(w => w.id === selectedWalletId)
-
-    const { error } = await supabase.from('gmail_wallet_mappings').insert({
-      user_id: session.user.id,
-      wallet_id: selectedWalletId,
-      sender_email: uniqueKey,
-      bank_name: `${selectedBank.bank} (...${digits})`,
-      last_4_digits: digits,
-    })
-
-    if (error) {
-      Alert.alert('Error', error.message)
-    } else {
-      Alert.alert('Berhasil!', `Transaksi ${selectedBank.bank} rekening (...${digits}) akan masuk ke ${wallet?.wallet_name}`)
-      setModalVisible(false)
-      fetchData()
-    }
   }
 
   const handleDelete = async (id: string) => {
@@ -135,21 +78,36 @@ export default function GmailSetupScreen() {
         <TouchableOpacity onPress={() => router.back()}>
           <Text style={styles.backText}>← Kembali</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Gmail Auto-Parsing</Text>
+        <Text style={styles.headerTitle}>Gmail Auto-Import</Text>
         <View style={{ width: 70 }} />
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
         <View style={styles.infoCard}>
           <Text style={styles.infoIcon}>📧</Text>
-          <Text style={styles.infoTitle}>Auto-Import Transaksi</Text>
+          <Text style={styles.infoTitle}>Auto-Detect Transaksi</Text>
           <Text style={styles.infoText}>
-            Zena akan membaca email notifikasi dari bank dan otomatis mencatat transaksimu.
-            Setiap rekening bank bisa dipetakan ke dompet berbeda.
+            Zena akan membaca email bank dan otomatis:
+            {'\n'}• Deteksi nama bank (BCA, Mandiri, dll)
+            {'\n'}• Deteksi 4 digit terakhir rekening
+            {'\n'}• Catat transaksi ke wallet yang kamu pilih
           </Text>
         </View>
 
-        {/* Mapping yang sudah ada */}
+        {/* Cara Setup */}
+        <View style={styles.stepCard}>
+          <Text style={styles.stepTitle}>📋 Cara Setup:</Text>
+          <Text style={styles.stepText}>
+            1. Logout → Login lagi via Google{'\n'}
+            2. Approve akses Gmail saat diminta{'\n'}
+            3. Tunggu email bank masuk (atau kirim test){'\n'}
+            4. Zena akan deteksi otomatis dan kirim notifikasi{'\n'}
+            5. Tap notifikasi → pilih wallet untuk bank tersebut{'\n'}
+            6. Selesai! Transaksi selanjutnya auto-masuk
+          </Text>
+        </View>
+
+        {/* Mapping Aktif */}
         {mappings.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>Mapping Aktif ({mappings.length})</Text>
@@ -176,80 +134,28 @@ export default function GmailSetupScreen() {
           </>
         )}
 
-        <Text style={styles.sectionLabel}>Tambah Mapping Baru</Text>
-
-        {BANK_EMAILS.map(bank => (
-          <TouchableOpacity
-            key={bank.bank}
-            style={styles.bankCard}
-            onPress={() => openModal(bank.bank, bank.baseEmail)}
-          >
-            <Text style={styles.bankIcon}>{bank.icon}</Text>
-            <View style={styles.bankInfo}>
-              <Text style={styles.bankName}>{bank.bank}</Text>
-              <Text style={styles.bankEmail}>noreply@{bank.baseEmail}</Text>
-            </View>
-            <Text style={styles.setupBtn}>+ Tambah</Text>
-          </TouchableOpacity>
-        ))}
+        {mappings.length === 0 && (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyIcon}>📧</Text>
+            <Text style={styles.emptyTitle}>Belum Ada Mapping</Text>
+            <Text style={styles.emptyText}>
+              Logout → Login lagi untuk approve Gmail consent, lalu tunggu email bank masuk.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.noteCard}>
-          <Text style={styles.noteTitle}>⚠️ Catatan Penting</Text>
+          <Text style={styles.noteTitle}>💡 Tips</Text>
           <Text style={styles.noteText}>
-            • Masukkan 4 digit terakhir rekening untuk bedakan rekening berbeda dari bank yang sama{'\n'}
-            • Parsing hanya untuk 7 hari terakhir{'\n'}
+            • Bank + 4 digit rekening otomatis terdeteksi dari email{'\n'}
+            • Notifikasi akan muncul setiap transaksi auto-import{'\n'}
             • Transaksi dari Gmail bersifat read-only{'\n'}
-            • Logout → Login lagi untuk aktifkan Gmail consent
+            • Parsing hanya untuk 7 hari terakhir
           </Text>
         </View>
 
         <View style={{ height: 40 }} />
       </ScrollView>
-
-      {/* Modal Picker */}
-      <Modal visible={modalVisible} transparent animationType="slide">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Setup {selectedBank?.bank}</Text>
-
-            <Text style={styles.label}>4 Digit Terakhir Rekening</Text>
-            <TextInput
-              style={styles.input}
-              value={last4Digits}
-              onChangeText={setLast4Digits}
-              placeholder="Misal: 1234"
-              placeholderTextColor="#555"
-              keyboardType="numeric"
-              maxLength={4}
-            />
-            <Text style={styles.hint}>Untuk bedakan kalau punya 2+ rekening {selectedBank?.bank}</Text>
-
-            <Text style={[styles.label, { marginTop: 20 }]}>Masuk ke Dompet</Text>
-            {wallets.map(w => (
-              <TouchableOpacity
-                key={w.id}
-                style={[styles.walletOption, selectedWalletId === w.id && styles.walletOptionActive]}
-                onPress={() => setSelectedWalletId(w.id)}
-              >
-                <Text style={styles.walletOptionIcon}>{w.icon}</Text>
-                <Text style={[styles.walletOptionName, selectedWalletId === w.id && styles.walletOptionNameActive]}>
-                  {w.wallet_name}
-                </Text>
-                {selectedWalletId === w.id && <Text style={styles.checkmark}>✓</Text>}
-              </TouchableOpacity>
-            ))}
-
-            <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.modalBtnCancel} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalBtnCancelText}>Batal</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.modalBtnSave} onPress={handleSave}>
-                <Text style={styles.modalBtnSaveText}>Simpan</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   )
 }
@@ -271,6 +177,12 @@ const styles = StyleSheet.create({
   infoIcon: { fontSize: 48, marginBottom: 12 },
   infoTitle: { fontSize: 18, fontWeight: '700', color: '#fff', marginBottom: 8 },
   infoText: { fontSize: 13, color: '#888780', textAlign: 'center', lineHeight: 20 },
+  stepCard: {
+    marginHorizontal: 20, marginTop: 20, backgroundColor: '#1A1A1A',
+    borderRadius: 12, padding: 16, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  stepTitle: { fontSize: 15, fontWeight: '700', color: '#fff', marginBottom: 10 },
+  stepText: { fontSize: 13, color: '#888780', lineHeight: 20 },
   sectionLabel: {
     fontSize: 13, fontWeight: '700', color: '#888780',
     marginHorizontal: 20, marginTop: 28, marginBottom: 12,
@@ -287,56 +199,17 @@ const styles = StyleSheet.create({
   mappingWalletName: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
   deleteBtn: { padding: 8 },
   deleteBtnText: { fontSize: 20 },
-  bankCard: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    marginHorizontal: 20, marginBottom: 10, backgroundColor: '#1A1A1A',
-    borderRadius: 12, padding: 14, borderWidth: 0.5, borderColor: '#2A2A2A',
+  emptyCard: {
+    marginHorizontal: 20, marginTop: 20, backgroundColor: '#1A1A1A',
+    borderRadius: 12, padding: 32, alignItems: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
-  bankIcon: { fontSize: 28 },
-  bankInfo: { flex: 1 },
-  bankName: { fontSize: 15, fontWeight: '600', color: '#fff', marginBottom: 4 },
-  bankEmail: { fontSize: 11, color: '#555' },
-  setupBtn: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
+  emptyIcon: { fontSize: 48, marginBottom: 12 },
+  emptyTitle: { fontSize: 16, fontWeight: '700', color: '#fff', marginBottom: 8 },
+  emptyText: { fontSize: 13, color: '#888780', textAlign: 'center', lineHeight: 20 },
   noteCard: {
     marginHorizontal: 20, marginTop: 24, backgroundColor: '#1A1A1A',
     borderRadius: 12, padding: 16, borderWidth: 0.5, borderColor: '#2A2A2A',
   },
   noteTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 8 },
   noteText: { fontSize: 12, color: '#888780', lineHeight: 18 },
-  modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.8)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#1A1A1A', borderTopLeftRadius: 24, borderTopRightRadius: 24,
-    paddingHorizontal: 20, paddingTop: 24, paddingBottom: 40,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 20, textAlign: 'center' },
-  label: { fontSize: 13, fontWeight: '600', color: '#888780', marginBottom: 8 },
-  input: {
-    backgroundColor: '#0F0F0F', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    fontSize: 15, color: '#fff', borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  hint: { fontSize: 11, color: '#555', marginTop: 6 },
-  walletOption: {
-    flexDirection: 'row', alignItems: 'center', gap: 12,
-    backgroundColor: '#0F0F0F', borderRadius: 12, padding: 14, marginBottom: 8,
-    borderWidth: 1, borderColor: '#2A2A2A',
-  },
-  walletOptionActive: { borderColor: PRIMARY, backgroundColor: PRIMARY + '20' },
-  walletOptionIcon: { fontSize: 20 },
-  walletOptionName: { flex: 1, fontSize: 15, color: '#888780', fontWeight: '500' },
-  walletOptionNameActive: { color: '#fff', fontWeight: '700' },
-  checkmark: { fontSize: 18, color: PRIMARY, fontWeight: '900' },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  modalBtnCancel: {
-    flex: 1, backgroundColor: '#2A2A2A', borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center',
-  },
-  modalBtnCancelText: { fontSize: 15, fontWeight: '600', color: '#888780' },
-  modalBtnSave: {
-    flex: 1, backgroundColor: PRIMARY, borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center',
-  },
-  modalBtnSaveText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 })
