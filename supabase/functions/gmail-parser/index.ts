@@ -58,26 +58,29 @@ serve(async (req) => {
   try {
     const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-    // Fetch semua user yang punya Gmail mapping
-    const { data: mappings } = await admin
-      .from('gmail_wallet_mappings')
-      .select('user_id, wallet_id, sender_email, bank_name')
+    // Fetch semua wallet yang punya bank_name + last_4_digits
+    const { data: wallets } = await admin
+      .from('user_wallets')
+      .select('id, user_id, wallet_name, bank_name, last_4_digits')
+      .not('bank_name', 'is', null)
+      .not('last_4_digits', 'is', null)
+      .eq('is_active', true)
 
-    if (!mappings || mappings.length === 0) {
+    if (!wallets || wallets.length === 0) {
       await admin.from('agent_logs').insert({
         agent_name: 'gmail-parser',
         user_id: null,
         action: 'cron_run',
-        result: 'No user mappings found',
+        result: 'No wallets with bank info found',
       })
-      return new Response(JSON.stringify({ status: 'no_mappings' }), { headers: cors })
+      return new Response(JSON.stringify({ status: 'no_wallets' }), { headers: cors })
     }
 
     let parsed = 0
     let failed = 0
 
-    // Group users yang punya mapping
-    const uniqueUsers = [...new Set(mappings.map(m => m.user_id))]
+    // Group users
+    const uniqueUsers = [...new Set(wallets.map(w => w.user_id))]
 
     // Loop per user
     for (const userId of uniqueUsers) {
@@ -91,21 +94,24 @@ serve(async (req) => {
         ]
 
         for (const email of simulatedEmails) {
-          const parsed = parseEmailBody(email.body, email.from)
-          if (!parsed) continue
+          const parsedEmail = parseEmailBody(email.body, email.from)
+          if (!parsedEmail) continue
 
-          // Cari mapping yang cocok: bank + 4 digit
-          const matchKey = `${email.from}:${parsed.last4Digits}`
-          const mapping = mappings.find(m => m.user_id === userId && m.sender_email === matchKey)
+          // Cari wallet yang cocok: bank name + 4 digit terakhir
+          const matchedWallet = wallets.find(w =>
+            w.user_id === userId &&
+            w.bank_name?.toLowerCase().includes(parsedEmail.bankName.toLowerCase()) &&
+            w.last_4_digits === parsedEmail.last4Digits
+          )
 
-          if (!mapping) {
-            // Tidak ada mapping → kirim notif minta setup
+          if (!matchedWallet) {
+            // Tidak ada wallet yang match → kirim notif setup
             await admin.from('notifications').insert({
               user_id: userId,
               type: 'gmail',
               title: `📧 Email Bank Terdeteksi`,
-              message: `Transaksi ${parsed.bankName} (...${parsed.last4Digits}) Rp ${parsed.amount.toLocaleString('id-ID')} belum ter-mapping. Setup di Gmail Auto-Import.`,
-              metadata: { bank: parsed.bankName, last4: parsed.last4Digits },
+              message: `Transaksi ${parsedEmail.bankName} (...${parsedEmail.last4Digits}) Rp ${parsedEmail.amount.toLocaleString('id-ID')}. Tambahkan data bank di dompet untuk auto-import.`,
+              metadata: { bank: parsedEmail.bankName, last4: parsedEmail.last4Digits },
             })
             continue
           }
@@ -113,11 +119,11 @@ serve(async (req) => {
           // Insert transaksi
           const { error } = await admin.from('transactions').insert({
             user_id: userId,
-            wallet_id: mapping.wallet_id,
-            type: parsed.type,
-            amount: parsed.amount,
-            category: parsed.type === 'expense' ? 'Belanja' : 'Pemasukan',
-            note: `📧 ${parsed.merchant}`,
+            wallet_id: matchedWallet.id,
+            type: parsedEmail.type,
+            amount: parsedEmail.amount,
+            category: parsedEmail.type === 'expense' ? 'Belanja' : 'Pemasukan',
+            note: `📧 ${parsedEmail.merchant}`,
             date: new Date().toISOString().split('T')[0],
             source: 'gmail',
             is_wallet_transfer: false,
@@ -129,19 +135,19 @@ serve(async (req) => {
           }
 
           // Update wallet balance
-          const { data: wallet } = await admin.from('user_wallets').select('current_balance').eq('id', mapping.wallet_id).single()
+          const { data: wallet } = await admin.from('user_wallets').select('current_balance').eq('id', matchedWallet.id).single()
           if (wallet) {
-            const newBalance = wallet.current_balance + (parsed.type === 'income' ? parsed.amount : -parsed.amount)
-            await admin.from('user_wallets').update({ current_balance: newBalance }).eq('id', mapping.wallet_id)
+            const newBalance = wallet.current_balance + (parsedEmail.type === 'income' ? parsedEmail.amount : -parsedEmail.amount)
+            await admin.from('user_wallets').update({ current_balance: newBalance }).eq('id', matchedWallet.id)
           }
 
           // Kirim notif sukses
           await admin.from('notifications').insert({
             user_id: userId,
             type: 'gmail',
-            title: `📧 ${parsed.bankName} (...${parsed.last4Digits})`,
-            message: `${parsed.merchant}: Rp ${parsed.amount.toLocaleString('id-ID')} dicatat otomatis.`,
-            metadata: { source: 'gmail', bank: parsed.bankName },
+            title: `📧 ${parsedEmail.bankName} → ${matchedWallet.wallet_name}`,
+            message: `${parsedEmail.merchant}: Rp ${parsedEmail.amount.toLocaleString('id-ID')} dicatat otomatis.`,
+            metadata: { source: 'gmail', bank: parsedEmail.bankName, wallet: matchedWallet.wallet_name },
           })
 
           parsed++

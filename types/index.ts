@@ -38,6 +38,8 @@ export interface UserWallet {
   wallet_name: string
   wallet_type: WalletType
   current_balance: number
+  bank_name?: string
+  last_4_digits?: string
   color: string
   icon: string
   is_active: boolean

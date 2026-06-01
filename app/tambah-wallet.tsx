@@ -21,6 +21,8 @@ export default function TambahWalletScreen() {
   const [selectedColor, setSelectedColor] = useState('#185FA5')
   const [selectedIcon, setSelectedIcon] = useState('💵')
   const [initialBalance, setInitialBalance] = useState('')
+  const [bankName, setBankName] = useState('')
+  const [last4Digits, setLast4Digits] = useState('')
   const [loading, setLoading] = useState(false)
 
   const formatBalance = (text: string) => {
@@ -64,6 +66,8 @@ export default function TambahWalletScreen() {
       color: selectedColor,
       icon: selectedIcon,
       current_balance: balance,
+      bank_name: bankName.trim() || null,
+      last_4_digits: last4Digits.trim() || null,
       is_active: true,
     })
 
@@ -177,6 +181,34 @@ export default function TambahWalletScreen() {
           />
         </View>
 
+        {/* Bank Info (Optional - untuk Gmail auto-import) */}
+        <View style={styles.bankInfoCard}>
+          <Text style={styles.bankInfoTitle}>📧 Gmail Auto-Import (Opsional)</Text>
+          <Text style={styles.bankInfoDesc}>
+            Isi data bank jika ingin transaksi dari email bank otomatis masuk ke dompet ini
+          </Text>
+
+          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>Nama Bank</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Contoh: BCA, Mandiri, BRI"
+            placeholderTextColor="#444"
+            value={bankName}
+            onChangeText={setBankName}
+          />
+
+          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>4 Digit Terakhir Rekening</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Contoh: 1234"
+            placeholderTextColor="#444"
+            value={last4Digits}
+            onChangeText={(text) => setLast4Digits(text.replace(/\D/g, '').slice(0, 4))}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+        </View>
+
         <TouchableOpacity
           style={styles.saveBtn}
           onPress={handleSave}
@@ -251,6 +283,12 @@ const styles = StyleSheet.create({
   },
   balancePrefix: { fontSize: 24, color: '#888780', marginRight: 8 },
   balanceInput: { flex: 1, fontSize: 32, fontWeight: '600', color: '#fff', paddingVertical: 16 },
+  bankInfoCard: {
+    backgroundColor: '#0D1A2E', borderRadius: 12, padding: 16,
+    marginBottom: 28, borderWidth: 1, borderColor: PRIMARY + '40',
+  },
+  bankInfoTitle: { fontSize: 14, fontWeight: '700', color: '#fff', marginBottom: 4 },
+  bankInfoDesc: { fontSize: 11, color: '#888780', lineHeight: 16 },
   saveBtn: {
     height: 52, backgroundColor: PRIMARY, borderRadius: 14,
     alignItems: 'center', justifyContent: 'center',
