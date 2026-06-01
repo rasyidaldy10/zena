@@ -322,16 +322,14 @@ export default function ProfilScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Dompet Saya ({wallets.length}/8)</Text>
-          {wallets.length < 8 && (
-            <TouchableOpacity onPress={() => router.push('/tambah-wallet')}>
-              <Text style={styles.editBtn}>+ Tambah</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={() => router.push('/detail-wallet')}>
+            <Text style={styles.editBtn}>Lihat Semua →</Text>
+          </TouchableOpacity>
         </View>
         {wallets.length === 0 ? (
           <Text style={styles.emptyWallet}>Belum ada dompet</Text>
         ) : (
-          wallets.map((w) => {
+          wallets.slice(0, 2).map((w) => {
             const typeLabel = WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type
             return (
               <TouchableOpacity

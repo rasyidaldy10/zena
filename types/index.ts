@@ -46,6 +46,26 @@ export interface UserWallet {
   created_at: string
 }
 
+export interface InvestmentHolding {
+  id: string
+  wallet_id: string
+  user_id: string
+  ticker: string
+  quantity: number
+  buy_price: number
+  current_price?: number
+  last_updated?: string
+  created_at: string
+}
+
+export interface StockPrice {
+  ticker: string
+  price: number
+  change_percent?: number
+  last_updated: string
+  source: string
+}
+
 export interface Transaction {
   id: string
   user_id: string

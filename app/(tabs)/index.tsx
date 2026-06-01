@@ -259,6 +259,39 @@ export default function DashboardScreen() {
         </View>
       </View>
 
+      {/* ── RINCIAN SALDO SEMUA DOMPET ── */}
+      <View style={styles.walletBreakdownCard}>
+        <View style={styles.walletBreakdownHeader}>
+          <Text style={styles.walletBreakdownTitle}>Rincian Saldo</Text>
+          <TouchableOpacity onPress={() => router.push('/detail-wallet')}>
+            <Text style={styles.walletBreakdownLink}>Lihat Detail →</Text>
+          </TouchableOpacity>
+        </View>
+        {wallets.slice(0, 5).map((w) => (
+          <View key={w.id} style={styles.walletBreakdownItem}>
+            <View style={styles.walletBreakdownLeft}>
+              <View style={[styles.walletBreakdownDot, { backgroundColor: w.color }]}>
+                <Text style={styles.walletBreakdownIcon}>{w.icon}</Text>
+              </View>
+              <Text style={styles.walletBreakdownName}>{w.wallet_name}</Text>
+            </View>
+            <Text style={styles.walletBreakdownBalance}>
+              Rp {w.current_balance.toLocaleString('id-ID')}
+            </Text>
+          </View>
+        ))}
+        {wallets.length > 5 && (
+          <TouchableOpacity
+            style={styles.walletBreakdownMore}
+            onPress={() => router.push('/detail-wallet')}
+          >
+            <Text style={styles.walletBreakdownMoreText}>
+              +{wallets.length - 5} dompet lainnya
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
       {/* ── SCORE GRID 2×2 ── */}
       <Text style={styles.sectionTitle}>Financial Score</Text>
       <View style={styles.scoreGrid}>
@@ -520,6 +553,35 @@ const styles = StyleSheet.create({
   leaderScore: { fontSize: 16, fontWeight: '800', color: '#fff' },
   leaderScoreUnit: { fontSize: 10, color: '#888780' },
   leaderNote: { fontSize: 11, color: '#888780', textAlign: 'center', padding: 10 },
+
+  // Wallet Breakdown
+  walletBreakdownCard: {
+    marginHorizontal: 20, marginTop: 16, backgroundColor: '#1A1A1A',
+    borderRadius: 16, padding: 16, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  walletBreakdownHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12,
+  },
+  walletBreakdownTitle: {
+    fontSize: 12, fontWeight: '700', color: '#888780',
+    textTransform: 'uppercase', letterSpacing: 0.5,
+  },
+  walletBreakdownLink: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
+  walletBreakdownItem: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+  },
+  walletBreakdownLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  walletBreakdownDot: {
+    width: 32, height: 32, borderRadius: 8, alignItems: 'center', justifyContent: 'center',
+  },
+  walletBreakdownIcon: { fontSize: 16 },
+  walletBreakdownName: { fontSize: 13, fontWeight: '500', color: '#fff' },
+  walletBreakdownBalance: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  walletBreakdownMore: {
+    alignItems: 'center', paddingVertical: 10,
+  },
+  walletBreakdownMoreText: { fontSize: 12, color: PRIMARY, fontWeight: '600' },
 
   // Quick Actions
   quickRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 20, marginBottom: 24 },
