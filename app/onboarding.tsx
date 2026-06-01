@@ -113,31 +113,33 @@ export default function OnboardingScreen() {
 
   const handleFinish = async () => {
     setLoading(true)
-    // getSession() baca dari localStorage, tidak perlu network call
     const { data: { session } } = await supabase.auth.getSession()
     const user = session?.user
 
     const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
     const userId = user?.id
 
-    // Navigate dulu, DB writes jalan di background
+    // HARUS selesai dulu sebelum navigate — kalau fire-and-forget,
+    // _layout.tsx cek user_preferences dan tidak ketemu → redirect ke onboarding lagi
+    await Promise.all([
+      supabase.from('user_preferences').upsert({
+        user_id: userId,
+        nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
+        persona,
+        language,
+        budget_method: budgetMethod,
+        monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+        ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
+        updated_at: new Date().toISOString(),
+      }),
+      supabase.from('user_wallets').insert([
+        { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
+        { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
+      ]),
+    ])
+
     router.replace('/(tabs)')
-
-    supabase.from('user_preferences').upsert({
-      user_id: userId,
-      nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
-      persona,
-      language,
-      budget_method: budgetMethod,
-      monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-      ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
-      updated_at: new Date().toISOString(),
-    }).then(() => {})
-
-    supabase.from('user_wallets').insert([
-      { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵' },
-      { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦' },
-    ]).then(() => {})
+    setLoading(false)
   }
 
   const renderStep = () => {
