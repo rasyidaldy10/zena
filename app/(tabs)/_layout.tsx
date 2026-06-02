@@ -70,8 +70,9 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="profil"
         options={{
-          href: null, // Hide from tab bar
-          tabBarButton: () => null,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon focused={focused} icon="👤" label="Profil" />
+          ),
         }}
       />
     </Tabs>

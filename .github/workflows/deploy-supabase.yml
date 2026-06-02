@@ -1,0 +1,40 @@
+name: Deploy Supabase Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: # Manual trigger via GitHub UI
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: |
+          supabase link --project-ref $SUPABASE_PROJECT_ID
+          supabase functions deploy budget-monitor --no-verify-jwt
+          supabase functions deploy anomaly-detector --no-verify-jwt
+          supabase functions deploy weekly-insight --no-verify-jwt
+          supabase functions deploy gmail-parser --no-verify-jwt
+          supabase functions deploy daily-summary --no-verify-jwt
+          supabase functions deploy stock-price-updater --no-verify-jwt
+
+      - name: Deployment Success
+        run: echo "✅ All edge functions deployed successfully!"
