@@ -85,10 +85,15 @@ export default function ChatScreen() {
 
   const loadPrefs = async () => {
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      router.replace('/(auth)/login')
+      return null
+    }
+
     const { data: prefs } = await supabase
       .from('user_preferences')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', user.id)
       .single()
 
     if (prefs?.persona) setPersona(prefs.persona)
@@ -101,13 +106,15 @@ export default function ChatScreen() {
 
   const loadTransactions = async () => {
     const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return []
+
     const threeMonthsAgo = new Date()
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3)
 
     const { data } = await supabase
       .from('transactions')
       .select('*')
-      .eq('user_id', user?.id)
+      .eq('user_id', user.id)
       .gte('date', threeMonthsAgo.toISOString().split('T')[0])
       .order('date', { ascending: false })
       .limit(100)

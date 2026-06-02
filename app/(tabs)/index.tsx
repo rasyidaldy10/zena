@@ -245,13 +245,16 @@ export default function HomeScreen() {
               <Text style={styles.quickLabel}>ZENA Intel</Text>
               <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => Alert.alert('Tabungan', 'Fitur tabungan segera hadir! 💰')}>
               <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
                 <Text style={{ fontSize: 24 }}>💰</Text>
               </View>
               <Text style={styles.quickLabel}>Tabungan</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => Alert.alert('Segera hadir! 🏆')}>
+            <TouchableOpacity
+              style={styles.quickBtn}
+              onPress={() => Alert.alert('Leaderboard 🏆', 'Fitur leaderboard akan datang segera! Bandingkan skor keuangan dengan pengguna lain.')}
+            >
               <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
                 <Text style={{ fontSize: 24 }}>🏆</Text>
               </View>

@@ -41,8 +41,8 @@ export default function RootLayout() {
 
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Only log once to avoid spam
-      if (event !== 'TOKEN_REFRESHED' && event !== 'INITIAL_SESSION') {
+      // Suppress noisy logs
+      if (event !== 'TOKEN_REFRESHED' && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') {
         console.log('Auth event:', event)
       }
       setSession(session)
