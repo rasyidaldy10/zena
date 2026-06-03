@@ -8,6 +8,7 @@ import { supabase } from '../../lib/supabase'
 import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
+import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 
 const PRIMARY = '#185FA5'
 const BG_APP = '#F4F7FA'
@@ -30,6 +31,7 @@ export default function HomeScreen() {
   const [tabMode, setTabMode] = useState<TabMode>('all')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [rincianExpanded, setRincianExpanded] = useState(false)
+  const [showCEOWelcome, setShowCEOWelcome] = useState(false)
   const channelRef = useRef<any>(null)
 
   const fetchData = async () => {
@@ -53,6 +55,29 @@ export default function HomeScreen() {
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
     setLoading(false)
+
+    // Check if user is new (show CEO welcome once)
+    const hasSeenWelcome = await supabase
+      .from('user_preferences')
+      .select('has_seen_ceo_welcome')
+      .eq('user_id', session.user.id)
+      .single()
+
+    if (p && !hasSeenWelcome.data?.has_seen_ceo_welcome) {
+      setTimeout(() => setShowCEOWelcome(true), 1000) // Show after 1 second
+    }
+  }
+
+  const handleCloseCEOWelcome = async () => {
+    setShowCEOWelcome(false)
+    // Mark as seen
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      await supabase
+        .from('user_preferences')
+        .update({ has_seen_ceo_welcome: true })
+        .eq('user_id', session.user.id)
+    }
   }
 
   useFocusEffect(useCallback(() => { fetchData() }, []))
@@ -114,6 +139,13 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* CEO WELCOME MODAL */}
+      <CEOWelcomeModal
+        visible={showCEOWelcome}
+        onClose={handleCloseCEOWelcome}
+        userName={prefs?.nickname || 'Friend'}
+      />
+
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
