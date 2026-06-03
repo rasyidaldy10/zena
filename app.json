@@ -16,12 +16,9 @@
       "package": "com.rasyid.zena",
       "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "backgroundColor": "#185FA5",
+        "foregroundImage": "./assets/icon.png"
       },
-      "predictiveBackGestureEnabled": false,
       "permissions": []
     },
     "web": {
