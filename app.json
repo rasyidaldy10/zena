@@ -41,6 +41,13 @@
     "plugins": [
       "expo-web-browser",
       "expo-router"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8a920606-fca0-479d-b008-0e45421197a4"
+      }
+    },
+    "owner": "rasyidaldy"
   }
 }
