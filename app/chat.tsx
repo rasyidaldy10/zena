@@ -5,12 +5,13 @@ import {
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
 import * as FileSystem from 'expo-file-system'
-// import { Audio } from 'expo-av' // TODO: Replace with expo-audio when implementing voice
+import { Audio } from 'expo-av'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { claudeChat, claudeVision } from '../lib/claude'
 import { getContextualSystemPrompt } from '../lib/personas'
 import { speak, stopSpeaking } from '../lib/speech'
+import { processVoiceNote } from '../lib/groq'
 import { Persona, Language, BudgetMethod, Transaction } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -40,9 +41,8 @@ export default function ChatScreen() {
   const [monthlyIncome, setMonthlyIncome] = useState(0)
   const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>('503020')
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
-  // const [recording, setRecording] = useState<Audio.Recording | null>(null)
-  // const [isRecording, setIsRecording] = useState(false)
-  // const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [recording, setRecording] = useState<Audio.Recording | null>(null)
+  const [isRecording, setIsRecording] = useState(false)
   const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
@@ -204,49 +204,89 @@ Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
   }
 
-  // ── VOICE NOTE ── (Disabled - TODO: Implement with expo-audio)
-  // const handleVoiceNote = async () => {
-  //   if (isRecording) {
-  //     await stopRecording()
-  //   } else {
-  //     await startRecording()
-  //   }
-  // }
+  // ── VOICE NOTE ── Powered by Groq Whisper
+  const handleVoiceNote = async () => {
+    if (isRecording) {
+      await stopRecording()
+    } else {
+      await startRecording()
+    }
+  }
 
-  // const startRecording = async () => {
-  //   try {
-  //     const permission = await Audio.requestPermissionsAsync()
-  //     if (!permission.granted) {
-  //       Alert.alert('Izin diperlukan', 'Izin mikrofon dibutuhkan.')
-  //       return
-  //     }
-  //     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true })
-  //     const { recording: rec } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
-  //     setRecording(rec)
-  //     setIsRecording(true)
-  //   } catch {
-  //     Alert.alert('Error', 'Gagal memulai rekaman.')
-  //   }
-  // }
+  const startRecording = async () => {
+    try {
+      const permission = await Audio.requestPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Izin diperlukan', 'Izin mikrofon dibutuhkan untuk voice note.')
+        return
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true
+      })
+      const { recording: rec } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      )
+      setRecording(rec)
+      setIsRecording(true)
+    } catch (err: any) {
+      console.error('Recording start error:', err)
+      Alert.alert('Error', 'Gagal memulai rekaman.')
+    }
+  }
 
-  // const stopRecording = async () => {
-  //   if (!recording) return
-  //   setIsRecording(false)
-  //   setLoading(true)
-  //   try {
-  //     await recording.stopAndUnloadAsync()
-  //     setRecording(null)
-  //     setLoading(false)
-  //     Alert.alert(
-  //       '🎤 Voice Note',
-  //       'Rekaman selesai! Ketik transaksinya di chat ya (contoh: "beli nasi 15 ribu tadi siang")',
-  //       [{ text: 'OK' }]
-  //     )
-  //   } catch {
-  //     setLoading(false)
-  //     Alert.alert('Error', 'Gagal memproses rekaman.')
-  //   }
-  // }
+  const stopRecording = async () => {
+    if (!recording) return
+
+    setIsRecording(false)
+    setLoading(true)
+
+    try {
+      await recording.stopAndUnloadAsync()
+      const uri = recording.getURI()
+      setRecording(null)
+
+      if (!uri) {
+        throw new Error('No audio URI')
+      }
+
+      // Convert audio to base64 untuk dikirim ke Edge Function
+      const base64Audio = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      })
+      const audioUri = `data:audio/m4a;base64,${base64Audio}`
+
+      // Process dengan Groq: Transcribe + Parse
+      const result = await processVoiceNote(audioUri)
+
+      // Format hasil untuk ditampilkan ke user
+      let resultText = `🎤 Voice Note:\n"${result.transcription}"\n\n`
+
+      if (result.nominal && result.kategori) {
+        resultText += `Terdeteksi:\n`
+        resultText += `💰 Nominal: Rp ${result.nominal.toLocaleString('id-ID')}\n`
+        resultText += `📂 Kategori: ${result.kategori}\n`
+        resultText += `📝 Catatan: ${result.catatan}\n\n`
+        resultText += `Mau langsung dicatat sebagai transaksi ${result.tipe === 'income' ? 'pemasukan' : 'pengeluaran'}?`
+      } else {
+        resultText += `Nominal atau kategori tidak terdeteksi. Ketik manual ya!`
+      }
+
+      setMessages(prev => [
+        ...prev,
+        { role: 'user', content: result.transcription },
+        { role: 'assistant', content: resultText }
+      ])
+
+      setLoading(false)
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+
+    } catch (err: any) {
+      console.error('Recording stop error:', err)
+      setLoading(false)
+      Alert.alert('Error', `Gagal memproses voice note: ${err.message}`)
+    }
+  }
 
   const getPersonaLabel = () => {
     const labels: Record<Persona, string> = {
@@ -345,13 +385,12 @@ Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
         <TouchableOpacity style={styles.iconBtn} onPress={handleScanStruk}>
           <Text style={styles.iconBtnText}>📷</Text>
         </TouchableOpacity>
-        {/* Voice button disabled - TODO: Implement with expo-audio */}
-        {/* <TouchableOpacity
+        <TouchableOpacity
           style={[styles.iconBtn, isRecording && styles.iconBtnRecording]}
           onPress={handleVoiceNote}
         >
           <Text style={styles.iconBtnText}>{isRecording ? '⏹' : '🎤'}</Text>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
         <TextInput
           style={styles.input}
           placeholder="Tanya Zena apa aja..."
