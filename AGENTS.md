@@ -291,6 +291,19 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
     - ✅ **Saved to .env** - For future automation scripts
     - ✅ **Ready for automation** - Edge function deployment, database ops
 
+51. **Groq API Integration - Voice Note (2026-06-03):**
+    - ✅ **Hybrid AI System** - Groq untuk voice/parsing, Claude untuk chat/analysis
+    - ✅ **lib/groq.ts** - Service layer (transcribeAudio, parseTransactionFromVoice, processVoiceNote)
+    - ✅ **groq-transcribe Edge Function** - Whisper Large V3 untuk transcription (Indonesian optimized)
+    - ✅ **groq-parse-transaction Edge Function** - Mixtral 8x7b untuk structured parsing
+    - ✅ **chat.tsx updated** - Voice button enabled, integrated dengan Groq flow
+    - ✅ **expo-av installed** - Audio recording capability restored
+    - ✅ **GROQ_SETUP.md** - Complete documentation (setup, troubleshooting, cost comparison)
+    - ✅ **.env.example updated** - Added GROQ_API_KEY placeholder
+    - ✅ **TypeScript 0 errors** - All new code type-safe
+    - ✅ **Security** - API key server-side only, no client exposure
+    - ✅ **Cost optimized** - 100x cheaper transcription vs Claude, 10x cheaper parsing
+
 ### Belum Dikerjakan (Requires Manual Steps)
 
 **🔴 CRITICAL (Before Production):**
@@ -302,11 +315,16 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 2. Setup cron jobs di Supabase Dashboard untuk Weekly Insight (Sabtu 09:00 WIB) dan Daily Summary (21:00 WIB)
 3. Deploy edge functions ke Supabase: `supabase functions deploy budget-monitor anomaly-detector weekly-insight gmail-parser daily-summary`
 
+**🟢 GROQ VOICE NOTE (Ready, Needs API Key):**
+1. **Get Groq API key** - Sign up di console.groq.com (free tier available)
+2. **Add to Supabase secrets** - `supabase secrets set GROQ_API_KEY=gsk_...`
+3. **Deploy Edge Functions** - `supabase functions deploy groq-transcribe groq-parse-transaction`
+4. **Test voice note** - Tap 🎤 di AI Chat, say "Beli nasi 25 ribu", should parse automatically
+
 **🟢 FUTURE FEATURES (Roadmap):**
 1. Gmail parsing aktif — butuh Google OAuth scope gmail.readonly
-2. Voice Note Whisper — butuh API key + upload audio ke server
-3. Couple mode — shared wallet dengan pasangan
-4. In-app purchase — Pro Rp 39k/bln, Bisnis Rp 79k/bln (butuh RevenueCat/StoreKit)
+2. Couple mode — shared wallet dengan pasangan
+3. In-app purchase — Pro Rp 39k/bln, Bisnis Rp 79k/bln (butuh RevenueCat/StoreKit)
 5. PDF export laporan
 6. Submit Play Store & App Store (after internal testing)
 
