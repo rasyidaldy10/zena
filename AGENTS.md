@@ -4,7 +4,57 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## STATUS SESI TERAKHIR (2026-06-05 Early Morning) ⚡📊
+## STATUS SESI TERAKHIR (2026-06-05 Morning) 🐛🔧
+
+**🐛 CRITICAL BUG FIX - SUPABASE REALTIME:**
+- ❌ **Bug Found:** "Cannot find postgres_changes callbacks after subscribe()"
+- ✅ **Root Cause:** Supabase v2 requires .subscribe((status) => ...) handler
+- ✅ **Fixed:** 2 files (index.tsx, zena-intelligence.tsx)
+- ✅ **Added:** Status handler + error catching + console logging
+- ✅ **Tested:** TypeScript 0 errors, no more uncaught errors
+- ✅ **Git:** Committed c5fcfcc, pushed to main
+
+**🔍 ERROR DETAILS:**
+```
+Uncaught Error: Cannot find "postgres_changes" callbacks 
+for realtime:notif-badge-ca57736-6db9-4d13-9f59-0caceebe0076 
+after 'subscribe()'
+
+Location: app/(tabs)/index.tsx (293-294)
+```
+
+**💡 ROOT CAUSE:**
+- Old code: `.subscribe()` with NO callback
+- Supabase JS v2: REQUIRES `.subscribe((status) => { ... })`
+- Without callback → Uncaught Error → App crash
+
+**🔧 FIXES APPLIED:**
+
+1. **app/(tabs)/index.tsx (notification badge):**
+   - Before: `.subscribe()` ❌
+   - After: `.subscribe((status) => { ... })` ✅
+   - Added: SUBSCRIBED, CHANNEL_ERROR, TIMED_OUT handling
+   - Added: try-catch on getSession() and removeChannel()
+
+2. **app/zena-intelligence.tsx (intelligence system):**
+   - Before: `.subscribe()` ❌
+   - After: `.subscribe((status) => { ... })` ✅
+   - Same error handling pattern
+
+**✅ RESULT:**
+- No more random crashes on dashboard load
+- Notification badge realtime works
+- Intelligence system realtime works
+- Clean console logs for debugging
+
+**📝 GIT:**
+- c5fcfcc: fix: Supabase Realtime subscribe error
+- a2b1b9d: docs: update AGENTS.md (AI + market)
+- f83f418: feat: AI speed + market data
+
+---
+
+## STATUS SESI SEBELUMNYA (2026-06-05 Early Morning) ⚡📊
 
 **⚡ DUAL FEATURE - AI SPEED + MARKET DATA:**
 - ✅ **AI Speed Optimized** - 2-3x faster responses (adaptive tokens + compact prompts)
