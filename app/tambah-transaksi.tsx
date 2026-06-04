@@ -295,7 +295,11 @@ export default function TambahTransaksiScreen() {
 
   const formatAmount = (text: string) => {
     const numbers = text.replace(/\D/g, '')
-    const formatted = numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+
+    // Prevent leading zeros (e.g., "0123" → "123", "00" → "0")
+    const cleaned = numbers.replace(/^0+/, '') || (numbers ? '0' : '')
+
+    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
     setAmount(formatted)
   }
 

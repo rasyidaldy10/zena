@@ -27,10 +27,10 @@ export interface UserPreferences {
   budget_method: BudgetMethod
   monthly_income: number
   nickname: string
-  avatar_url?: string
   has_seen_ceo_welcome?: boolean
   created_at: string
   updated_at: string
+  // Note: avatar_url comes from session.user.user_metadata.picture (Google OAuth)
 }
 
 export interface UserWallet {

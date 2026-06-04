@@ -125,8 +125,6 @@ export default function OnboardingScreen() {
       return
     }
 
-    const avatarUrl = user?.user_metadata?.avatar_url || user?.user_metadata?.picture || null
-
     // Cek apakah user sudah punya wallet (avoid duplicate kalau onboarding dipanggil 2x)
     const { count: walletCount } = await supabase
       .from('user_wallets')
@@ -134,34 +132,44 @@ export default function OnboardingScreen() {
       .eq('user_id', userId)
 
     try {
-      const tasks = [
-        supabase.from('user_preferences').upsert({
+      // Execute upsert and wait for result
+      const { data: prefsData, error: prefsError } = await supabase
+        .from('user_preferences')
+        .upsert({
           user_id: userId,
           nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
           persona,
           language,
           budget_method: budgetMethod,
           monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-          ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
           updated_at: new Date().toISOString(),
         })
-      ]
+        .select()
+        .single()
 
-      // Hanya insert wallet kalau belum ada (count = 0)
-      if (walletCount === 0) {
-        tasks.push(
-          supabase.from('user_wallets').insert([
-            { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵', current_balance: 0 },
-            { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦', current_balance: 0 },
-          ])
-        )
+      if (prefsError) {
+        throw new Error(`Failed to save preferences: ${prefsError.message}`)
       }
 
-      await Promise.all(tasks)
+      // Insert default wallets if user doesn't have any yet
+      if (walletCount === 0) {
+        const { error: walletError } = await supabase.from('user_wallets').insert([
+          { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵', current_balance: 0 },
+          { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦', current_balance: 0 },
+        ])
 
+        if (walletError) {
+          console.error('Wallet creation error (non-fatal):', walletError)
+          // Don't throw - wallets can be created later by user
+        }
+      }
+
+      // Only redirect if preferences were saved successfully
+      setLoading(false)
       router.replace('/(tabs)')
     } catch (error) {
       setLoading(false)
+      console.error('Onboarding error:', error)
       Alert.alert('Error', 'Gagal menyimpan data. Silakan coba lagi.')
     }
   }
