@@ -4,26 +4,33 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## STATUS SESI TERAKHIR (2026-06-04 Morning) 🚀
+## STATUS SESI TERAKHIR (2026-06-04 Afternoon) 🚀
 
-**🐛 CRITICAL APK BUG FIXES + BUILD #4:**
-- ✅ **Logo Baru** - Updated icon.png dengan design terbaru dari WhatsApp Image (1024x1024)
-- ✅ **Login Screen** - Logo PNG visible (bukan emoji 💰), responsive 120x120
-- ✅ **Dashboard Header** - Logo 40x40 + Greeting dinamis (Pagi/Siang/Sore/Malam) + User name
-- ✅ **Auth Loop Fixed** - Errors tidak force logout, session persists, "Coba Lagi" button
-- ✅ **ErrorBoundary Updated** - Stay in app after error, no redirect ke login
-- ✅ **Gmail Connect Error** - Alert saja, tidak logout user
-- ✅ **Database Reset** - rasyidaldy10@gmail.com cleaned (total fresh start)
-- ✅ **Fresh Onboarding Ready** - Default 2 wallets (Cash + Bank), no dummy data
-- ✅ **Groq API Integration** - Voice note transcription + parsing (Whisper + Mixtral)
-- ✅ **Groq Edge Functions** - groq-transcribe, groq-parse-transaction deployed & active
-- ✅ **Build #4 Started** - Preview build in progress (ETA 5-10 min)
+**🐛 BUILD #4 INSTALL ERROR + BUILD #5 FIX:**
+- ❌ **Build #4 Failed Install** - "Aplikasi tidak terinstal" error on Android
+- 🔍 **Root Cause Found** - versionCode not incremented (stayed at 1)
+- ✅ **Fix Applied** - versionCode: 1 → 4, buildNumber: 1 → 4
+- ✅ **Build #5 Triggered** - New build with incremented versionCode
+- ✅ **expo-doctor** - 20/21 checks passed
+- ✅ **TypeScript** - 0 errors verified
+- ✅ **Git committed** - 75d738e pushed to main
 
 **🔨 BUILD HISTORY:**
-- Build #1: ❌ Failed (adaptive icon config)
-- Build #2: ❌ Failed (same Gradle error)
-- Build #3: ✅ Success (icon.png format fixed)
-- **Build #4: ⏳ In Progress (Bug fixes + new logo + Groq integration)**
+- Build #1: ❌ Failed (adaptive icon config) - versionCode 1
+- Build #2: ❌ Failed (same Gradle error) - versionCode 1
+- Build #3: ✅ Build Success (icon.png format fixed) - versionCode 1
+- Build #4: ✅ Build Success BUT ❌ Install Failed (versionCode not incremented) - versionCode 1
+- **Build #5: ⏳ In Progress (versionCode fix) - versionCode 4**
+
+**📋 BUILD #4 FEATURES (All Carried to Build #5):**
+- ✅ **Logo Baru** - Updated icon.png dengan design terbaru (1024x1024)
+- ✅ **Login Screen** - Logo PNG visible (bukan emoji 💰)
+- ✅ **Dashboard Header** - Logo 40x40 + Greeting dinamis + User name
+- ✅ **Auth Loop Fixed** - Errors tidak force logout
+- ✅ **ErrorBoundary Updated** - Stay in app after error
+- ✅ **Database Reset** - rasyidaldy10@gmail.com cleaned
+- ✅ **Groq API Integration** - Voice note ready
+- ✅ **Fresh Onboarding** - Default 2 wallets (Cash + Bank)
 
 **🎨 CODE CHANGES:**
 - `app/(auth)/login.tsx` → Logo PNG + Image component
@@ -48,18 +55,32 @@ Result: ✅ Complete fresh start
 - Cleanup script → /tmp/cleanup_rasyid_account.sql (executed)
 - EAS Dashboard → https://expo.dev/accounts/rasyidaldy/projects/zena/builds
 
+**🔧 BUILD #5 FIX DETAILS:**
+```json
+// app.json changes
+"android": {
+  "versionCode": 4  // Was: 1 (caused install error)
+}
+"ios": {
+  "buildNumber": "4"  // Was: "1" (consistency)
+}
+```
+
 **📊 STATUS:**
 - **Completeness:** 95% (Logo + Groq + Bug fixes!)
 - **Security:** ✅ 100% (RLS active)
-- **Build System:** ⏳ Build #4 in progress
+- **Build System:** ⏳ Build #5 in progress (versionCode fix)
 - **TypeScript:** ✅ 0 errors
-- **Git:** ✅ All committed & pushed (d28afa5)
+- **Git:** ✅ All committed & pushed (75d738e)
+- **expo-doctor:** ✅ 20/21 checks passed
 
 **🎯 NEXT STEPS:**
-1. ⏳ Wait for Build #4 completion (5-10 min)
-2. Download APK → Install/Update on Android
-3. Test fresh onboarding flow (database kosong)
-4. Verify CEO Welcome shows once
+1. ⏳ Wait for Build #5 completion (5-10 min)
+2. Download APK from EAS dashboard
+3. Install on Android (should succeed: versionCode 4 > 1)
+4. Test fresh onboarding + CEO Welcome + logo
+5. If PASS → Production build
+6. If FAIL → Debug + fix + rebuild
 5. Test logo di login + dashboard
 6. Test error handling (no forced logout)
 7. Test Groq voice note (if API key configured)
@@ -322,7 +343,7 @@ Result: ✅ Complete fresh start
     - ✅ **Edge Functions Deployed** - groq-transcribe (v2), groq-parse-transaction (v2) active
     - ✅ **Groq API Key** - Added to Supabase secrets
 
-52. **Critical APK Bug Fixes (2026-06-04):**
+52. **Critical APK Bug Fixes (2026-06-04 Morning):**
     - ✅ **Logo Baru** - icon.png updated dengan design terbaru (1024x1024 dari WhatsApp Image)
     - ✅ **Login Screen** - Logo PNG visible (Image component), responsive 120x120
     - ✅ **Dashboard Header Redesign** - Logo 40x40 + Greeting dinamis (Pagi/Siang/Sore/Malam) + User name
@@ -332,9 +353,21 @@ Result: ✅ Complete fresh start
     - ✅ **Database Reset** - SQL script untuk clean rasyidaldy10@gmail.com account
     - ✅ **Fresh Onboarding Verified** - Default 2 wallets (Cash + Bank), no dummy data
     - ✅ **Testing Documentation** - APK_TEST_PLAN.md (5 tests + regression), BUILD_v2_SUMMARY.md
-    - ✅ **Build #4 Started** - Preview build in progress (bug fixes + new logo)
+    - ✅ **Build #4 Completed** - Build success but install failed
     - ✅ **TypeScript 0 errors** - All changes verified
     - ✅ **Git committed** - d28afa5 pushed to main
+
+53. **Build #4 Install Error Fix (2026-06-04 Afternoon):**
+    - ❌ **Build #4 Problem** - "Aplikasi tidak terinstal" error on Android
+    - 🔍 **Root Cause** - versionCode not incremented (stayed at 1 across builds #1-4)
+    - ✅ **Fix Applied** - app.json: android.versionCode 1 → 4, ios.buildNumber 1 → 4
+    - ✅ **Validation** - expo-doctor: 20/21 checks passed
+    - ✅ **TypeScript** - 0 errors verified
+    - ✅ **Documentation** - BUILD_5_FIX.md created with root cause analysis
+    - ✅ **Build #5 Triggered** - Preview build with versionCode 4 (installable)
+    - ✅ **Git committed** - 75d738e pushed to main
+    - ⏳ **Build #5 Status** - In progress (ETA 5-10 min)
+    - 📝 **Lesson Learned** - Always increment versionCode for each Android build
 
 ### Belum Dikerjakan (Requires Manual Steps)
 
