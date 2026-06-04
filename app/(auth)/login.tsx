@@ -67,7 +67,11 @@ export default function LoginScreen() {
       <View style={styles.content}>
         {/* Logo/Icon */}
         <View style={styles.logoContainer}>
-          <Text style={styles.logoText}>💰</Text>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
           <Text style={styles.appName}>Zena</Text>
           <Text style={styles.tagline}>Keuanganmu, selaras.</Text>
         </View>
@@ -106,6 +110,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0F0F0F', justifyContent: 'space-between' },
   content: { flex: 1, justifyContent: 'center', paddingHorizontal: 32 },
   logoContainer: { alignItems: 'center', marginBottom: 60 },
+  logo: { width: 120, height: 120, marginBottom: 16 },
   logoText: { fontSize: 72, marginBottom: 12 },
   appName: { fontSize: 42, fontWeight: '900', color: '#fff', letterSpacing: 4, marginBottom: 8 },
   tagline: { fontSize: 14, color: '#888780', letterSpacing: 1 },

@@ -1,5 +1,6 @@
 import React from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
+import { router } from 'expo-router'
 
 interface Props {
   children: React.ReactNode
@@ -24,17 +25,22 @@ export class ErrorBoundary extends React.Component<Props, State> {
     console.error('Error caught by boundary:', error, errorInfo)
   }
 
+  handleRetry = () => {
+    // Reset error state dan stay di screen yang sama
+    this.setState({ hasError: false, error: null })
+  }
+
   render() {
     if (this.state.hasError) {
       return (
         <View style={styles.container}>
-          <Text style={styles.title}>⚠️ Oops! Something went wrong</Text>
-          <Text style={styles.error}>{this.state.error?.message}</Text>
+          <Text style={styles.title}>⚠️ Terjadi Kesalahan</Text>
+          <Text style={styles.error}>{this.state.error?.message || 'Error tidak diketahui'}</Text>
           <TouchableOpacity
             style={styles.button}
-            onPress={() => this.setState({ hasError: false, error: null })}
+            onPress={this.handleRetry}
           >
-            <Text style={styles.buttonText}>Try Again</Text>
+            <Text style={styles.buttonText}>Coba Lagi</Text>
           </TouchableOpacity>
         </View>
       )

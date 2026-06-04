@@ -129,6 +129,16 @@ export default function HomeScreen() {
   const initials = prefs?.nickname ? prefs.nickname.slice(0, 2).toUpperCase() : 'U'
   const balance = getBalance()
 
+  // Greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Selamat Pagi'
+    if (hour < 15) return 'Selamat Siang'
+    if (hour < 18) return 'Selamat Sore'
+    return 'Selamat Malam'
+  }
+  const greeting = getGreeting()
+
   if (loading) {
     return (
       <View style={styles.container}>
@@ -149,12 +159,14 @@ export default function HomeScreen() {
       {/* HEADER */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.headerLogo}
+            resizeMode="contain"
+          />
           <View>
+            <Text style={styles.headerGreeting}>{greeting}</Text>
             <Text style={styles.headerName}>{prefs?.nickname || 'User'}</Text>
-            <Text style={styles.headerTier}>{tierName} • {score?.total ?? 0} XP</Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -368,11 +380,13 @@ const styles = StyleSheet.create({
     backgroundColor: PRIMARY, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 32,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerLogo: { width: 40, height: 40, borderRadius: 20 },
   avatar: {
     width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center', justifyContent: 'center',
   },
   avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 2 },
   headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   headerTier: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
   headerRight: { flexDirection: 'row', gap: 8 },
