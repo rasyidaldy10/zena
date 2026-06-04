@@ -86,7 +86,9 @@ export default function HomeScreen() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
-      channelRef.current = supabase
+
+      // Setup realtime channel with proper error handling
+      const channel = supabase
         .channel(`notif-badge-${session.user.id}`)
         .on('postgres_changes', {
           event: 'INSERT',
@@ -96,10 +98,31 @@ export default function HomeScreen() {
         }, () => {
           setNotifCount(prev => prev + 1)
         })
-        .subscribe()
+        .subscribe((status) => {
+          // Handle subscription status
+          if (status === 'SUBSCRIBED') {
+            console.log('Notification badge realtime: connected')
+          }
+          if (status === 'CHANNEL_ERROR') {
+            console.error('Notification badge realtime: error')
+          }
+          if (status === 'TIMED_OUT') {
+            console.error('Notification badge realtime: timed out')
+          }
+        })
+
+      channelRef.current = channel
+    }).catch((error) => {
+      // Catch any auth errors
+      console.error('Realtime setup error:', error)
     })
+
     return () => {
-      if (channelRef.current) supabase.removeChannel(channelRef.current)
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current).catch((err) => {
+          console.error('Channel cleanup error:', err)
+        })
+      }
     }
   }, [])
 

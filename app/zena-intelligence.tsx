@@ -187,7 +187,9 @@ export default function ZenaIntelligenceScreen() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
-      channelRef.current = supabase
+
+      // Setup realtime channel with proper error handling
+      const channel = supabase
         .channel(`jarvis-${session.user.id}`)
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, (p) => {
           const notif = p.new as ZenaNotification
@@ -197,9 +199,27 @@ export default function ZenaIntelligenceScreen() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agent_logs', filter: `user_id=eq.${session.user.id}` }, (p) => {
           setLogs(prev => [p.new as AgentLog, ...prev.slice(0, 29)])
         })
-        .subscribe()
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('Intelligence realtime: connected')
+          }
+          if (status === 'CHANNEL_ERROR') {
+            console.error('Intelligence realtime: error')
+          }
+        })
+
+      channelRef.current = channel
+    }).catch((error) => {
+      console.error('Intelligence realtime setup error:', error)
     })
-    return () => { if (channelRef.current) supabase.removeChannel(channelRef.current) }
+
+    return () => {
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current).catch((err) => {
+          console.error('Intelligence channel cleanup error:', err)
+        })
+      }
+    }
   }, [])
 
   const activeCount = AGENTS.filter(a => getStatus(logs, a.id) !== 'standby').length
