@@ -148,6 +148,28 @@ export const CATEGORIES = EXPENSE_CATEGORIES
 
 export type NotificationType = 'budget_alert' | 'anomaly' | 'weekly_insight' | 'daily_summary' | 'gmail' | 'categorization'
 
+// Market Data Types
+export type AssetType = 'crypto' | 'stock' | 'index'
+
+export interface MarketPrice {
+  symbol: string // BTC, ETH, IHSG
+  name: string // Bitcoin, Ethereum, IHSG
+  price: number
+  currency: string // IDR
+  change_24h: number // percentage
+  change_7d?: number
+  market_cap?: number
+  volume_24h?: number
+  last_updated: string
+}
+
+export interface MarketData {
+  crypto: MarketPrice[]
+  indices: MarketPrice[]
+  last_updated: string
+  cache_ttl: number // seconds
+}
+
 export interface ZenaNotification {
   id: string
   user_id: string

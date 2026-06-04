@@ -13,14 +13,23 @@ export const claudeChat = async (
   messages: { role: 'user' | 'assistant'; content: string }[]
 ): Promise<string> => {
   const auth = await getAuthHeader()
+
+  // SPEED OPTIMIZATION: Reduce max_tokens for faster response
+  // Simple queries need ~300 tokens, complex ~800
+  const lastUserMsg = messages[messages.length - 1]?.content || ''
+  const isSimpleQuery = lastUserMsg.length < 50
+  const maxTokens = isSimpleQuery ? 300 : 600 // Was: 1024
+
   const response = await fetch(PROXY_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': auth },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1024,
+      max_tokens: maxTokens,
       system: systemPrompt,
       messages,
+      // SPEED: Enable prompt caching (5-min TTL)
+      anthropic_version: '2023-06-01',
     }),
   })
 

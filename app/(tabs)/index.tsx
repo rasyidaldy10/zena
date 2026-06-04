@@ -9,6 +9,7 @@ import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
+import MarketWidget from '../../components/MarketWidget'
 
 const PRIMARY = '#185FA5'
 const BG_APP = '#F4F7FA'
@@ -334,6 +335,9 @@ export default function HomeScreen() {
             </View>
           ))}
         </View>
+
+        {/* MARKET DATA */}
+        <MarketWidget />
 
         {/* TRANSAKSI TERAKHIR */}
         <View style={styles.txnHeader}>
