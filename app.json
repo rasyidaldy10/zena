@@ -9,12 +9,12 @@
     "userInterfaceStyle": "light",
     "ios": {
       "bundleIdentifier": "com.rasyid.zena",
-      "buildNumber": "6",
+      "buildNumber": "7",
       "supportsTablet": true
     },
     "android": {
       "package": "com.rasyid.zena",
-      "versionCode": 6,
+      "versionCode": 7,
       "adaptiveIcon": {
         "backgroundColor": "#185FA5",
         "foregroundImage": "./assets/icon.png"
