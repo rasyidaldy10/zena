@@ -17,53 +17,73 @@ export default function RootLayout() {
 
       // Route based on session - only on first load
       if (!hasNavigatedRef.current) {
-        if (session) {
-          // Check onboarding status
-          const { data } = await supabase
-            .from('user_preferences')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle()
+        try {
+          if (session) {
+            // Check onboarding status
+            const { data, error } = await supabase
+              .from('user_preferences')
+              .select('id')
+              .eq('user_id', session.user.id)
+              .maybeSingle()
 
-          if (data) {
-            router.replace('/(tabs)')
+            if (error) {
+              console.error('Error fetching user_preferences:', error)
+              // If DB error, go to login
+              router.replace('/(auth)/login')
+            } else if (data) {
+              router.replace('/(tabs)')
+            } else {
+              router.replace('/onboarding')
+            }
           } else {
-            router.replace('/onboarding')
+            router.replace('/(auth)/login')
           }
-        } else {
+        } catch (error) {
+          console.error('Routing error:', error)
+          // Fallback to login on any error
           router.replace('/(auth)/login')
         }
         hasNavigatedRef.current = true
       }
 
       setInitializing(false)
+    }).catch((error) => {
+      console.error('Auth session error:', error)
+      setInitializing(false)
+      router.replace('/(auth)/login')
     })
 
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Suppress noisy logs
-      if (event !== 'TOKEN_REFRESHED' && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') {
-        console.log('Auth event:', event)
-      }
-      setSession(session)
-
-      // Handle only login/logout events (not TOKEN_REFRESHED, INITIAL_SESSION)
-      if (event === 'SIGNED_IN' && session && hasNavigatedRef.current) {
-        const { data } = await supabase
-          .from('user_preferences')
-          .select('id')
-          .eq('user_id', session.user.id)
-          .maybeSingle()
-
-        if (data) {
-          router.replace('/(tabs)')
-        } else {
-          router.replace('/onboarding')
+      try {
+        // Suppress noisy logs
+        if (event !== 'TOKEN_REFRESHED' && event !== 'INITIAL_SESSION' && event !== 'SIGNED_IN') {
+          console.log('Auth event:', event)
         }
-      } else if (event === 'SIGNED_OUT' && hasNavigatedRef.current) {
-        router.replace('/(auth)/login')
+        setSession(session)
+
+        // Handle only login/logout events (not TOKEN_REFRESHED, INITIAL_SESSION)
+        if (event === 'SIGNED_IN' && session && hasNavigatedRef.current) {
+          const { data, error } = await supabase
+            .from('user_preferences')
+            .select('id')
+            .eq('user_id', session.user.id)
+            .maybeSingle()
+
+          if (error) {
+            console.error('Error fetching preferences on SIGNED_IN:', error)
+          } else if (data) {
+            router.replace('/(tabs)')
+          } else {
+            router.replace('/onboarding')
+          }
+        } else if (event === 'SIGNED_OUT' && hasNavigatedRef.current) {
+          router.replace('/(auth)/login')
+        }
+        // Ignore TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
+      } catch (error) {
+        console.error('Auth state change error:', error)
       }
-      // Ignore TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
     })
 
     return () => subscription.unsubscribe()
