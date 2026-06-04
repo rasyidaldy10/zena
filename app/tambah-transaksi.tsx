@@ -6,7 +6,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
-import { CATEGORIES } from '../types'
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 
 const PRIMARY = '#185FA5'
 const GREEN = '#1D9E75'
@@ -125,6 +125,11 @@ export default function TambahTransaksiScreen() {
     fetchWallets()
   }, [])
 
+  // Reset category when type changes (income vs expense have different categories)
+  useEffect(() => {
+    setCategory('')
+  }, [type])
+
   const fetchWallets = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
@@ -232,9 +237,11 @@ export default function TambahTransaksiScreen() {
       await supabase.from('user_wallets').update({ current_balance: fromWalletData.current_balance - nominal }).eq('id', selectedWallet)
       await supabase.from('user_wallets').update({ current_balance: toWalletData.current_balance + nominal }).eq('id', toWallet)
 
+      setLoading(false)
       Alert.alert('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`, [
         { text: 'OK', onPress: () => router.back() }
       ])
+      return
     } else {
       const { error } = await supabase.from('transactions').insert({
         user_id: user?.id,
@@ -272,9 +279,14 @@ export default function TambahTransaksiScreen() {
       })
 
       setLoading(false)
-      Alert.alert('Berhasil! ✅', 'Transaksi berhasil dicatat', [
-        { text: 'OK', onPress: () => router.back() }
-      ])
+
+      // Auto redirect tanpa tunggu OK (prevent double submission)
+      router.back()
+
+      // Show success toast di home (jangan blocking)
+      setTimeout(() => {
+        Alert.alert('Berhasil! ✅', 'Transaksi berhasil dicatat')
+      }, 300)
       return
     }
 
@@ -412,7 +424,7 @@ export default function TambahTransaksiScreen() {
           <>
             <Text style={styles.label}>Kategori</Text>
             <View style={styles.categoryGrid}>
-              {CATEGORIES.map((cat) => (
+              {(type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES).map((cat) => (
                 <TouchableOpacity
                   key={cat}
                   style={[styles.catBtn, category === cat && { backgroundColor: typeColor, borderColor: typeColor }]}

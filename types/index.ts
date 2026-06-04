@@ -118,19 +118,33 @@ export interface FinancialScore {
   tier: TierName
 }
 
-export const CATEGORIES = [
+// Kategori untuk EXPENSE (Pengeluaran)
+export const EXPENSE_CATEGORIES = [
   'Makan & Minum',
   'Transport',
   'Belanja',
   'Tagihan',
   'Hiburan',
   'Kesehatan',
-  'Bisnis',
-  'Investasi',
-  'Tabungan',
+  'Pendidikan',
   'Biaya Admin & Fee',
   'Lainnya',
 ]
+
+// Kategori untuk INCOME (Pemasukan)
+export const INCOME_CATEGORIES = [
+  'Gaji',
+  'Bonus',
+  'Freelance',
+  'Bisnis',
+  'Investasi',
+  'Hadiah',
+  'Cashback',
+  'Lainnya',
+]
+
+// Legacy export (deprecated, use EXPENSE_CATEGORIES or INCOME_CATEGORIES)
+export const CATEGORIES = EXPENSE_CATEGORIES
 
 export type NotificationType = 'budget_alert' | 'anomaly' | 'weekly_insight' | 'daily_summary' | 'gmail' | 'categorization'
 
