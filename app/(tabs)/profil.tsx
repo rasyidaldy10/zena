@@ -24,6 +24,8 @@ export default function ProfilScreen() {
   const [tier, setTier] = useState('Starter')
   const [wallets, setWallets] = useState<UserWallet[]>([])
   const [gmailConnected, setGmailConnected] = useState(false)
+  const [tapCount, setTapCount] = useState(0)
+  const [lastTapTime, setLastTapTime] = useState(0)
 
   const fetchData = async () => {
     setLoading(true)
@@ -165,6 +167,34 @@ export default function ProfilScreen() {
     ])
   }
 
+  // Hidden Marketing Dashboard access (tap 5x on header)
+  const handleHeaderTap = () => {
+    const now = Date.now()
+
+    // Reset if more than 2 seconds between taps
+    if (now - lastTapTime > 2000) {
+      setTapCount(1)
+    } else {
+      const newCount = tapCount + 1
+      setTapCount(newCount)
+
+      // Open Marketing Dashboard after 5 taps
+      if (newCount >= 5) {
+        setTapCount(0)
+        Alert.alert(
+          '🎨 Marketing Manager',
+          'Akses admin - Generate content dengan Higgsfield AI',
+          [
+            { text: 'Batal', style: 'cancel' },
+            { text: 'Buka', onPress: () => router.push('/marketing-dashboard') },
+          ]
+        )
+      }
+    }
+
+    setLastTapTime(now)
+  }
+
   const tierConfig = TIER_CONFIG[tier as keyof typeof TIER_CONFIG]
 
   if (loading) return (
@@ -175,9 +205,13 @@ export default function ProfilScreen() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
+      <TouchableOpacity
+        style={styles.header}
+        activeOpacity={1}
+        onPress={handleHeaderTap}
+      >
         <Text style={styles.headerTitle}>Profil</Text>
-      </View>
+      </TouchableOpacity>
 
       {/* ZENA Intelligence Banner */}
       <TouchableOpacity style={styles.zenaBanner} onPress={() => router.push('/zena-intelligence')} activeOpacity={0.8}>
