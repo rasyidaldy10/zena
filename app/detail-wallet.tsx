@@ -134,15 +134,15 @@ export default function DetailWalletScreen() {
                         <View style={styles.divider} />
                         <Text style={styles.holdingsTitle}>Portofolio ({walletHoldings.length})</Text>
                         {walletHoldings.map((holding) => {
-                          const currentValue = holding.quantity * 100 * (holding.current_price || holding.buy_price)
-                          const buyValue = holding.quantity * 100 * holding.buy_price
-                          const profitLoss = currentValue - buyValue
-                          const profitLossPercent = (profitLoss / buyValue) * 100
+                          const currentValue = holding.total_value
+                          const buyValue = holding.quantity * holding.average_buy_price
+                          const profitLoss = holding.unrealized_gain_loss
+                          const profitLossPercent = holding.unrealized_gain_loss_percent
 
                           return (
                             <View key={holding.id} style={styles.holdingItem}>
                               <View style={styles.holdingHeader}>
-                                <Text style={styles.holdingTicker}>{holding.ticker}</Text>
+                                <Text style={styles.holdingTicker}>{holding.symbol}</Text>
                                 <Text style={[
                                   styles.holdingPL,
                                   { color: profitLoss >= 0 ? '#1D9E75' : '#E24B4A' }
@@ -151,11 +151,11 @@ export default function DetailWalletScreen() {
                                 </Text>
                               </View>
                               <View style={styles.holdingRow}>
-                                <Text style={styles.holdingLabel}>{holding.quantity} lot • {holding.quantity * 100} lembar</Text>
+                                <Text style={styles.holdingLabel}>{holding.quantity} unit • {holding.asset_name}</Text>
                                 <Text style={styles.holdingValue}>Rp {currentValue.toLocaleString('id-ID')}</Text>
                               </View>
                               <View style={styles.holdingRow}>
-                                <Text style={styles.holdingLabel}>Harga: Rp {(holding.current_price || holding.buy_price).toLocaleString('id-ID')}</Text>
+                                <Text style={styles.holdingLabel}>Harga: Rp {holding.current_price.toLocaleString('id-ID')}</Text>
                                 <Text style={[
                                   styles.holdingPLAmount,
                                   { color: profitLoss >= 0 ? '#1D9E75' : '#E24B4A' }

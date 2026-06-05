@@ -10,6 +10,7 @@ import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 import MarketWidget from '../../components/MarketWidget'
+import StockWidget from '../../components/StockWidget'
 
 const PRIMARY = '#185FA5'
 const BG_APP = '#F4F7FA'
@@ -114,7 +115,7 @@ export default function HomeScreen() {
       channelRef.current = channel
     }).catch((error) => {
       // Catch any auth errors
-      console.error('Realtime setup error:', error)
+      console.error('Realtime setup error:', error.message || 'Unknown error')
     })
 
     return () => {
@@ -313,11 +314,12 @@ export default function HomeScreen() {
               <Text style={styles.quickLabel}>ZENA Intel</Text>
               <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => Alert.alert('Tabungan', 'Fitur tabungan segera hadir! 💰')}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
               <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                <Text style={{ fontSize: 24 }}>💰</Text>
+                <Text style={{ fontSize: 24 }}>💎</Text>
               </View>
-              <Text style={styles.quickLabel}>Tabungan</Text>
+              <Text style={styles.quickLabel}>Investasi</Text>
+              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.quickBtn}
@@ -342,9 +344,9 @@ export default function HomeScreen() {
         <View style={styles.scoreGrid}>
           {[
             { label: 'Konsistensi', value: score?.consistency ?? 0, color: INCOME_COLOR },
-            { label: 'Budget', value: score?.budget_adherence ?? 0, color: PRIMARY },
+            { label: 'Budget', value: Math.min(score?.budget_adherence ?? 0, 100), color: PRIMARY },
             { label: 'Tabungan', value: score?.saving_rate ?? 0, color: '#B45309' },
-            { label: 'Goal', value: score?.goal_completion ?? 0, color: '#7C3AED' },
+            { label: tierName, value: score?.total ?? 0, color: tierConfig.color },
           ].map(item => (
             <View key={item.label} style={styles.scoreCard}>
               <Text style={styles.scoreLabel}>{item.label}</Text>
@@ -361,6 +363,9 @@ export default function HomeScreen() {
 
         {/* MARKET DATA */}
         <MarketWidget />
+
+        {/* STOCK MARKET */}
+        <StockWidget />
 
         {/* TRANSAKSI TERAKHIR */}
         <View style={styles.txnHeader}>

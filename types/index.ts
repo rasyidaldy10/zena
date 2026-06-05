@@ -47,25 +47,7 @@ export interface UserWallet {
   created_at: string
 }
 
-export interface InvestmentHolding {
-  id: string
-  wallet_id: string
-  user_id: string
-  ticker: string
-  quantity: number
-  buy_price: number
-  current_price?: number
-  last_updated?: string
-  created_at: string
-}
-
-export interface StockPrice {
-  ticker: string
-  price: number
-  change_percent?: number
-  last_updated: string
-  source: string
-}
+// StockPrice type moved to stock-data.ts (no longer used here)
 
 export interface Transaction {
   id: string
@@ -263,4 +245,23 @@ export interface BankConnection {
   last_sync_at: string | null
   created_at: string
   updated_at: string
+}
+
+// Investment Holdings Types
+export type InvestmentAssetType = 'stock' | 'crypto' | 'reksadana' | 'obligasi'
+
+export interface InvestmentHolding {
+  id: string
+  user_id: string
+  asset_type: InvestmentAssetType
+  symbol: string
+  asset_name: string
+  quantity: number
+  average_buy_price: number
+  current_price: number
+  total_value: number
+  unrealized_gain_loss: number
+  unrealized_gain_loss_percent: number
+  last_updated_at: string
+  created_at: string
 }
