@@ -7,6 +7,7 @@ import {
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { WALLET_TYPE_CONFIG } from '../types'
+import BankConnectModal from '../components/BankConnectModal'
 
 const PRIMARY = '#185FA5'
 
@@ -24,10 +25,35 @@ export default function TambahWalletScreen() {
   const [bankName, setBankName] = useState('')
   const [last4Digits, setLast4Digits] = useState('')
   const [loading, setLoading] = useState(false)
+  const [showBankConnect, setShowBankConnect] = useState(false)
+  const [userId, setUserId] = useState('')
+
+  // Load user ID on mount
+  useState(() => {
+    loadUserId()
+  })
+
+  const loadUserId = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) setUserId(user.id)
+  }
 
   const formatBalance = (text: string) => {
     const nums = text.replace(/\D/g, '')
     setInitialBalance(nums.replace(/\B(?=(\d{3})+(?!\d))/g, '.'))
+  }
+
+  const handleBankConnect = (bankCode: string, bankName: string) => {
+    Alert.alert(
+      'Coming Soon! 🚀',
+      `Connect ${bankName} sedang dalam tahap development.\n\nSilakan tambah wallet manual terlebih dahulu.`
+    )
+    // TODO: Implement OAuth flow with Brick.co
+    // 1. Open getBrickAuthUrl(bankCode, userId)
+    // 2. Handle callback at zena://brick-callback
+    // 3. Exchange auth code for access token
+    // 4. Get bank accounts
+    // 5. Create wallet with bank connection
   }
 
   const handleSave = async () => {
@@ -100,6 +126,30 @@ export default function TambahWalletScreen() {
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* Bank Connect Option */}
+        <TouchableOpacity
+          style={styles.bankConnectCard}
+          onPress={() => setShowBankConnect(true)}
+        >
+          <View style={styles.bankConnectIcon}>
+            <Text style={{ fontSize: 24 }}>🏦</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.bankConnectTitle}>Connect Bank Account</Text>
+            <Text style={styles.bankConnectDesc}>
+              Auto-sync transaksi dari 50+ bank Indonesia
+            </Text>
+          </View>
+          <Text style={styles.bankConnectArrow}>›</Text>
+        </TouchableOpacity>
+
+        {/* Divider */}
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>atau tambah manual</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
         {/* Preview card */}
         <View style={[styles.previewCard, { backgroundColor: selectedColor }]}>
           <Text style={styles.previewIcon}>{selectedIcon}</Text>
@@ -221,6 +271,14 @@ export default function TambahWalletScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Bank Connect Modal */}
+      <BankConnectModal
+        visible={showBankConnect}
+        onClose={() => setShowBankConnect(false)}
+        onBankSelected={handleBankConnect}
+        userId={userId}
+      />
     </KeyboardAvoidingView>
   )
 }
@@ -294,4 +352,54 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  bankConnectCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D1A2E',
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: PRIMARY + '60',
+  },
+  bankConnectIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  bankConnectTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  bankConnectDesc: {
+    fontSize: 12,
+    color: '#888780',
+  },
+  bankConnectArrow: {
+    fontSize: 24,
+    color: PRIMARY,
+    marginLeft: 8,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#2A2A2A',
+  },
+  dividerText: {
+    fontSize: 12,
+    color: '#666',
+    marginHorizontal: 12,
+  },
 })

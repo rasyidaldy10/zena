@@ -206,3 +206,61 @@ export const TIER_CONFIG: Record<TierName, { min: number; max: number; color: st
   Platinum:  { min: 80, max: 94,  color: '#AFA9EC', icon: '💠' },
   Sovereign: { min: 95, max: 100, color: '#F0997B', icon: '👑' },
 }
+
+// Brick.co Bank Connection Types
+export type BankConnectionStatus = 'pending' | 'active' | 'expired' | 'error'
+
+export interface BrickBank {
+  id: number
+  name: string
+  code: string
+  logo_url: string
+  is_popular: boolean
+}
+
+export interface BrickAccessToken {
+  access_token: string
+  token_type: string
+  expires_in: number
+  refresh_token?: string
+}
+
+export interface BrickBankAccount {
+  id: string
+  account_number: string
+  account_name: string
+  balance: number
+  currency: string
+  type: string // savings, checking, credit
+}
+
+export interface BrickTransaction {
+  id: string
+  account_id: string
+  amount: number
+  direction: 'in' | 'out'
+  description: string
+  reference_id: string
+  date: string
+  category?: string
+  merchant_name?: string
+}
+
+export interface BankConnection {
+  id: string
+  user_id: string
+  wallet_id: string | null
+  bank_id: number
+  bank_name: string
+  bank_code: string
+  account_id: string
+  account_number: string
+  account_name: string
+  access_token: string
+  refresh_token?: string
+  token_expires_at: string
+  status: BankConnectionStatus
+  last_sync_at: string | null
+  created_at: string
+  updated_at: string
+}
