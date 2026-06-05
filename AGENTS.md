@@ -4,7 +4,128 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## STATUS SESI TERAKHIR (2026-06-05 Morning) 🐛🔧
+## STATUS SESI TERAKHIR (2026-06-06 Morning) 📈💎
+
+**📈 STOCK WATCHLIST + 💎 INVESTMENT PORTFOLIO:**
+- ✅ **3 Critical Bugs Fixed** - Realtime error, Financial Score display, InvestmentHolding schema
+- ✅ **Stock Watchlist Widget** - IHSG + custom watchlist (select up to 10 stocks)
+- ✅ **Investment Portfolio Screen** - Track stocks, crypto, reksadana, obligasi holdings
+- ✅ **Dashboard Enhanced** - Stock widget + Investment quick action
+- ✅ **TypeScript 0 errors** - All verified
+- ✅ **Git:** Committed ae77876, pushed to main
+
+**🐛 3 CRITICAL BUGS FIXED:**
+
+1. **Realtime Error Toast (FIXED ✅):**
+   - Before: Toast showing `error:http://...` (error object)
+   - After: `error.message` displayed properly
+   - Location: `app/(tabs)/index.tsx` line 117
+   - Impact: No more confusing error messages
+
+2. **Financial Score Display (FIXED ✅):**
+   - Before: Budget showing 170 (exceeded max 100), Tier showing "100" (number instead of name)
+   - After: Budget capped at 100 with `Math.min()`, Tier shows name (Starter/Bronze/etc) with tier color
+   - Location: `app/(tabs)/index.tsx` Financial Score grid
+   - Impact: Accurate score display
+
+3. **InvestmentHolding Duplicate (FIXED ✅):**
+   - Before: 2 conflicting interfaces (old: ticker/buy_price, new: symbol/average_buy_price)
+   - After: Single interface aligned with database schema
+   - Renamed: `AssetType` → `InvestmentAssetType` (avoid conflict with MarketWidget's AssetType)
+   - Updated: `detail-wallet.tsx` to use new interface fields
+   - Impact: TypeScript errors resolved, consistent data model
+
+**📈 STOCK WATCHLIST FEATURE:**
+
+1. **lib/stock-data.ts - Service Layer:**
+   - `getIHSGIndex()` - Indonesia Stock Exchange Composite Index
+   - `getStockPrices(tickers)` - Get prices for multiple stocks
+   - `clearStockCache()` - Force refresh (5-min TTL)
+   - `POPULAR_STOCKS` - 16 popular stocks (BBCA, BBRI, TLKM, ASII, GOTO, UNVR, dll)
+   - `DEFAULT_WATCHLIST` - ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO']
+   - Mock data: Realistic price ranges (BBCA ~9800, TLKM ~3800, GOTO ~65)
+
+2. **components/StockWidget.tsx - UI Component:**
+   - Horizontal scroll cards (IHSG + user's watchlist stocks)
+   - IHSG card: Blue (PRIMARY color), shows index points + change
+   - Stock cards: Symbol, name, price, change %
+   - Color-coded: 🟢 Green (gain) / 🔴 Red (loss)
+   - Header: Update time (Xm ago), Refresh button (↻), Watchlist button (⭐)
+   - Watchlist modal: Select/deselect stocks (max 10)
+   - Sectors: Finansial, Telekomunikasi, Otomotif, Konsumer, Energi, Pertambangan, Teknologi
+   - AsyncStorage: Persist user's watchlist selections
+   - Search + filter: Popular stocks vs All stocks
+
+3. **Dashboard Integration:**
+   - Added StockWidget after MarketWidget (crypto prices above, stocks below)
+   - Keeps MarketWidget (crypto: BTC, ETH, BNB, SOL, ADA)
+   - Visual hierarchy: Balance → Quick Actions → Financial Score → Crypto → Stocks → Transactions
+
+**💎 INVESTMENT PORTFOLIO FEATURE:**
+
+1. **Database Schema - 003_investment_holdings.sql:**
+   ```sql
+   CREATE TABLE investment_holdings (
+     id UUID PRIMARY KEY,
+     user_id UUID REFERENCES auth.users,
+     asset_type TEXT CHECK (asset_type IN ('stock', 'crypto', 'reksadana', 'obligasi')),
+     symbol TEXT NOT NULL,
+     asset_name TEXT NOT NULL,
+     quantity DECIMAL(18, 8),
+     average_buy_price DECIMAL(18, 2),
+     current_price DECIMAL(18, 2),
+     total_value DECIMAL(18, 2), -- Auto-calculated via trigger
+     unrealized_gain_loss DECIMAL(18, 2), -- Auto-calculated
+     unrealized_gain_loss_percent DECIMAL(8, 2), -- Auto-calculated
+     last_updated_at TIMESTAMPTZ,
+     created_at TIMESTAMPTZ
+   );
+   ```
+   - RLS policies: Users can only CRUD their own holdings
+   - Trigger: Auto-calculate total_value, gain/loss on INSERT/UPDATE
+   - Seed function: `seed_sample_holdings(user_id)` for testing
+
+2. **app/investment-portfolio.tsx - Portfolio Screen:**
+   - Summary card: Total portfolio value + total gain/loss (₹ / %)
+   - Filter tabs: All, Stock, Crypto, Reksadana, Obligasi (with counts)
+   - Holdings list: Each card shows:
+     - Icon (📈 stock, ₿ crypto, 💼 reksadana, 📊 obligasi)
+     - Symbol + Asset name
+     - Quantity @ Current price
+     - Total value (Rp)
+     - Gain/Loss (% and Rp) - color-coded green/red
+   - Empty state: "Belum ada asset" + "Tambah Asset" button (coming soon)
+   - Footer hint: "Harga otomatis update setiap 5 menit"
+
+3. **Dashboard Integration:**
+   - Quick action "Tabungan" → "Investasi" 💎 (NEW badge)
+   - Links to `/investment-portfolio` screen
+   - Positioned in Row 2, slot 2 (after ZENA Intel)
+
+**📊 TYPES UPDATES:**
+- Added `InvestmentAssetType = 'stock' | 'crypto' | 'reksadana' | 'obligasi'`
+- Added `InvestmentHolding` interface with 12 fields
+- Removed old duplicate `InvestmentHolding` (ticker/buy_price)
+- Removed duplicate `StockPrice` interface (moved to stock-data.ts)
+
+**📦 DEPENDENCIES:**
+- Installed: `@react-native-async-storage/async-storage` (for watchlist persistence)
+
+**✅ TESTING:**
+- TypeScript: 0 errors ✅
+- All new screens: investment-portfolio.tsx, StockWidget.tsx
+- Fixed files: index.tsx, detail-wallet.tsx, types/index.ts
+- Git: ae77876 pushed to main
+
+**🎯 READY FOR:**
+- Localhost testing: Stock watchlist + Investment portfolio
+- Database migration: Run 003_investment_holdings.sql in Supabase
+- Seed data: Call `seed_sample_holdings(user_id)` for demo portfolio
+- API integration: Replace mock data with real Yahoo Finance / IDX API
+
+---
+
+## STATUS SESI SEBELUMNYA (2026-06-05 Morning) 🐛🔧
 
 **🐛 CRITICAL BUG FIX - SUPABASE REALTIME:**
 - ❌ **Bug Found:** "Cannot find postgres_changes callbacks after subscribe()"
@@ -612,6 +733,28 @@ Result: ✅ Complete fresh start
     - ✅ **TypeScript 0 errors** - @types/node installed, all code verified
     - ✅ **Git committed** - 398bc5a pushed to main
     - ⏳ **TODO** - Create backend service untuk run Higgsfield CLI (Node.js only, won't work in React Native)
+
+55. **Brick.co Open Banking Integration (2026-06-05):**
+    - ✅ **lib/brick.ts** - Service layer untuk 50+ Indonesian banks
+    - ✅ **components/BankConnectModal.tsx** - Bank selection modal dengan search
+    - ✅ **app/tambah-wallet.tsx** - "Connect Bank Account" card di top
+    - ✅ **types/index.ts** - BrickBank, BrickAccessToken, BrickBankAccount, BankConnection types
+    - ✅ **.env setup** - BRICK_CLIENT_ID, BRICK_CLIENT_SECRET, BRICK_REDIRECT_URI (sandbox)
+    - ✅ **TypeScript 0 errors** - All OAuth flow types verified
+    - ⏳ **TODO** - OAuth callback handler (zena://brick-callback deep link)
+    - ⏳ **TODO** - Supabase Edge Function untuk secure token storage
+
+56. **Stock Watchlist + Investment Portfolio (2026-06-06):**
+    - ✅ **lib/stock-data.ts** - IHSG + 16 popular Indonesian stocks (BBCA, TLKM, GOTO, dll)
+    - ✅ **components/StockWidget.tsx** - Horizontal scroll cards + watchlist modal (max 10 stocks)
+    - ✅ **app/investment-portfolio.tsx** - Complete portfolio screen (stocks, crypto, reksadana, obligasi)
+    - ✅ **supabase/migrations/003_investment_holdings.sql** - Table + RLS + auto-calculate trigger
+    - ✅ **Dashboard integration** - StockWidget after MarketWidget, "Investasi" quick action
+    - ✅ **AsyncStorage** - Persist user watchlist selections
+    - ✅ **Bug fixes** - Realtime error toast, Financial Score display (budget cap + tier name), InvestmentHolding schema
+    - ✅ **TypeScript 0 errors** - All verified
+    - ✅ **Git committed** - ae77876 pushed to main
+    - ⏳ **TODO** - Run migration 003, integrate real stock API (Yahoo Finance / IDX API)
 
 ### Belum Dikerjakan (Requires Manual Steps)
 
