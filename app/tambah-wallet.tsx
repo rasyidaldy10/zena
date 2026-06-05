@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator, ScrollView,
@@ -29,9 +29,9 @@ export default function TambahWalletScreen() {
   const [userId, setUserId] = useState('')
 
   // Load user ID on mount
-  useState(() => {
+  useEffect(() => {
     loadUserId()
-  })
+  }, [])
 
   const loadUserId = async () => {
     const { data: { user } } = await supabase.auth.getUser()
