@@ -23,10 +23,12 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { encryptToken, decryptToken, hashForAudit } from '../_shared/encryption.ts'
 import {
-  quantumResistantEncrypt,
-  quantumResistantDecrypt,
-  getQuantumSecurityLevel
-} from '../_shared/quantum-resistant.ts'
+  eliteEncrypt,
+  eliteDecrypt,
+  getDefenseInDepthSecurityLevel
+} from '../_shared/defense-in-depth.ts'
+import { rateLimit, RATE_LIMITS } from '../_shared/rate-limit.ts'
+import { validateBrickOAuthParams } from '../_shared/validation.ts'
 
 // Environment variables (SERVER-SIDE ONLY - NEVER exposed to client)
 const BRICK_CLIENT_ID = Deno.env.get('BRICK_CLIENT_ID')!
@@ -135,9 +137,10 @@ async function exchangeAuthCode(
     // Use first account (or let user choose later)
     const account = accounts[0]
 
-    // Encrypt tokens before storage (QUANTUM-RESISTANT: Hybrid AES-256 + Kyber-1024)
-    const encryptedAccessToken = await quantumResistantEncrypt(access_token)
-    const encryptedRefreshToken = refresh_token ? await quantumResistantEncrypt(refresh_token) : null
+    // Encrypt tokens before storage (DEFENSE-IN-DEPTH: 7 Layers - Real Implementation)
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const encryptedAccessToken = await eliteEncrypt(access_token, masterKey, undefined, userId)
+    const encryptedRefreshToken = refresh_token ? await eliteEncrypt(refresh_token, masterKey, undefined, userId) : null
 
     // Store in database with RLS
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
@@ -219,8 +222,9 @@ async function refreshAccessToken(
       throw new Error('No refresh token available')
     }
 
-    // Decrypt refresh token (QUANTUM-RESISTANT)
-    const refreshToken = await quantumResistantDecrypt(connection.refresh_token_encrypted)
+    // Decrypt refresh token (DEFENSE-IN-DEPTH)
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const refreshToken = await eliteDecrypt(connection.refresh_token_encrypted, masterKey, undefined, userId)
 
     // Call Brick API to refresh token
     const response = await fetch(`${BRICK_BASE_URL}/auth/token/refresh`, {
@@ -250,8 +254,9 @@ async function refreshAccessToken(
     const data = await response.json()
     const { access_token, expires_in } = data
 
-    // Encrypt new access token (QUANTUM-RESISTANT)
-    const encryptedAccessToken = await quantumResistantEncrypt(access_token)
+    // Encrypt new access token (DEFENSE-IN-DEPTH)
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const encryptedAccessToken = await eliteEncrypt(access_token, masterKey, undefined, userId)
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
 
     // Update database
@@ -310,8 +315,9 @@ async function revokeConnection(
       throw new Error('Connection not found or unauthorized')
     }
 
-    // Decrypt access token (QUANTUM-RESISTANT)
-    const accessToken = await quantumResistantDecrypt(connection.access_token_encrypted)
+    // Decrypt access token (DEFENSE-IN-DEPTH)
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const accessToken = await eliteDecrypt(connection.access_token_encrypted, masterKey, undefined, userId)
 
     // Revoke token at Brick API
     await fetch(`${BRICK_BASE_URL}/auth/revoke`, {
@@ -373,8 +379,9 @@ async function getBankAccounts(
       throw new Error('Token expired - please refresh')
     }
 
-    // Decrypt access token (QUANTUM-RESISTANT)
-    const accessToken = await quantumResistantDecrypt(connection.access_token_encrypted)
+    // Decrypt access token (DEFENSE-IN-DEPTH)
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const accessToken = await eliteDecrypt(connection.access_token_encrypted, masterKey, undefined, userId)
 
     // Call Brick API
     const response = await fetch(`${BRICK_BASE_URL}/accounts`, {
@@ -418,9 +425,18 @@ serve(async (req) => {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  // RATE LIMITING: Prevent DoS attacks
+  const rateLimitResult = await rateLimit(req, RATE_LIMITS.OAUTH, 'brick-oauth')
+  if (!rateLimitResult.success && rateLimitResult.response) {
+    return rateLimitResult.response
+  }
+
   try {
-    // Parse request
-    const { action, code, userId, state, connectionId, fromDate, toDate } = await req.json()
+    // Parse and VALIDATE request (PREVENT SQL INJECTION + XSS)
+    const rawBody = await req.json()
+    const params = validateBrickOAuthParams(rawBody)
+
+    const { action } = params
 
     // Get auth token from request
     const authHeader = req.headers.get('Authorization')
@@ -446,31 +462,19 @@ serve(async (req) => {
 
     switch (action) {
       case 'exchange':
-        if (!code || !userId || !state) {
-          throw new Error('Missing required parameters: code, userId, state')
-        }
-        result = await exchangeAuthCode(supabase, code, userId, state, req)
+        result = await exchangeAuthCode(supabase, params.code, params.userId, params.state, req)
         break
 
       case 'refresh':
-        if (!connectionId) {
-          throw new Error('Missing required parameter: connectionId')
-        }
-        result = await refreshAccessToken(supabase, connectionId, user.id, req)
+        result = await refreshAccessToken(supabase, params.connectionId, user.id, req)
         break
 
       case 'revoke':
-        if (!connectionId) {
-          throw new Error('Missing required parameter: connectionId')
-        }
-        result = await revokeConnection(supabase, connectionId, user.id, req)
+        result = await revokeConnection(supabase, params.connectionId, user.id, req)
         break
 
       case 'get-accounts':
-        if (!connectionId) {
-          throw new Error('Missing required parameter: connectionId')
-        }
-        result = await getBankAccounts(supabase, connectionId, user.id, req)
+        result = await getBankAccounts(supabase, params.connectionId, user.id, req)
         break
 
       default:
