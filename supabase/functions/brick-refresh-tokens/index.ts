@@ -7,7 +7,7 @@
  * - Uses service role key (full access)
  * - Logs all refresh attempts for audit
  *
- * Schedule: */30 * * * * (every 30 minutes)
+ * Schedule: every 30 minutes
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
