@@ -22,6 +22,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { encryptToken, decryptToken, hashForAudit } from '../_shared/encryption.ts'
+import {
+  quantumResistantEncrypt,
+  quantumResistantDecrypt,
+  getQuantumSecurityLevel
+} from '../_shared/quantum-resistant.ts'
 
 // Environment variables (SERVER-SIDE ONLY - NEVER exposed to client)
 const BRICK_CLIENT_ID = Deno.env.get('BRICK_CLIENT_ID')!
@@ -130,9 +135,9 @@ async function exchangeAuthCode(
     // Use first account (or let user choose later)
     const account = accounts[0]
 
-    // Encrypt tokens before storage (AES-256-GCM)
-    const encryptedAccessToken = await encryptToken(access_token)
-    const encryptedRefreshToken = refresh_token ? await encryptToken(refresh_token) : null
+    // Encrypt tokens before storage (QUANTUM-RESISTANT: Hybrid AES-256 + Kyber-1024)
+    const encryptedAccessToken = await quantumResistantEncrypt(access_token)
+    const encryptedRefreshToken = refresh_token ? await quantumResistantEncrypt(refresh_token) : null
 
     // Store in database with RLS
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
@@ -214,8 +219,8 @@ async function refreshAccessToken(
       throw new Error('No refresh token available')
     }
 
-    // Decrypt refresh token
-    const refreshToken = await decryptToken(connection.refresh_token_encrypted)
+    // Decrypt refresh token (QUANTUM-RESISTANT)
+    const refreshToken = await quantumResistantDecrypt(connection.refresh_token_encrypted)
 
     // Call Brick API to refresh token
     const response = await fetch(`${BRICK_BASE_URL}/auth/token/refresh`, {
@@ -245,8 +250,8 @@ async function refreshAccessToken(
     const data = await response.json()
     const { access_token, expires_in } = data
 
-    // Encrypt new access token
-    const encryptedAccessToken = await encryptToken(access_token)
+    // Encrypt new access token (QUANTUM-RESISTANT)
+    const encryptedAccessToken = await quantumResistantEncrypt(access_token)
     const expiresAt = new Date(Date.now() + (expires_in * 1000))
 
     // Update database
@@ -305,8 +310,8 @@ async function revokeConnection(
       throw new Error('Connection not found or unauthorized')
     }
 
-    // Decrypt access token
-    const accessToken = await decryptToken(connection.access_token_encrypted)
+    // Decrypt access token (QUANTUM-RESISTANT)
+    const accessToken = await quantumResistantDecrypt(connection.access_token_encrypted)
 
     // Revoke token at Brick API
     await fetch(`${BRICK_BASE_URL}/auth/revoke`, {
@@ -368,8 +373,8 @@ async function getBankAccounts(
       throw new Error('Token expired - please refresh')
     }
 
-    // Decrypt access token
-    const accessToken = await decryptToken(connection.access_token_encrypted)
+    // Decrypt access token (QUANTUM-RESISTANT)
+    const accessToken = await quantumResistantDecrypt(connection.access_token_encrypted)
 
     // Call Brick API
     const response = await fetch(`${BRICK_BASE_URL}/accounts`, {

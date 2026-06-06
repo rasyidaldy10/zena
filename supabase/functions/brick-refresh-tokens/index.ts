@@ -13,6 +13,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 import { encryptToken, decryptToken } from '../_shared/encryption.ts'
+import { quantumResistantEncrypt, quantumResistantDecrypt } from '../_shared/quantum-resistant.ts'
 
 const BRICK_CLIENT_ID = Deno.env.get('BRICK_CLIENT_ID')!
 const BRICK_CLIENT_SECRET = Deno.env.get('BRICK_CLIENT_SECRET')!
@@ -71,8 +72,8 @@ serve(async (req) => {
       try {
         console.log(`Refreshing token for connection ${conn.id} (${conn.bank_name})`)
 
-        // Decrypt refresh token
-        const refreshToken = await decryptToken(conn.refresh_token_encrypted)
+        // Decrypt refresh token (QUANTUM-RESISTANT)
+        const refreshToken = await quantumResistantDecrypt(conn.refresh_token_encrypted)
 
         // Call Brick API to refresh
         const response = await fetch(`${BRICK_BASE_URL}/auth/token/refresh`, {
@@ -114,10 +115,10 @@ serve(async (req) => {
         const data = await response.json()
         const { access_token, expires_in, refresh_token: newRefreshToken } = data
 
-        // Encrypt new tokens
-        const encryptedAccessToken = await encryptToken(access_token)
+        // Encrypt new tokens (QUANTUM-RESISTANT)
+        const encryptedAccessToken = await quantumResistantEncrypt(access_token)
         const encryptedRefreshToken = newRefreshToken
-          ? await encryptToken(newRefreshToken)
+          ? await quantumResistantEncrypt(newRefreshToken)
           : conn.refresh_token_encrypted
 
         const expiresAt = new Date(Date.now() + (expires_in * 1000))
