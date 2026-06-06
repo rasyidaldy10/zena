@@ -138,7 +138,11 @@ async function exchangeAuthCode(
     const account = accounts[0]
 
     // Encrypt tokens before storage (DEFENSE-IN-DEPTH: 7 Layers - Real Implementation)
-    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+    const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')
+    if (!masterKey) {
+      throw new Error('CRITICAL: BANK_TOKEN_ENCRYPTION_KEY not configured in Supabase Vault')
+    }
+
     const encryptedAccessToken = await eliteEncrypt(access_token, masterKey, undefined, userId)
     const encryptedRefreshToken = refresh_token ? await eliteEncrypt(refresh_token, masterKey, undefined, userId) : null
 

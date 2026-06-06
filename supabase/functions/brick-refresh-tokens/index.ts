@@ -73,7 +73,11 @@ serve(async (req) => {
         console.log(`Refreshing token for connection ${conn.id} (${conn.bank_name})`)
 
         // Decrypt refresh token (DEFENSE-IN-DEPTH)
-        const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')!
+        const masterKey = Deno.env.get('BANK_TOKEN_ENCRYPTION_KEY')
+        if (!masterKey) {
+          throw new Error('CRITICAL: BANK_TOKEN_ENCRYPTION_KEY not configured')
+        }
+
         const refreshToken = await eliteDecrypt(conn.refresh_token_encrypted, masterKey, undefined, conn.user_id)
 
         // Call Brick API to refresh

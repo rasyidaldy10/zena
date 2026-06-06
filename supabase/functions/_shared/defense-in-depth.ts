@@ -181,17 +181,22 @@ async function verifySignature(
 /**
  * Device Binding via HMAC-SHA512
  * Binds encryption to specific device (prevents token theft)
+ *
+ * NOTE: Device fingerprint should be STABLE (same device = same fingerprint)
+ * Do NOT include timestamp or it will change on every decrypt!
  */
 async function generateDeviceFingerprint(
   userId: string,
   deviceId?: string
 ): Promise<string> {
-  const data = `${userId}:${deviceId || 'server'}:${Date.now()}`
+  // STABLE fingerprint (no timestamp!)
+  const data = `${userId}:${deviceId || 'server'}`
   const encoder = new TextEncoder()
 
+  const secret = Deno.env.get('DEVICE_BINDING_SECRET') || 'default-secret-change-in-production'
   const key = await subtle.importKey(
     'raw',
-    encoder.encode(Deno.env.get('DEVICE_BINDING_SECRET') || 'default-secret'),
+    encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-512' },
     false,
     ['sign']
@@ -216,6 +221,7 @@ interface SecurePayload {
   salt: string // Salt for key derivation
   deviceFingerprint: string // Device binding
   signature: string // ECDSA signature for tamper detection
+  publicKey: string // ECDSA public key (for signature verification)
 
   // Version and algorithm info
   version: string
@@ -262,43 +268,35 @@ export async function eliteEncrypt(
     // Layer 5: Device binding
     const deviceFingerprint = await generateDeviceFingerprint(userId || 'unknown', deviceId)
 
-    // Layer 6: Create payload
-    const payload: SecurePayload = {
+    // Layer 6: Create payload (without signature yet)
+    const payloadWithoutSig = {
       doubleCiphertext: btoa(String.fromCharCode(...combined2)),
       iv1: btoa(String.fromCharCode(...iv1)),
       iv2: btoa(String.fromCharCode(...iv2)),
       salt: btoa(String.fromCharCode(...salt)),
       deviceFingerprint,
-      signature: '', // Will fill next
       version: '1.0.0',
-      algorithm: 'defense-in-depth-v1',
+      algorithm: 'defense-in-depth-v1' as const,
       timestamp: new Date().toISOString()
     }
 
     // Layer 7: Sign entire payload (tamper detection)
     const signingKeys = await generateSigningKey()
-    const payloadToSign = JSON.stringify({
-      doubleCiphertext: payload.doubleCiphertext,
-      iv1: payload.iv1,
-      iv2: payload.iv2,
-      salt: payload.salt,
-      deviceFingerprint: payload.deviceFingerprint,
-      timestamp: payload.timestamp
-    })
+    const payloadToSign = JSON.stringify(payloadWithoutSig)
 
     const signature = await signData(payloadToSign, signingKeys.privateKey)
-    payload.signature = btoa(String.fromCharCode(...signature))
 
-    // Export public key for verification (store separately in DB)
+    // Export public key for verification
     const publicKeyExport = await subtle.exportKey('jwk', signingKeys.publicKey)
 
-    // Return payload + public key
-    const result = {
-      payload: btoa(JSON.stringify(payload)),
+    // Create final payload with signature and public key
+    const finalPayload: SecurePayload = {
+      ...payloadWithoutSig,
+      signature: btoa(String.fromCharCode(...signature)),
       publicKey: JSON.stringify(publicKeyExport)
     }
 
-    return btoa(JSON.stringify(result))
+    return btoa(JSON.stringify(finalPayload))
 
   } catch (error) {
     console.error('Elite encryption failed:', error)
@@ -316,9 +314,8 @@ export async function eliteDecrypt(
   userId?: string
 ): Promise<string> {
   try {
-    // Parse result
-    const result = JSON.parse(atob(encryptedData))
-    const payload: SecurePayload = JSON.parse(atob(result.payload))
+    // Parse payload (now includes publicKey)
+    const payload = JSON.parse(atob(encryptedData))
 
     // Verify version
     if (payload.algorithm !== 'defense-in-depth-v1') {
@@ -327,11 +324,22 @@ export async function eliteDecrypt(
 
     // Verify device fingerprint (prevent token theft)
     const expectedFingerprint = await generateDeviceFingerprint(userId || 'unknown', deviceId)
-    // Note: In production, you'd want more strict verification
-    // For now, we just log mismatch (not block)
+
     if (payload.deviceFingerprint !== expectedFingerprint) {
-      console.warn('Device fingerprint mismatch - possible token theft!')
-      // In production: throw error or require 2FA
+      console.error('SECURITY ALERT: Device fingerprint mismatch!', {
+        expected: expectedFingerprint.substring(0, 16) + '...',
+        received: payload.deviceFingerprint.substring(0, 16) + '...',
+        userId
+      })
+
+      // STRICT MODE: Throw error (prevent token theft)
+      // For server-side only (no deviceId), allow mismatch (since server restarts)
+      if (deviceId && deviceId !== 'server') {
+        throw new Error('Device fingerprint mismatch - possible token theft detected!')
+      }
+
+      // For server-side, just log warning
+      console.warn('Server-side decryption: device fingerprint mismatch allowed')
     }
 
     // Verify signature (tamper detection)
@@ -344,7 +352,12 @@ export async function eliteDecrypt(
       timestamp: payload.timestamp
     })
 
-    const publicKeyJwk = JSON.parse(result.publicKey)
+    // Extract public key from payload
+    if (!payload.publicKey) {
+      throw new Error('Missing public key in encrypted payload')
+    }
+
+    const publicKeyJwk = JSON.parse(payload.publicKey)
     const publicKey = await subtle.importKey(
       'jwk',
       publicKeyJwk,
