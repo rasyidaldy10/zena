@@ -9,6 +9,10 @@ export type WalletType =
   | 'rekening_utama' | 'dana_darurat' | 'ewallet'
   | 'dompet_transit' | 'tabungan' | 'investasi'
 
+export type WalletFunction =
+  | 'rekening_utama' | 'dana_darurat' | 'ewallet'
+  | 'transit' | 'tabungan' | 'investasi' | 'bisnis'
+
 export const WALLET_TYPE_CONFIG: Record<string, { label: string; icon: string; desc: string }> = {
   rekening_utama: { label: 'Rekening Utama', icon: '🏦', desc: 'Rekening bank utama sehari-hari' },
   dana_darurat:   { label: 'Dana Darurat',   icon: '🛡️', desc: 'Simpanan untuk kondisi darurat' },
@@ -28,6 +32,8 @@ export interface UserPreferences {
   monthly_income: number
   nickname: string
   has_seen_ceo_welcome?: boolean
+  business_mode?: boolean
+  active_mode?: 'personal' | 'business'
   created_at: string
   updated_at: string
   // Note: avatar_url comes from session.user.user_metadata.picture (Google OAuth)
@@ -38,6 +44,7 @@ export interface UserWallet {
   user_id: string
   wallet_name: string
   wallet_type: WalletType
+  wallet_function?: WalletFunction
   current_balance: number
   bank_name?: string
   last_4_digits?: string
@@ -48,6 +55,10 @@ export interface UserWallet {
 }
 
 // StockPrice type moved to stock-data.ts (no longer used here)
+
+export type BusinessCategory =
+  | 'penjualan' | 'pembelian_alat' | 'operasional' | 'transport'
+  | 'gaji' | 'entertain' | 'iklan' | 'lainnya'
 
 export interface Transaction {
   id: string
@@ -67,6 +78,9 @@ export interface Transaction {
   mood: Mood | null
   date: string
   created_at: string
+  project_id?: string | null
+  business_category?: BusinessCategory | null
+  has_items?: boolean
 }
 
 export interface Budget {
@@ -264,4 +278,93 @@ export interface InvestmentHolding {
   unrealized_gain_loss_percent: number
   last_updated_at: string
   created_at: string
+}
+
+// ============================================
+// BUSINESS MODE TYPES
+// ============================================
+
+export type ProjectType = 'alkes' | 'servis' | 'konsultasi' | 'lainnya'
+export type ProjectStatus = 'aktif' | 'selesai' | 'pending'
+export type ReceivableType = 'piutang' | 'hutang'
+export type ReceivableStatus = 'pending' | 'lunas'
+export type StockMovementType = 'in' | 'out' | 'adjustment'
+
+export interface Project {
+  id: string
+  user_id: string
+  name: string
+  client_name?: string
+  type: ProjectType
+  contract_value: number
+  status: ProjectStatus
+  created_at: string
+  // Computed fields (from helper function)
+  total_paid?: number
+  total_expense?: number
+  estimated_profit?: number
+  margin_pct?: number
+}
+
+export interface ProjectTerm {
+  id: string
+  project_id: string
+  label: string
+  amount: number
+  condition_text?: string
+  paid_at?: string | null
+  wallet_id?: string | null
+  created_at?: string
+}
+
+export interface Receivable {
+  id: string
+  user_id: string
+  project_id?: string | null
+  type: ReceivableType
+  party_name: string
+  amount: number
+  description?: string
+  due_date?: string | null
+  status: ReceivableStatus
+  settled_at?: string | null
+  created_at: string
+}
+
+export interface Product {
+  id: string
+  user_id: string
+  name: string
+  category?: string
+  unit: string
+  buy_price: number
+  sell_price: number
+  stock_qty: number
+  stock_min_alert: number
+  is_active: boolean
+  created_at: string
+}
+
+export interface StockMovement {
+  id: string
+  user_id: string
+  product_id: string
+  project_id?: string | null
+  transaction_id?: string | null
+  type: StockMovementType
+  qty: number
+  price_per_unit: number
+  note?: string
+  created_at: string
+}
+
+export interface TransactionItem {
+  id: string
+  transaction_id: string
+  product_id: string
+  product?: Product
+  qty: number
+  price_per_unit: number
+  subtotal: number
+  created_at?: string
 }
