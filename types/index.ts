@@ -34,6 +34,8 @@ export interface UserPreferences {
   has_seen_ceo_welcome?: boolean
   business_mode?: boolean
   active_mode?: 'personal' | 'business'
+  ppn_rate?: number
+  ppn_enabled?: boolean
   created_at: string
   updated_at: string
   // Note: avatar_url comes from session.user.user_metadata.picture (Google OAuth)
@@ -81,6 +83,10 @@ export interface Transaction {
   project_id?: string | null
   business_category?: BusinessCategory | null
   has_items?: boolean
+  ppn_type?: 'masukan' | 'keluaran' | null
+  ppn_amount?: number
+  amount_before_ppn?: number
+  is_ppn_inclusive?: boolean
 }
 
 export interface Budget {
@@ -366,5 +372,19 @@ export interface TransactionItem {
   qty: number
   price_per_unit: number
   subtotal: number
+  hpp_per_unit?: number
+  hpp_total?: number
   created_at?: string
+}
+
+export interface TaxSummary {
+  id: string
+  user_id: string
+  period_month: number
+  period_year: number
+  ppn_keluaran: number
+  ppn_masukan: number
+  ppn_terutang: number
+  created_at: string
+  updated_at: string
 }

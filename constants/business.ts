@@ -107,3 +107,21 @@ export function getProjectTypeLabel(type: ProjectType): string {
 export function getProjectTypeIcon(type: ProjectType): string {
   return PROJECT_TYPES.find(t => t.value === type)?.icon || '📋'
 }
+
+// PPN (VAT) Constants
+export const DEFAULT_PPN_RATE = 11
+
+export const PPN_TYPES = [
+  {
+    value: 'keluaran',
+    label: 'PPN Keluaran',
+    desc: 'Dari penjualan — kamu yang setor ke pajak',
+    icon: '📤',
+  },
+  {
+    value: 'masukan',
+    label: 'PPN Masukan',
+    desc: 'Dari pembelian — bisa dikreditkan',
+    icon: '📥',
+  },
+]
