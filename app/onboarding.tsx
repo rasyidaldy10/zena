@@ -142,6 +142,10 @@ export default function OnboardingScreen() {
           language,
           budget_method: budgetMethod,
           monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+          active_mode: 'personal', // Default personal mode
+          business_mode: false, // Business mode inactive by default
+          ppn_enabled: false, // PPN disabled by default
+          ppn_rate: 11, // Default PPN rate 11%
           updated_at: new Date().toISOString(),
         })
         .select()
@@ -154,8 +158,8 @@ export default function OnboardingScreen() {
       // Insert default wallets if user doesn't have any yet
       if (walletCount === 0) {
         const { error: walletError } = await supabase.from('user_wallets').insert([
-          { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', color: '#185FA5', icon: '💵', current_balance: 0 },
-          { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', color: '#534AB7', icon: '🏦', current_balance: 0 },
+          { user_id: userId, wallet_name: 'Cash', wallet_type: 'personal', wallet_function: 'personal', color: '#185FA5', icon: '💵', current_balance: 0 },
+          { user_id: userId, wallet_name: 'Bank', wallet_type: 'personal', wallet_function: 'personal', color: '#534AB7', icon: '🏦', current_balance: 0 },
         ])
 
         if (walletError) {
