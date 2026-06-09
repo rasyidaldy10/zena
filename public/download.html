@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Zena - Finance Management App</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      max-width: 500px;
+      width: 100%;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-10px); }
+    }
+
+    h1 {
+      color: #185FA5;
+      font-size: 32px;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .tagline {
+      color: #666;
+      font-size: 16px;
+      margin-bottom: 30px;
+    }
+
+    .features {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 30px;
+      text-align: left;
+    }
+
+    .feature {
+      display: flex;
+      align-items: center;
+      margin-bottom: 12px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .feature:last-child {
+      margin-bottom: 0;
+    }
+
+    .feature-icon {
+      font-size: 20px;
+      margin-right: 10px;
+    }
+
+    .download-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-bottom: 30px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 16px 24px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 16px;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: #185FA5;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #134a85;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 20px rgba(24,95,165,0.3);
+    }
+
+    .btn-secondary {
+      background: #f8f9fa;
+      color: #333;
+      border: 2px solid #dee2e6;
+    }
+
+    .btn-secondary:hover {
+      background: #e9ecef;
+      border-color: #adb5bd;
+    }
+
+    .btn-disabled {
+      background: #e9ecef;
+      color: #adb5bd;
+      cursor: not-allowed;
+      border: 2px dashed #dee2e6;
+    }
+
+    .version {
+      color: #999;
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .instructions {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 13px;
+      color: #856404;
+      margin-bottom: 20px;
+    }
+
+    .instructions strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+
+    .footer {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .status-badge {
+      display: inline-block;
+      background: #28a745;
+      color: white;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .coming-soon {
+      background: #ffc107;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">💰</div>
+    <h1>Zena Finance</h1>
+    <p class="tagline">Personal & Business Finance Management</p>
+
+    <div class="status-badge">✨ Business Mode Available</div>
+
+    <div class="features">
+      <div class="feature">
+        <span class="feature-icon">📊</span>
+        <span>Multi-wallet tracking & budgeting</span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">💼</span>
+        <span>Projects & Receivables management</span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">📦</span>
+        <span>Inventory & Stock tracking</span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">🧾</span>
+        <span>HPP & PPN tax automation</span>
+      </div>
+      <div class="feature">
+        <span class="feature-icon">🤖</span>
+        <span>AI-powered financial insights</span>
+      </div>
+    </div>
+
+    <div class="download-buttons">
+      <!-- Android APK - Update link setelah build -->
+      <a href="#" class="btn btn-disabled" id="androidBtn">
+        <span>📥</span>
+        <span>Download for Android (APK)</span>
+      </a>
+
+      <!-- iOS TestFlight - Coming soon -->
+      <a href="#" class="btn btn-disabled" id="iosBtn">
+        <span>📥</span>
+        <span>Download for iPhone (iOS)</span>
+      </a>
+
+      <!-- Web Version (Vercel) -->
+      <a href="/" class="btn btn-secondary">
+        <span>🌐</span>
+        <span>Open Web Version</span>
+      </a>
+    </div>
+
+    <div class="instructions">
+      <strong>📱 Installation Instructions:</strong>
+      <strong>Android:</strong> Download APK → Enable "Install from Unknown Sources" in Settings → Open file to install
+      <br><br>
+      <strong>iPhone:</strong> Requires TestFlight app from App Store (Coming Soon)
+    </div>
+
+    <div class="version">Version 1.0.8 (Build 8) • Business Mode Edition</div>
+
+    <div class="footer">
+      Built with ❤️ by Rasyid Aldy<br>
+      Powered by Expo & Supabase
+    </div>
+  </div>
+
+  <script>
+    // Update these URLs after EAS build completes
+    const ANDROID_APK_URL = ''; // Paste URL dari EAS build di sini
+    const IOS_TESTFLIGHT_URL = ''; // Paste TestFlight URL di sini
+
+    const androidBtn = document.getElementById('androidBtn');
+    const iosBtn = document.getElementById('iosBtn');
+
+    if (ANDROID_APK_URL) {
+      androidBtn.href = ANDROID_APK_URL;
+      androidBtn.classList.remove('btn-disabled');
+      androidBtn.classList.add('btn-primary');
+    } else {
+      androidBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('APK belum tersedia. Jalankan: eas build --platform android --profile preview');
+      });
+    }
+
+    if (IOS_TESTFLIGHT_URL) {
+      iosBtn.href = IOS_TESTFLIGHT_URL;
+      iosBtn.classList.remove('btn-disabled');
+      iosBtn.classList.add('btn-primary');
+    } else {
+      iosBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        alert('iOS version coming soon! Requires Apple Developer Account.');
+      });
+    }
+  </script>
+</body>
+</html>
