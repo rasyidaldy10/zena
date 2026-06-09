@@ -172,7 +172,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 ## PENDING TASKS (Belum Dikerjakan)
 
 **🔴 DEPLOYMENT (Manual Required):**
-1. ⏳ Run SETUP_SUPABASE.sql di Supabase SQL Editor (1-click migration untuk 004 + 005)
+1. ✅ Run SETUP_SUPABASE_SAFE.sql di Supabase SQL Editor - **DONE** (7 tabel business mode aktif)
 2. ⏳ Run migrations lama: `001_zena_intelligence.sql`, `002_add_ceo_welcome_flag.sql`, `003_investment_holdings.sql`
 3. ⏳ Deploy Edge Functions: `supabase functions deploy budget-monitor anomaly-detector weekly-insight gmail-parser daily-summary brick-oauth brick-refresh-tokens groq-transcribe groq-parse-transaction`
 4. ⏳ Setup cron jobs: Weekly Insight (Sabtu 09:00 WIB), Daily Summary (21:00 WIB)
