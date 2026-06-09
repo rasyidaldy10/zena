@@ -36,46 +36,16 @@ export const WALLET_FUNCTIONS: Array<{
   desc: string
 }> = [
   {
-    value: 'rekening_utama',
-    label: 'Rekening Utama',
-    icon: '🏦',
-    desc: 'Rekening bank utama sehari-hari',
+    value: 'personal',
+    label: 'Pribadi',
+    icon: '👤',
+    desc: 'Dompet untuk keperluan pribadi',
   },
   {
-    value: 'dana_darurat',
-    label: 'Dana Darurat',
-    icon: '🛡️',
-    desc: 'Simpanan untuk kondisi darurat',
-  },
-  {
-    value: 'ewallet',
-    label: 'E-Wallet',
-    icon: '💳',
-    desc: 'Dompet digital (GoPay, OVO, Dana)',
-  },
-  {
-    value: 'transit',
-    label: 'Dompet Transit',
-    icon: '🔄',
-    desc: 'Uang tunai keperluan harian',
-  },
-  {
-    value: 'tabungan',
-    label: 'Tabungan',
-    icon: '🌱',
-    desc: 'Rekening tabungan tujuan tertentu',
-  },
-  {
-    value: 'investasi',
-    label: 'Investasi',
-    icon: '📈',
-    desc: 'Saham, reksa dana, dll',
-  },
-  {
-    value: 'bisnis',
+    value: 'business',
     label: 'Bisnis',
     icon: '💼',
-    desc: 'Rekening khusus bisnis',
+    desc: 'Dompet untuk keperluan bisnis',
   },
 ]
 

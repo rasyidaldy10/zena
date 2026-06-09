@@ -9,9 +9,7 @@ export type WalletType =
   | 'rekening_utama' | 'dana_darurat' | 'ewallet'
   | 'dompet_transit' | 'tabungan' | 'investasi'
 
-export type WalletFunction =
-  | 'rekening_utama' | 'dana_darurat' | 'ewallet'
-  | 'transit' | 'tabungan' | 'investasi' | 'bisnis'
+export type WalletFunction = 'personal' | 'business'
 
 export const WALLET_TYPE_CONFIG: Record<string, { label: string; icon: string; desc: string }> = {
   rekening_utama: { label: 'Rekening Utama', icon: '🏦', desc: 'Rekening bank utama sehari-hari' },

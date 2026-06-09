@@ -454,18 +454,18 @@ export default function ProfilScreen() {
         )}
       </View>
 
-      {/* Dompet Saya */}
+      {/* Dompet Pribadi */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Dompet Saya ({wallets.length}/8)</Text>
+          <Text style={styles.sectionTitle}>Dompet Pribadi ({wallets.filter(w => w.wallet_function === 'personal').length}/5)</Text>
           <TouchableOpacity onPress={() => router.push('/detail-wallet')}>
             <Text style={styles.editBtn}>Lihat Semua →</Text>
           </TouchableOpacity>
         </View>
-        {wallets.length === 0 ? (
-          <Text style={styles.emptyWallet}>Belum ada dompet</Text>
+        {wallets.filter(w => w.wallet_function === 'personal').length === 0 ? (
+          <Text style={styles.emptyWallet}>Belum ada dompet pribadi</Text>
         ) : (
-          wallets.slice(0, 2).map((w) => {
+          wallets.filter(w => w.wallet_function === 'personal').slice(0, 2).map((w) => {
             const typeLabel = WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type
             return (
               <TouchableOpacity
@@ -492,6 +492,47 @@ export default function ProfilScreen() {
           })
         )}
       </View>
+
+      {/* Dompet Bisnis - only show if business_mode enabled */}
+      {prefs?.business_mode && (
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Dompet Bisnis ({wallets.filter(w => w.wallet_function === 'business').length}/5)</Text>
+            <TouchableOpacity onPress={() => router.push('/detail-wallet')}>
+              <Text style={styles.editBtn}>Lihat Semua →</Text>
+            </TouchableOpacity>
+          </View>
+          {wallets.filter(w => w.wallet_function === 'business').length === 0 ? (
+            <Text style={styles.emptyWallet}>Belum ada dompet bisnis</Text>
+          ) : (
+            wallets.filter(w => w.wallet_function === 'business').slice(0, 2).map((w) => {
+              const typeLabel = WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type
+              return (
+                <TouchableOpacity
+                  key={w.id}
+                  style={styles.walletItem}
+                  onPress={() => router.push(`/edit-wallet?id=${w.id}`)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[styles.walletDot, { backgroundColor: w.color || PRIMARY }]}>
+                    <Text style={styles.walletDotIcon}>{w.icon}</Text>
+                  </View>
+                  <View style={styles.walletInfo}>
+                    <Text style={styles.walletName}>{w.wallet_name}</Text>
+                    <Text style={styles.walletType}>{typeLabel}</Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={styles.walletBalance}>
+                      Rp {w.current_balance.toLocaleString('id-ID')}
+                    </Text>
+                    <Text style={styles.walletEdit}>Edit →</Text>
+                  </View>
+                </TouchableOpacity>
+              )
+            })
+          )}
+        </View>
+      )}
 
       {/* Logout Button */}
       <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>

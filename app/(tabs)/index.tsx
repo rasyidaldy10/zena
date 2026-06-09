@@ -177,10 +177,10 @@ export default function HomeScreen() {
 
   const getBalance = () => {
     if (activeMode === 'personal') {
-      return wallets.filter(w => w.wallet_function !== 'bisnis').reduce((s, w) => s + w.current_balance, 0)
+      return wallets.filter(w => w.wallet_function === 'personal').reduce((s, w) => s + w.current_balance, 0)
     }
     if (activeMode === 'business') {
-      return wallets.filter(w => w.wallet_function === 'bisnis').reduce((s, w) => s + w.current_balance, 0)
+      return wallets.filter(w => w.wallet_function === 'business').reduce((s, w) => s + w.current_balance, 0)
     }
     return 0
   }

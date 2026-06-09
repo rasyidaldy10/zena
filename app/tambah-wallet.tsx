@@ -19,6 +19,7 @@ const ICONS  = ['💵', '🏦', '💳', '📱', '🐷', '📈', '💰', '🛡️
 export default function TambahWalletScreen() {
   const [walletName, setWalletName]     = useState('')
   const [walletType, setWalletType]     = useState('')
+  const [walletFunction, setWalletFunction] = useState<'personal' | 'business'>('personal')
   const [selectedColor, setSelectedColor] = useState('#185FA5')
   const [selectedIcon, setSelectedIcon] = useState('💵')
   const [initialBalance, setInitialBalance] = useState('')
@@ -66,7 +67,7 @@ export default function TambahWalletScreen() {
       return
     }
 
-    // Cek jumlah wallet user saat ini
+    // Cek jumlah wallet user saat ini per function
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
@@ -75,9 +76,13 @@ export default function TambahWalletScreen() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', session.user.id)
       .eq('is_active', true)
+      .eq('wallet_function', walletFunction)
 
-    if (count && count >= 8) {
-      Alert.alert('Batas Maksimal', 'Kamu hanya bisa memiliki maksimal 8 dompet aktif. Hapus dulu salah satu dompet lama untuk menambah yang baru.')
+    const maxWallets = 5
+    const walletTypeLabel = walletFunction === 'personal' ? 'pribadi' : 'bisnis'
+
+    if (count && count >= maxWallets) {
+      Alert.alert('Batas Maksimal', `Kamu hanya bisa memiliki maksimal ${maxWallets} dompet ${walletTypeLabel}. Hapus dulu salah satu dompet lama untuk menambah yang baru.`)
       return
     }
 
@@ -89,6 +94,7 @@ export default function TambahWalletScreen() {
       user_id: user?.id,
       wallet_name: walletName.trim(),
       wallet_type: walletType,
+      wallet_function: walletFunction,
       color: selectedColor,
       icon: selectedIcon,
       current_balance: balance,
@@ -167,6 +173,27 @@ export default function TambahWalletScreen() {
           value={walletName}
           onChangeText={setWalletName}
         />
+
+        {/* Fungsi Wallet (Personal / Business) */}
+        <Text style={styles.label}>Untuk Keperluan</Text>
+        <View style={styles.functionToggle}>
+          <TouchableOpacity
+            style={[styles.functionBtn, walletFunction === 'personal' && styles.functionBtnActive]}
+            onPress={() => setWalletFunction('personal')}
+          >
+            <Text style={[styles.functionText, walletFunction === 'personal' && styles.functionTextActive]}>
+              👤 Pribadi
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.functionBtn, walletFunction === 'business' && styles.functionBtnActive]}
+            onPress={() => setWalletFunction('business')}
+          >
+            <Text style={[styles.functionText, walletFunction === 'business' && styles.functionTextActive]}>
+              💼 Bisnis
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Tipe / Fungsi */}
         <Text style={styles.label}>Tipe / Fungsi</Text>
@@ -310,6 +337,23 @@ const styles = StyleSheet.create({
     height: 48, backgroundColor: '#1A1A1A', borderRadius: 12,
     paddingHorizontal: 16, fontSize: 15, color: '#fff',
     borderWidth: 0.5, borderColor: '#2A2A2A', marginBottom: 24,
+  },
+  functionToggle: {
+    flexDirection: 'row', gap: 12, marginBottom: 24,
+  },
+  functionBtn: {
+    flex: 1, height: 48, backgroundColor: '#1A1A1A', borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  functionBtnActive: {
+    backgroundColor: PRIMARY + '20', borderColor: PRIMARY, borderWidth: 2,
+  },
+  functionText: {
+    fontSize: 15, fontWeight: '600', color: '#888780',
+  },
+  functionTextActive: {
+    color: PRIMARY,
   },
   typeBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
