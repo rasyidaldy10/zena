@@ -49,7 +49,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 4a0f099 (Binance-style mode toggle in balance card)
+**Latest Commit:** 35d02a2 (Hide StockWidget + Migration checklist)
 
 ---
 
