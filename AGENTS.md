@@ -49,14 +49,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** a65da21 (Deployment assets + dead code analysis)
+**Latest Commit:** 537ecb1 (Business Mode toggle + PPN settings)
 
 ---
 
 ## LATEST SESSION (2026-06-08 s/d 2026-06-09) - BUSINESS MODE COMPLETE ✅
 
 **💼 BUSINESS MODE: PRODUCTION READY** - Complete Business Management System  
-**5 Commits, 35 Files Created/Updated**
+**8 Commits, 37 Files Created/Updated, Supabase Migration SUCCESS ✅**
 
 **IMPLEMENTED FEATURES:**
 
@@ -95,17 +95,26 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - Multi-wallet support
 
 **6. Deployment Assets:**
-- SETUP_SUPABASE.sql - 1-click migration script (combines 004 + 005)
+- SETUP_SUPABASE_SAFE.sql - 1-click migration script (DROP + CREATE clean install) ✅ EXECUTED
 - public/download.html - Vercel distribution page (APK/iOS download landing)
 - DEAD_CODE_ANALYSIS.md - Dead code cleanup guide (4 files safe to delete)
+- SESSION_SUMMARY_BUSINESS_MODE.md - Complete session summary (37 files, 6450 lines)
 
-**FILES CREATED (35 total):**
+**7. Profile Settings Integration:**
+- Business Mode toggle (activate/deactivate fitur bisnis)
+- PPN enable/disable toggle
+- PPN rate input (default 11%, editable 0-100%)
+- Quick links ke business screens (Projects, Inventory, Receivables)
+- Auto-save to user_preferences table
+
+**FILES CREATED (37 total):**
 - 2 migrations (004_business_mode.sql, 005_hpp_and_ppn.sql)
-- 1 consolidated migration (SETUP_SUPABASE.sql)
-- 8 screens (projects, project-detail, receivables, inventory, stock-detail)
-- 14 modals/components (forms, pickers, transaction)
+- 2 consolidated migrations (SETUP_SUPABASE.sql, SETUP_SUPABASE_SAFE.sql)
+- 5 screens (projects, project-detail, receivables, inventory, stock-detail)
+- 9 modals (business forms, pickers)
 - 4 utility files (business.ts, theme.ts, format.ts)
-- 3 deployment assets (SETUP_SUPABASE.sql, download.html, DEAD_CODE_ANALYSIS.md)
+- 4 deployment assets (SQL safe script, download.html, DEAD_CODE_ANALYSIS.md, SESSION_SUMMARY)
+- 1 screen updated (profil.tsx - business mode toggle + PPN settings)
 - Updated types/index.ts
 
 **DATABASE SCHEMA:**
@@ -192,9 +201,9 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 1. ⏳ LaporanScreen Laba Kotor tab - `get_monthly_gross_profit()`, `get_product_sales_report()` sudah ready
 2. ⏳ LaporanScreen Pajak tab - tax_summary table sudah ready, tinggal UI display
 3. ⏳ HomeScreen business mode - stats cards (total kas bisnis, piutang, hutang, stok rendah)
-4. ⏳ ProfileScreen PPN settings - toggle ppn_enabled, input ppn_rate
-5. ⏳ ModalImportData - parse Excel/CSV/PDF via Claude API
-6. ⏳ Navigation integration - add business screens ke bottom nav atau drawer
+4. ✅ ProfileScreen PPN settings - toggle ppn_enabled, input ppn_rate **DONE**
+5. ✅ Navigation integration - quick links di Profile screen **DONE**
+6. ⏳ ModalImportData - parse Excel/CSV/PDF via Claude API
 
 **🟢 FUTURE FEATURES (Roadmap):**
 1. Couple mode - shared wallet + joint transactions
