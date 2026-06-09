@@ -4,7 +4,28 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## RASYID'S 7 ATURAN CODING
+## RASYID'S WORKFLOW & ATURAN CODING
+
+### 🎯 WORKFLOW (PENTING!)
+
+**DISKUSI DULU SEBELUM CODING:**
+1. ✅ **Bahas approach dulu** - Diskusi apa yang mau dibikin, confirm plan
+2. ✅ **Confirm sebelum execute** - Tunggu "oke" atau "lanjut" sebelum coding
+3. ✅ **Hemat token** - Avoid rework, diskusi → plan → execute
+
+**DIRECT DATABASE ACCESS:**
+- ✅ Claude **BISA run SQL langsung** via psql (jangan suruh manual copy-paste ke Supabase SQL Editor)
+- ✅ Connection setup: `.env.local` contains `SUPABASE_DB_URL`
+- ✅ PostgreSQL 14 installed via Homebrew
+- ✅ Command format: `psql "$SUPABASE_DB_URL" -c "SQL_QUERY_HERE"`
+- ✅ Migration otomatis: Bikin SQL file → Run langsung → Verify → Commit
+
+**DEPLOYMENT:**
+- ✅ Git push → Auto-deploy ke Vercel (webhook)
+- ✅ Database changes → Claude run via psql
+- ✅ Test di Vercel → https://zena-mu.vercel.app
+
+### 📋 7 ATURAN CODING
 
 1. **TypeScript 0 errors** - Selalu jalankan `npx tsc --noEmit` sebelum commit
 2. **Semua respons Bahasa Indonesia** - Kecuali kode dan commit message
@@ -44,12 +65,20 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 ## PROJECT INFO
 
 **Supabase:** `https://fxftwdfdlxmjfxuadhfy.supabase.co`  
+**Supabase Project Ref:** `lcvenmsxauasaemjjxtc`  
+**Database:** `postgresql://postgres.lcvenmsxauasaemjjxtc:[PASSWORD]@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres`  
 **Vercel:** `https://zena-mu.vercel.app`  
 **GitHub:** `rasyidaldy/zena` (private)  
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 35d02a2 (Hide StockWidget + Migration checklist)
+**Latest Commit:** 788c3ab (Business mode always available + business name field)
+
+**Database Access:**
+- ✅ PostgreSQL 14 installed via Homebrew
+- ✅ Connection string stored in `.env.local` (file: `SUPABASE_DB_URL`)
+- ✅ Claude can run SQL directly via `psql "$SUPABASE_DB_URL" -c "..."`
+- ⚠️ Password stored locally - never commit `.env.local` to git
 
 ---
 
