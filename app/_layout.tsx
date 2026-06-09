@@ -56,10 +56,23 @@ export default function RootLayout() {
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       try {
-        console.log('🔔 Auth event:', event, 'Session:', !!session, 'HasNavigated:', hasNavigatedRef.current)
+        // Suppress noisy logs - only log important events
+        const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION', 'USER_UPDATED']
+        if (!silentEvents.includes(event)) {
+          console.log('🔔 Auth event:', event, 'Session:', !!session)
+        }
+
         setSession(session)
 
-        // Handle only login/logout events (not TOKEN_REFRESHED, INITIAL_SESSION)
+        // Handle token refresh failure - force logout
+        if (event === 'TOKEN_REFRESHED' && !session) {
+          console.log('⚠️ Token refresh failed, logging out...')
+          await supabase.auth.signOut()
+          router.replace('/(auth)/login')
+          return
+        }
+
+        // Handle only login/logout events
         if (event === 'SIGNED_IN' && session && hasNavigatedRef.current) {
           console.log('🔵 SIGNED_IN detected, checking onboarding...')
           const { data, error } = await supabase
@@ -68,12 +81,8 @@ export default function RootLayout() {
             .eq('user_id', session.user.id)
             .maybeSingle()
 
-          console.log('🔵 User preferences result:', { exists: !!data, error })
-
           if (error) {
-            console.error('❌ Error fetching preferences on SIGNED_IN:', error)
-            // Fallback ke onboarding jika error
-            console.log('⚠️ Fallback to onboarding due to error')
+            console.error('❌ Error fetching preferences:', error.message)
             router.replace('/onboarding')
           } else if (data) {
             console.log('✅ User has preferences, go to dashboard')
@@ -86,12 +95,9 @@ export default function RootLayout() {
           console.log('🔴 SIGNED_OUT, go to login')
           router.replace('/(auth)/login')
         }
-        // Ignore TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION
-      } catch (error) {
-        console.error('❌ Auth state change error:', error)
-        // Fallback to onboarding on any error
+      } catch (error: any) {
+        console.error('❌ Auth error:', error.message || error)
         if (session) {
-          console.log('⚠️ Fallback to onboarding due to catch error')
           router.replace('/onboarding')
         }
       }
