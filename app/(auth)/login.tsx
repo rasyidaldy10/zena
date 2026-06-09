@@ -86,48 +86,41 @@ export default function LoginScreen() {
   }
 
   const handleGoogleLogin = async () => {
+    console.log('🔵 Google login clicked')
     setLoadingGoogle(true)
     try {
       if (Platform.OS === 'web') {
+        console.log('🔵 Web OAuth flow')
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: window.location.origin,
-            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
+            redirectTo: `${window.location.origin}/`,
             skipBrowserRedirect: false,
-            queryParams: {
-              access_type: 'offline',
-              // prompt: 'consent' removed - hanya pakai saat pertama kali atau di profile
-            },
           },
         })
-        if (error) throw error
-        // Web will auto-redirect to Google, no need to setLoading(false)
+        if (error) {
+          console.error('❌ OAuth error:', error.message)
+          throw error
+        }
+        console.log('✅ Redirecting to Google...')
+        // Web will auto-redirect, loading stays ON
       } else {
+        // Native mobile flow (not used in web deployment)
         const redirectTo = Linking.createURL('/')
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: {
-            redirectTo,
-            skipBrowserRedirect: true,
-            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
-            queryParams: {
-              access_type: 'offline',
-              // prompt: 'consent' removed
-            },
-          },
+          options: { redirectTo, skipBrowserRedirect: true },
         })
         if (error) throw error
         if (data?.url) {
           const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
           if (result.type === 'success' && result.url) {
-            const url = Linking.parse(result.url)
-            const sessionUrl = `${redirectTo}${url.path ?? ''}?${url.queryParams ? new URLSearchParams(url.queryParams as Record<string, string>).toString() : ''}`
-            await Linking.openURL(sessionUrl)
+            await Linking.openURL(result.url)
           }
         }
       }
     } catch (error: any) {
+      console.error('❌ Google login error:', error.message)
       Alert.alert('Login Gagal', error.message || 'Terjadi kesalahan saat login dengan Google')
       setLoadingGoogle(false)
     }

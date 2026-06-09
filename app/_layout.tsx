@@ -9,6 +9,7 @@ export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [initializing, setInitializing] = useState(true)
   const hasNavigatedRef = useRef(false)
+  const isHandlingAuthRef = useRef(false)
 
   useEffect(() => {
     // Initial check with routing
@@ -55,26 +56,34 @@ export default function RootLayout() {
 
     // Listen to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      try {
-        // Suppress noisy logs - only log important events
-        const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION', 'USER_UPDATED']
-        if (!silentEvents.includes(event)) {
-          console.log('🔔 Auth event:', event, 'Session:', !!session)
-        }
+      // Suppress noisy events
+      const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION', 'USER_UPDATED']
+      if (!silentEvents.includes(event)) {
+        console.log('🔔 Auth event:', event)
+      }
 
-        setSession(session)
+      setSession(session)
 
-        // Handle token refresh failure - force logout
-        if (event === 'TOKEN_REFRESHED' && !session) {
-          console.log('⚠️ Token refresh failed, logging out...')
-          await supabase.auth.signOut()
-          router.replace('/(auth)/login')
-          return
-        }
+      // Ignore events if already handling or haven't done initial nav
+      if (isHandlingAuthRef.current || !hasNavigatedRef.current) {
+        return
+      }
 
-        // Handle only login/logout events
-        if (event === 'SIGNED_IN' && session && hasNavigatedRef.current) {
-          console.log('🔵 SIGNED_IN detected, checking onboarding...')
+      // Handle SIGNED_OUT
+      if (event === 'SIGNED_OUT') {
+        console.log('🔴 SIGNED_OUT')
+        isHandlingAuthRef.current = true
+        router.replace('/(auth)/login')
+        setTimeout(() => { isHandlingAuthRef.current = false }, 1000)
+        return
+      }
+
+      // Handle SIGNED_IN - only once
+      if (event === 'SIGNED_IN' && session) {
+        isHandlingAuthRef.current = true
+        console.log('🔵 SIGNED_IN, checking preferences...')
+
+        try {
           const { data, error } = await supabase
             .from('user_preferences')
             .select('id')
@@ -82,23 +91,20 @@ export default function RootLayout() {
             .maybeSingle()
 
           if (error) {
-            console.error('❌ Error fetching preferences:', error.message)
+            console.error('❌ Prefs error:', error.message)
             router.replace('/onboarding')
           } else if (data) {
-            console.log('✅ User has preferences, go to dashboard')
+            console.log('✅ Has prefs → dashboard')
             router.replace('/(tabs)')
           } else {
-            console.log('✅ New user, go to onboarding')
+            console.log('✅ New user → onboarding')
             router.replace('/onboarding')
           }
-        } else if (event === 'SIGNED_OUT' && hasNavigatedRef.current) {
-          console.log('🔴 SIGNED_OUT, go to login')
-          router.replace('/(auth)/login')
-        }
-      } catch (error: any) {
-        console.error('❌ Auth error:', error.message || error)
-        if (session) {
+        } catch (err: any) {
+          console.error('❌ Catch:', err.message)
           router.replace('/onboarding')
+        } finally {
+          setTimeout(() => { isHandlingAuthRef.current = false }, 1000)
         }
       }
     })
