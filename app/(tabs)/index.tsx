@@ -22,7 +22,7 @@ const EXPENSE_COLOR = '#E24B4A'
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
-type TabMode = 'personal' | 'business' | 'all'
+type TabMode = 'personal' | 'business'
 
 export default function HomeScreen() {
   const [prefs, setPrefs] = useState<UserPreferences | null>(null)
@@ -30,7 +30,7 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [notifCount, setNotifCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [tabMode, setTabMode] = useState<TabMode>('all')
+  const [tabMode, setTabMode] = useState<TabMode>('personal')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [rincianExpanded, setRincianExpanded] = useState(false)
   const [showCEOWelcome, setShowCEOWelcome] = useState(false)
@@ -157,9 +157,13 @@ export default function HomeScreen() {
   }, [])
 
   const getBalance = () => {
-    if (tabMode === 'personal') return wallets.filter(w => w.wallet_type === 'personal').reduce((s, w) => s + w.current_balance, 0)
-    if (tabMode === 'business') return wallets.filter(w => w.wallet_type === 'business').reduce((s, w) => s + w.current_balance, 0)
-    return wallets.reduce((s, w) => s + w.current_balance, 0)
+    if (tabMode === 'personal') {
+      return wallets.filter(w => w.wallet_function !== 'bisnis').reduce((s, w) => s + w.current_balance, 0)
+    }
+    if (tabMode === 'business') {
+      return wallets.filter(w => w.wallet_function === 'bisnis').reduce((s, w) => s + w.current_balance, 0)
+    }
+    return 0
   }
 
   // Calculate streak
@@ -242,19 +246,21 @@ export default function HomeScreen() {
         {/* BALANCE CARD */}
         <View style={styles.balanceCard}>
           {/* Tabs */}
-          <View style={styles.balanceTabs}>
-            {(['all', 'personal', 'business'] as TabMode[]).map(tab => (
-              <TouchableOpacity
-                key={tab}
-                style={[styles.balanceTab, tabMode === tab && styles.balanceTabActive]}
-                onPress={() => setTabMode(tab)}
-              >
-                <Text style={[styles.balanceTabText, tabMode === tab && styles.balanceTabTextActive]}>
-                  {tab === 'all' ? 'Semua' : tab === 'personal' ? 'Pribadi' : 'Bisnis'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {prefs?.business_mode && (
+            <View style={styles.balanceTabs}>
+              {(['personal', 'business'] as TabMode[]).map(tab => (
+                <TouchableOpacity
+                  key={tab}
+                  style={[styles.balanceTab, tabMode === tab && styles.balanceTabActive]}
+                  onPress={() => setTabMode(tab)}
+                >
+                  <Text style={[styles.balanceTabText, tabMode === tab && styles.balanceTabTextActive]}>
+                    {tab === 'personal' ? '👤 Pribadi' : '💼 Bisnis'}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           {/* Balance */}
           <View style={styles.balanceContent}>
@@ -303,8 +309,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* BUSINESS STATS (show if business mode active) */}
-        {prefs?.business_mode && (tabMode === 'business' || tabMode === 'all') && (
+        {/* BUSINESS STATS (show only in business tab) */}
+        {tabMode === 'business' && (
           <View style={styles.businessStatsSection}>
             <View style={styles.businessStatsHeader}>
               <Text style={styles.businessStatsTitle}>💼 Ringkasan Bisnis</Text>
@@ -396,72 +402,139 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* QUICK ACTIONS */}
-        <View style={styles.quickActions}>
-          {/* Row 1 */}
-          <View style={styles.quickRow}>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
-                <Text style={{ fontSize: 24 }}>💬</Text>
-              </View>
-              <Text style={styles.quickLabel}>Zena AI</Text>
-              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={{ fontSize: 24 }}>📸</Text>
-              </View>
-              <Text style={styles.quickLabel}>Scan Struk</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                <Text style={{ fontSize: 24 }}>📊</Text>
-              </View>
-              <Text style={styles.quickLabel}>Laporan</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
-                <Text style={{ fontSize: 24 }}>🎯</Text>
-              </View>
-              <Text style={styles.quickLabel}>Budget</Text>
-            </TouchableOpacity>
-          </View>
+        {/* QUICK ACTIONS - PERSONAL MODE */}
+        {tabMode === 'personal' && (
+          <View style={styles.quickActions}>
+            {/* Row 1 */}
+            <View style={styles.quickRow}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
+                  <Text style={{ fontSize: 24 }}>💬</Text>
+                </View>
+                <Text style={styles.quickLabel}>Zena AI</Text>
+                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={{ fontSize: 24 }}>📸</Text>
+                </View>
+                <Text style={styles.quickLabel}>Scan Struk</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                  <Text style={{ fontSize: 24 }}>📊</Text>
+                </View>
+                <Text style={styles.quickLabel}>Laporan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
+                  <Text style={{ fontSize: 24 }}>🎯</Text>
+                </View>
+                <Text style={styles.quickLabel}>Budget</Text>
+              </TouchableOpacity>
+            </View>
 
-          {/* Row 2 */}
-          <View style={styles.quickRow}>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
-                <Text style={{ fontSize: 24 }}>🧠</Text>
-              </View>
-              <Text style={styles.quickLabel}>ZENA Intel</Text>
-              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                <Text style={{ fontSize: 24 }}>💎</Text>
-              </View>
-              <Text style={styles.quickLabel}>Investasi</Text>
-              <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.quickBtn}
-              onPress={() => Alert.alert('Leaderboard 🏆', 'Fitur leaderboard akan datang segera! Bandingkan skor keuangan dengan pengguna lain.')}
-            >
-              <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                <Text style={{ fontSize: 24 }}>🏆</Text>
-              </View>
-              <Text style={styles.quickLabel}>Leaderboard</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
-              <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                <Text style={{ fontSize: 24 }}>🔔</Text>
-              </View>
+            {/* Row 2 */}
+            <View style={styles.quickRow}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
+                  <Text style={{ fontSize: 24 }}>🧠</Text>
+                </View>
+                <Text style={styles.quickLabel}>ZENA Intel</Text>
+                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
+                  <Text style={{ fontSize: 24 }}>💎</Text>
+                </View>
+                <Text style={styles.quickLabel}>Investasi</Text>
+                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.quickBtn}
+                onPress={() => Alert.alert('Leaderboard 🏆', 'Fitur leaderboard akan datang segera! Bandingkan skor keuangan dengan pengguna lain.')}
+              >
+                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                  <Text style={{ fontSize: 24 }}>🏆</Text>
+                </View>
+                <Text style={styles.quickLabel}>Leaderboard</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={{ fontSize: 24 }}>🔔</Text>
+                </View>
               <Text style={styles.quickLabel}>Reminder</Text>
             </TouchableOpacity>
           </View>
         </View>
+        )}
 
-        {/* FINANCIAL SCORE */}
+        {/* QUICK ACTIONS - BUSINESS MODE */}
+        {tabMode === 'business' && (
+          <View style={styles.quickActions}>
+            {/* Row 1 - Business Core */}
+            <View style={styles.quickRow}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-projects')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={{ fontSize: 24 }}>📊</Text>
+                </View>
+                <Text style={styles.quickLabel}>Projects</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-inventory')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
+                  <Text style={{ fontSize: 24 }}>📦</Text>
+                </View>
+                <Text style={styles.quickLabel}>Inventory</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-receivables')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
+                  <Text style={{ fontSize: 24 }}>💸</Text>
+                </View>
+                <Text style={styles.quickLabel}>Receivables</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                  <Text style={{ fontSize: 24 }}>💰</Text>
+                </View>
+                <Text style={styles.quickLabel}>Transaksi</Text>
+                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
+              </TouchableOpacity>
+            </View>
+
+            {/* Row 2 - Business Support */}
+            <View style={styles.quickRow}>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
+                  <Text style={{ fontSize: 24 }}>💬</Text>
+                </View>
+                <Text style={styles.quickLabel}>Zena AI</Text>
+                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
+                  <Text style={{ fontSize: 24 }}>📋</Text>
+                </View>
+                <Text style={styles.quickLabel}>Laporan</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
+                  <Text style={{ fontSize: 24 }}>🔔</Text>
+                </View>
+                <Text style={styles.quickLabel}>Reminder</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
+                <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
+                  <Text style={{ fontSize: 24 }}>🧠</Text>
+                </View>
+                <Text style={styles.quickLabel}>ZENA Intel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* FINANCIAL SCORE (Personal mode only) */}
+        {tabMode === 'personal' && (
+          <>
         <Text style={styles.sectionTitle}>Financial Score</Text>
         <View style={styles.scoreGrid}>
           {[
@@ -488,8 +561,10 @@ export default function HomeScreen() {
 
         {/* STOCK MARKET */}
         <StockWidget />
+        </>
+        )}
 
-        {/* TRANSAKSI TERAKHIR */}
+        {/* TRANSAKSI TERAKHIR (show in both modes, but filtered by mode) */}
         <View style={styles.txnHeader}>
           <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
           <TouchableOpacity onPress={() => router.push('/(tabs)/laporan')}>
@@ -505,7 +580,12 @@ export default function HomeScreen() {
         ) : (
           <View style={styles.txnList}>
             {transactions.map(txn => (
-              <View key={txn.id} style={styles.txnItem}>
+              <TouchableOpacity
+                key={txn.id}
+                style={styles.txnItem}
+                onPress={() => router.push(`/edit-transaksi?id=${txn.id}`)}
+                activeOpacity={0.7}
+              >
                 <View style={[styles.txnIcon, { backgroundColor: txn.type === 'income' ? '#F0FDF4' : '#FEF2F2' }]}>
                   <Text style={{ fontSize: 20 }}>
                     {txn.type === 'income' ? '💰' : '💸'}
@@ -518,7 +598,7 @@ export default function HomeScreen() {
                 <Text style={[styles.txnAmount, { color: txn.type === 'income' ? INCOME_COLOR : EXPENSE_COLOR }]}>
                   {txn.type === 'income' ? '+' : '-'}Rp {txn.amount.toLocaleString('id-ID')}
                 </Text>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
