@@ -32,6 +32,7 @@ export default function LoginScreen() {
     try {
       if (mode === 'signup') {
         // Sign up
+        console.log('🔵 Signup attempt:', email)
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
@@ -39,14 +40,19 @@ export default function LoginScreen() {
             emailRedirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
           }
         })
+
+        console.log('🔵 Signup result:', { user: !!data.user, session: !!data.session, error })
+
         if (error) throw error
 
         // Cek apakah user langsung confirmed atau butuh email verification
         if (data.user && data.session) {
           // Auto-confirmed! Langsung masuk (handled by _layout.tsx)
-          // No need to do anything, session sudah ada
+          console.log('✅ Auto-confirmed! Session active:', data.session.user.id)
+          // Loading akan tetap ON sampai redirect selesai
         } else {
           // Butuh email verification
+          console.log('⚠️ Email verification required')
           setLoading(false)
           Alert.alert(
             '✅ Akun Berhasil Dibuat!',
@@ -62,14 +68,23 @@ export default function LoginScreen() {
         }
       } else {
         // Login
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('🔵 Login attempt:', email)
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password.trim(),
         })
+
+        console.log('🔵 Login result:', { session: !!data.session, error })
+
         if (error) throw error
-        // Auto redirect ke home setelah login success (handled by _layout.tsx)
+
+        if (data.session) {
+          console.log('✅ Login success! Session:', data.session.user.id)
+          // Loading akan tetap ON sampai redirect selesai by _layout.tsx
+        }
       }
     } catch (error: any) {
+      console.error('❌ Auth error:', error)
       Alert.alert(
         mode === 'signup' ? 'Gagal Daftar' : 'Gagal Masuk',
         error.message || 'Terjadi kesalahan. Silakan coba lagi.'
