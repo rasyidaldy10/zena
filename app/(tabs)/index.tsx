@@ -584,8 +584,8 @@ export default function HomeScreen() {
         {/* MARKET DATA */}
         <MarketWidget />
 
-        {/* STOCK MARKET */}
-        <StockWidget />
+        {/* STOCK MARKET - Temporarily hidden (mock data not valid) */}
+        {/* <StockWidget /> */}
         </>
         )}
 
