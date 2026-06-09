@@ -49,14 +49,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** ebb8506 (Defense-in-depth encryption fixes)
+**Latest Commit:** a65da21 (Deployment assets + dead code analysis)
 
 ---
 
 ## LATEST SESSION (2026-06-08 s/d 2026-06-09) - BUSINESS MODE COMPLETE ✅
 
 **💼 BUSINESS MODE: PRODUCTION READY** - Complete Business Management System  
-**4 Commits, 32 Files Created/Updated**
+**5 Commits, 35 Files Created/Updated**
 
 **IMPLEMENTED FEATURES:**
 
@@ -94,11 +94,18 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - Project linking
 - Multi-wallet support
 
-**FILES CREATED (32 total):**
+**6. Deployment Assets:**
+- SETUP_SUPABASE.sql - 1-click migration script (combines 004 + 005)
+- public/download.html - Vercel distribution page (APK/iOS download landing)
+- DEAD_CODE_ANALYSIS.md - Dead code cleanup guide (4 files safe to delete)
+
+**FILES CREATED (35 total):**
 - 2 migrations (004_business_mode.sql, 005_hpp_and_ppn.sql)
+- 1 consolidated migration (SETUP_SUPABASE.sql)
 - 8 screens (projects, project-detail, receivables, inventory, stock-detail)
 - 14 modals/components (forms, pickers, transaction)
 - 4 utility files (business.ts, theme.ts, format.ts)
+- 3 deployment assets (SETUP_SUPABASE.sql, download.html, DEAD_CODE_ANALYSIS.md)
 - Updated types/index.ts
 
 **DATABASE SCHEMA:**
@@ -165,12 +172,15 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 ## PENDING TASKS (Belum Dikerjakan)
 
 **🔴 DEPLOYMENT (Manual Required):**
-1. ⏳ Deploy Edge Functions: `supabase functions deploy budget-monitor anomaly-detector weekly-insight gmail-parser daily-summary brick-oauth brick-refresh-tokens groq-transcribe groq-parse-transaction`
-2. ⏳ Run migrations: `001_zena_intelligence.sql`, `002_add_ceo_welcome_flag.sql`, `003_investment_holdings.sql`, `004_business_mode.sql`, `005_hpp_and_ppn.sql`
-3. ⏳ Setup cron jobs: Weekly Insight (Sabtu 09:00 WIB), Daily Summary (21:00 WIB)
-4. ⏳ Add env vars: `DEVICE_BINDING_SECRET`, `BRICK_MASTER_KEY`, `GROQ_API_KEY`
-5. ⏳ APK testing Build #7 (versionCode 7) - test onboarding + security features + business mode
-6. Production build: `eas build --platform android --profile production`
+1. ⏳ Run SETUP_SUPABASE.sql di Supabase SQL Editor (1-click migration untuk 004 + 005)
+2. ⏳ Run migrations lama: `001_zena_intelligence.sql`, `002_add_ceo_welcome_flag.sql`, `003_investment_holdings.sql`
+3. ⏳ Deploy Edge Functions: `supabase functions deploy budget-monitor anomaly-detector weekly-insight gmail-parser daily-summary brick-oauth brick-refresh-tokens groq-transcribe groq-parse-transaction`
+4. ⏳ Setup cron jobs: Weekly Insight (Sabtu 09:00 WIB), Daily Summary (21:00 WIB)
+5. ⏳ Add env vars: `DEVICE_BINDING_SECRET`, `BRICK_MASTER_KEY`, `GROQ_API_KEY`
+6. ⏳ Test di Vercel dulu beberapa hari (https://zena-mu.vercel.app)
+7. ⏳ Optional: Hapus dead code (4 files) via DEAD_CODE_ANALYSIS.md recommendations
+8. ⏳ APK testing Build #8 (increment versionCode 7 → 8) - test business mode
+9. Production build: `eas build --platform android --profile production`
 
 **🟡 INTEGRATIONS (Code Ready, Needs API Keys/OAuth):**
 1. ⏳ Brick.co OAuth callback handler (zena://brick-callback) - save tokens to DB
