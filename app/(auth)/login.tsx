@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View, Text, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, Platform, Image, KeyboardAvoidingView, ScrollView
@@ -17,6 +17,22 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [loadingGoogle, setLoadingGoogle] = useState(false)
+
+  // Safety timeout: reset loading jika stuck lebih dari 8 detik
+  useEffect(() => {
+    if (loading) {
+      const timeout = setTimeout(() => {
+        console.log('⚠️ Loading timeout! Resetting...')
+        setLoading(false)
+        Alert.alert(
+          'Timeout',
+          'Login memakan waktu terlalu lama. Coba refresh halaman atau coba lagi.',
+          [{ text: 'OK' }]
+        )
+      }, 8000)
+      return () => clearTimeout(timeout)
+    }
+  }, [loading])
 
   const handleEmailAuth = async () => {
     if (!email.trim() || !password.trim()) {
