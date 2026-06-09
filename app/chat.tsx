@@ -12,6 +12,8 @@ import { claudeChat, claudeVision } from '../lib/claude'
 import { getContextualSystemPrompt } from '../lib/personas'
 import { speak, stopSpeaking } from '../lib/speech'
 import { processVoiceNote } from '../lib/groq'
+import { parseTransactionText, ParsedTransaction } from '../lib/transaction-parser'
+import TransactionConfirmCard from '../components/TransactionConfirmCard'
 import { Persona, Language, BudgetMethod, Transaction } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -43,6 +45,9 @@ export default function ChatScreen() {
   const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([])
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const [pendingTransaction, setPendingTransaction] = useState<ParsedTransaction | null>(null)
+  const [savingTransaction, setSavingTransaction] = useState(false)
+  const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
   const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
@@ -101,6 +106,7 @@ export default function ChatScreen() {
     if (prefs?.nickname) setNickname(prefs.nickname)
     if (prefs?.monthly_income) setMonthlyIncome(prefs.monthly_income)
     if (prefs?.budget_method) setBudgetMethod(prefs.budget_method)
+    if (prefs?.active_mode) setActiveMode(prefs.active_mode)
     return prefs
   }
 
@@ -133,6 +139,19 @@ export default function ChatScreen() {
   const sendMessage = async (text?: string) => {
     const messageText = text || input.trim()
     if (!messageText || loading) return
+
+    // Try to parse as transaction input first
+    const parsed = parseTransactionText(messageText, activeMode)
+    if (parsed && parsed.confidence >= 0.5) {
+      // Show confirmation card
+      setPendingTransaction(parsed)
+      setMessages(prev => [...prev, { role: 'user', content: messageText }])
+      setInput('')
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
+      return
+    }
+
+    // Normal chat flow
     const userMessage: Message = { role: 'user', content: messageText }
     const newMessages = [...messages, userMessage]
     setMessages(newMessages)
@@ -150,6 +169,89 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, lagi gangguan bentar. Coba lagi ya!' }])
     }
     setLoading(false)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+  }
+
+  // ── SAVE TRANSACTION FROM CHAT ──
+  const handleSaveTransaction = async () => {
+    if (!pendingTransaction) return
+
+    setSavingTransaction(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    try {
+      // Get first wallet of matching function
+      const { data: wallets } = await supabase
+        .from('user_wallets')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('wallet_function', activeMode)
+        .eq('is_active', true)
+        .limit(1)
+
+      if (!wallets || wallets.length === 0) {
+        Alert.alert('Oops', `Kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dulu ya!`)
+        setPendingTransaction(null)
+        setSavingTransaction(false)
+        return
+      }
+
+      if (pendingTransaction.type === 'personal') {
+        // Save personal transaction
+        const { error } = await supabase.from('transactions').insert({
+          user_id: user.id,
+          wallet_id: wallets[0].id,
+          type: pendingTransaction.transaction_type,
+          amount: pendingTransaction.amount,
+          category: pendingTransaction.category || 'lainnya',
+          description: pendingTransaction.description,
+          source: 'manual',
+          date: new Date().toISOString().split('T')[0],
+        })
+
+        if (error) throw error
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ Oke! Transaksi ${pendingTransaction.transaction_type === 'income' ? 'pemasukan' : 'pengeluaran'} Rp ${pendingTransaction.amount.toLocaleString('id-ID')} udah tersimpan!`
+        }])
+      } else {
+        // Save business transaction
+        const { error } = await supabase.from('transactions').insert({
+          user_id: user.id,
+          wallet_id: wallets[0].id,
+          type: 'expense', // Most business transactions are expenses
+          amount: pendingTransaction.amount,
+          business_category: pendingTransaction.business_category,
+          description: pendingTransaction.description,
+          source: 'manual',
+          date: new Date().toISOString().split('T')[0],
+        })
+
+        if (error) throw error
+
+        setMessages(prev => [...prev, {
+          role: 'assistant',
+          content: `✅ Oke! Transaksi bisnis (${pendingTransaction.business_category}) Rp ${pendingTransaction.amount.toLocaleString('id-ID')} udah tersimpan!`
+        }])
+      }
+
+      setPendingTransaction(null)
+    } catch (error) {
+      Alert.alert('Gagal', 'Gagal menyimpan transaksi. Coba lagi ya!')
+    }
+
+    setSavingTransaction(false)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+  }
+
+  const handleCancelTransaction = () => {
+    setPendingTransaction(null)
+    setMessages(prev => [...prev, {
+      role: 'assistant',
+      content: 'Oke, dibatalin. Ada yang bisa gue bantu lagi?'
+    }])
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
   }
 
@@ -351,6 +453,14 @@ Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
             </View>
           </View>
         ))}
+        {pendingTransaction && (
+          <TransactionConfirmCard
+            parsed={pendingTransaction}
+            onConfirm={handleSaveTransaction}
+            onCancel={handleCancelTransaction}
+            loading={savingTransaction}
+          />
+        )}
         {loading && (
           <View style={styles.msgRow}>
             <View style={styles.avatar}>
