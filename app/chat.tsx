@@ -290,16 +290,81 @@ export default function ChatScreen() {
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
       const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
-      const result = await claudeVision(base64, mimeType,
-        `Kamu adalah asisten keuangan Zena. Analisis struk/nota ini dan:
-1. Sebutkan nama toko dan tanggal (jika ada)
-2. List item-item yang dibeli beserta harganya
-3. Sebutkan total belanja
-4. Kategori transaksi yang tepat (Makan & Minum / Belanja / Tagihan / Hiburan / Kesehatan / Transport / dll)
-5. Berikan 1 komentar singkat yang friendly tentang pengeluaran ini
-Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
-      setMessages(prev => [...prev, { role: 'assistant', content: result }])
-    } catch {
+
+      // Different prompts for personal vs business
+      let prompt = ''
+      if (activeMode === 'business') {
+        prompt = `Analisis struk/invoice bisnis ini dan extract data dalam format JSON:
+{
+  "store_name": "nama toko/supplier",
+  "date": "YYYY-MM-DD",
+  "items": [{"name": "nama item", "qty": 1, "price": 50000}],
+  "total": 150000,
+  "category": "penjualan/pembelian_alat/operasional",
+  "is_business": true
+}
+
+Jika ini struk penjualan produk kamu → category: "penjualan"
+Jika ini struk beli alat/bahan → category: "pembelian_alat"
+Jika ini struk operasional (sewa, listrik) → category: "operasional"
+
+Return ONLY valid JSON, no markdown, no explanation.`
+      } else {
+        prompt = `Analisis struk belanja ini dan extract data dalam format JSON:
+{
+  "store_name": "nama toko",
+  "date": "YYYY-MM-DD",
+  "items": [{"name": "nama item", "price": 15000}],
+  "total": 50000,
+  "category": "makanan/belanja/transport/hiburan/kesehatan/tagihan/lainnya",
+  "is_business": false
+}
+
+Kategori berdasarkan jenis pembelian:
+- Resto/cafe/warung → "makanan"
+- Supermarket/minimarket → "belanja"
+- Bensin/parkir/grab → "transport"
+- Bioskop/game → "hiburan"
+- Apotek/klinik → "kesehatan"
+- Listrik/pulsa/internet → "tagihan"
+
+Return ONLY valid JSON, no markdown, no explanation.`
+      }
+
+      const result = await claudeVision(base64, mimeType, prompt)
+
+      // Parse JSON response
+      const cleanResult = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const data = JSON.parse(cleanResult)
+
+      // Create parsed transaction from OCR data
+      if (data.is_business) {
+        const parsed: ParsedTransaction = {
+          type: 'business',
+          business_category: data.category || 'lainnya',
+          amount: data.total,
+          description: `${data.store_name} - ${data.items?.map((i: any) => i.name).join(', ') || 'Scan struk'}`,
+          product_name: data.items?.[0]?.name,
+          quantity: data.items?.[0]?.qty,
+          ppn_type: data.category === 'penjualan' ? 'keluaran' : 'masukan',
+          confidence: 0.9,
+        }
+        setPendingTransaction(parsed)
+        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil scan struk bisnis dari ${data.store_name}!` }])
+      } else {
+        const parsed: ParsedTransaction = {
+          type: 'personal',
+          transaction_type: 'expense',
+          amount: data.total,
+          description: `${data.store_name} - ${data.items?.map((i: any) => i.name).join(', ') || 'Scan struk'}`,
+          category: data.category || 'lainnya',
+          confidence: 0.9,
+        }
+        setPendingTransaction(parsed)
+        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil scan struk dari ${data.store_name}!` }])
+      }
+    } catch (error) {
+      console.error('OCR Error:', error)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gagal baca struk. Pastikan foto jelas ya!' }])
     }
     setLoading(false)
@@ -361,24 +426,26 @@ Format jawaban natural, bahasa Indonesia, friendly. Bukan JSON.`)
       // Process dengan Groq: Transcribe + Parse
       const result = await processVoiceNote(audioUri)
 
-      // Format hasil untuk ditampilkan ke user
-      let resultText = `🎤 Voice Note:\n"${result.transcription}"\n\n`
-
-      if (result.nominal && result.kategori) {
-        resultText += `Terdeteksi:\n`
-        resultText += `💰 Nominal: Rp ${result.nominal.toLocaleString('id-ID')}\n`
-        resultText += `📂 Kategori: ${result.kategori}\n`
-        resultText += `📝 Catatan: ${result.catatan}\n\n`
-        resultText += `Mau langsung dicatat sebagai transaksi ${result.tipe === 'income' ? 'pemasukan' : 'pengeluaran'}?`
-      } else {
-        resultText += `Nominal atau kategori tidak terdeteksi. Ketik manual ya!`
-      }
-
       setMessages(prev => [
         ...prev,
-        { role: 'user', content: result.transcription },
-        { role: 'assistant', content: resultText }
+        { role: 'user', content: `🎤 "${result.transcription}"` }
       ])
+
+      // If parsed successfully, create ParsedTransaction
+      if (result.nominal && result.kategori) {
+        const parsed: ParsedTransaction = {
+          type: 'personal',
+          transaction_type: result.tipe === 'income' ? 'income' : 'expense',
+          amount: result.nominal,
+          description: result.catatan || result.transcription,
+          category: result.kategori,
+          confidence: 0.85,
+        }
+        setPendingTransaction(parsed)
+        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil parse voice note!` }])
+      } else {
+        setMessages(prev => [...prev, { role: 'assistant', content: `Maaf, nominal atau kategori tidak terdeteksi. Coba ketik manual ya!` }])
+      }
 
       setLoading(false)
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
