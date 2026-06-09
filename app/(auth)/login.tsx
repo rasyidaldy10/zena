@@ -47,41 +47,17 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       if (mode === 'signup') {
-        // Sign up
+        // Sign up - skip untuk development, pakai Google SSO
         console.log('🔵 Signup attempt:', email)
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password: password.trim(),
-          options: {
-            emailRedirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
-          }
-        })
-
-        console.log('🔵 Signup result:', { user: !!data.user, session: !!data.session, error })
-
-        if (error) throw error
-
-        // Cek apakah user langsung confirmed atau butuh email verification
-        if (data.user && data.session) {
-          // Auto-confirmed! Langsung masuk (handled by _layout.tsx)
-          console.log('✅ Auto-confirmed! Session active:', data.session.user.id)
-          // Loading akan tetap ON sampai redirect selesai
-        } else {
-          // Butuh email verification
-          console.log('⚠️ Email verification required')
-          setLoading(false)
-          Alert.alert(
-            '✅ Akun Berhasil Dibuat!',
-            'Sekarang kamu bisa langsung login dengan email dan password yang baru dibuat.',
-            [{
-              text: 'Login Sekarang',
-              onPress: () => {
-                setMode('login')
-                // Email & password sudah terisi, user tinggal klik "Masuk"
-              }
-            }]
-          )
-        }
+        setLoading(false)
+        Alert.alert(
+          'Info',
+          'Untuk saat ini, silakan gunakan "Masuk dengan Google" di bawah.\n\nEmail signup sedang dalam pengembangan.',
+          [{
+            text: 'OK'
+          }]
+        )
+        return
       } else {
         // Login
         console.log('🔵 Login attempt:', email)
