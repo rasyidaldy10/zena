@@ -31,13 +31,37 @@ export default function LoginScreen() {
     setLoading(true)
     try {
       if (mode === 'signup') {
-        const { error } = await supabase.auth.signUp({
+        // Sign up
+        const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
+          options: {
+            emailRedirectTo: Platform.OS === 'web' ? window.location.origin : undefined,
+          }
         })
         if (error) throw error
-        Alert.alert('Sukses!', 'Akun berhasil dibuat. Silakan cek email untuk verifikasi.')
+
+        // Cek apakah user langsung confirmed atau butuh email verification
+        if (data.user && data.session) {
+          // Auto-confirmed! Langsung masuk (handled by _layout.tsx)
+          // No need to do anything, session sudah ada
+        } else {
+          // Butuh email verification
+          setLoading(false)
+          Alert.alert(
+            '✅ Akun Berhasil Dibuat!',
+            'Sekarang kamu bisa langsung login dengan email dan password yang baru dibuat.',
+            [{
+              text: 'Login Sekarang',
+              onPress: () => {
+                setMode('login')
+                // Email & password sudah terisi, user tinggal klik "Masuk"
+              }
+            }]
+          )
+        }
       } else {
+        // Login
         const { error } = await supabase.auth.signInWithPassword({
           email: email.trim(),
           password: password.trim(),
@@ -46,8 +70,10 @@ export default function LoginScreen() {
         // Auto redirect ke home setelah login success (handled by _layout.tsx)
       }
     } catch (error: any) {
-      Alert.alert(mode === 'signup' ? 'Gagal Daftar' : 'Gagal Masuk', error.message)
-    } finally {
+      Alert.alert(
+        mode === 'signup' ? 'Gagal Daftar' : 'Gagal Masuk',
+        error.message || 'Terjadi kesalahan. Silakan coba lagi.'
+      )
       setLoading(false)
     }
   }
