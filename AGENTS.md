@@ -49,14 +49,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 4f9b30e (Complete documentation for Claude reference)
+**Latest Commit:** 737e655 (Business Mode stats cards in Dashboard)
 
 ---
 
 ## LATEST SESSION (2026-06-08 s/d 2026-06-09) - BUSINESS MODE COMPLETE ✅
 
 **💼 BUSINESS MODE: PRODUCTION READY** - Complete Business Management System  
-**10 Commits, 39 Files Created/Updated, Supabase Migration SUCCESS ✅**
+**11 Commits, 40 Files Created/Updated, Supabase Migration SUCCESS ✅**
 
 **IMPLEMENTED FEATURES:**
 
@@ -106,6 +106,13 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - PPN rate input (default 11%, editable 0-100%)
 - Quick links ke business screens (Projects, Inventory, Receivables)
 - Auto-save to user_preferences table
+
+**8. Dashboard Business Stats (NEW!):**
+- Conditional render: Show only if business_mode active + tab business/all
+- 4 stat cards: Piutang (green), Hutang (red), Project Aktif (blue), Stok Rendah (yellow)
+- Real-time data: RPC get_low_stock_count + Supabase queries
+- Clickable cards navigate to respective screens
+- Quick links row: Projects, Inventory, Receivables
 
 **FILES CREATED (39 total):**
 - 2 migrations (004_business_mode.sql, 005_hpp_and_ppn.sql)
@@ -200,9 +207,9 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **🟠 BUSINESS MODE ENHANCEMENTS (Optional - Core sudah lengkap):**
 1. ⏳ LaporanScreen Laba Kotor tab - `get_monthly_gross_profit()`, `get_product_sales_report()` sudah ready
 2. ⏳ LaporanScreen Pajak tab - tax_summary table sudah ready, tinggal UI display
-3. ⏳ HomeScreen business mode - stats cards (total kas bisnis, piutang, hutang, stok rendah)
+3. ✅ HomeScreen business mode - stats cards (piutang, hutang, project aktif, stok rendah) **DONE**
 4. ✅ ProfileScreen PPN settings - toggle ppn_enabled, input ppn_rate **DONE**
-5. ✅ Navigation integration - quick links di Profile screen **DONE**
+5. ✅ Navigation integration - quick links di Profile + Dashboard **DONE**
 6. ⏳ ModalImportData - parse Excel/CSV/PDF via Claude API
 
 **🟢 FUTURE FEATURES (Roadmap):**
