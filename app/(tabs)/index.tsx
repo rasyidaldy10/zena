@@ -30,7 +30,7 @@ export default function HomeScreen() {
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [notifCount, setNotifCount] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [tabMode, setTabMode] = useState<TabMode>('personal')
+  const [activeMode, setActiveMode] = useState<TabMode>('personal')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [rincianExpanded, setRincianExpanded] = useState(false)
   const [showCEOWelcome, setShowCEOWelcome] = useState(false)
@@ -62,6 +62,11 @@ export default function HomeScreen() {
     setWallets((w ?? []) as UserWallet[])
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
+
+    // Set active mode from preferences
+    if (p?.active_mode) {
+      setActiveMode(p.active_mode as TabMode)
+    }
 
     // Fetch business stats if business mode active
     if (p?.business_mode) {
@@ -156,11 +161,25 @@ export default function HomeScreen() {
     }
   }, [])
 
+  const handleToggleMode = async () => {
+    const newMode = activeMode === 'personal' ? 'business' : 'personal'
+    setActiveMode(newMode)
+
+    // Save to preferences
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session) {
+      await supabase
+        .from('user_preferences')
+        .update({ active_mode: newMode })
+        .eq('user_id', session.user.id)
+    }
+  }
+
   const getBalance = () => {
-    if (tabMode === 'personal') {
+    if (activeMode === 'personal') {
       return wallets.filter(w => w.wallet_function !== 'bisnis').reduce((s, w) => s + w.current_balance, 0)
     }
-    if (tabMode === 'business') {
+    if (activeMode === 'business') {
       return wallets.filter(w => w.wallet_function === 'bisnis').reduce((s, w) => s + w.current_balance, 0)
     }
     return 0
@@ -245,22 +264,28 @@ export default function HomeScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* BALANCE CARD */}
         <View style={styles.balanceCard}>
-          {/* Tabs */}
-          {prefs?.business_mode && (
-            <View style={styles.balanceTabs}>
-              {(['personal', 'business'] as TabMode[]).map(tab => (
-                <TouchableOpacity
-                  key={tab}
-                  style={[styles.balanceTab, tabMode === tab && styles.balanceTabActive]}
-                  onPress={() => setTabMode(tab)}
-                >
-                  <Text style={[styles.balanceTabText, tabMode === tab && styles.balanceTabTextActive]}>
-                    {tab === 'personal' ? '👤 Pribadi' : '💼 Bisnis'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+          {/* Mode Label + Toggle */}
+          <View style={styles.modeHeader}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={styles.modeLabel}>
+                {activeMode === 'personal' ? '👤 Mode Pribadi' : '💼 Mode Bisnis'}
+              </Text>
             </View>
-          )}
+
+            {/* Toggle Switch (only show if business_mode enabled) */}
+            {prefs?.business_mode && (
+              <TouchableOpacity
+                style={styles.modeToggle}
+                onPress={handleToggleMode}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modeToggleIcon}>⇄</Text>
+                <Text style={styles.modeToggleText}>
+                  {activeMode === 'personal' ? 'Bisnis' : 'Pribadi'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Balance */}
           <View style={styles.balanceContent}>
@@ -310,7 +335,7 @@ export default function HomeScreen() {
         </View>
 
         {/* BUSINESS STATS (show only in business tab) */}
-        {tabMode === 'business' && (
+        {activeMode === 'business' && (
           <View style={styles.businessStatsSection}>
             <View style={styles.businessStatsHeader}>
               <Text style={styles.businessStatsTitle}>💼 Ringkasan Bisnis</Text>
@@ -403,7 +428,7 @@ export default function HomeScreen() {
         )}
 
         {/* QUICK ACTIONS - PERSONAL MODE */}
-        {tabMode === 'personal' && (
+        {activeMode === 'personal' && (
           <View style={styles.quickActions}>
             {/* Row 1 */}
             <View style={styles.quickRow}>
@@ -470,7 +495,7 @@ export default function HomeScreen() {
         )}
 
         {/* QUICK ACTIONS - BUSINESS MODE */}
-        {tabMode === 'business' && (
+        {activeMode === 'business' && (
           <View style={styles.quickActions}>
             {/* Row 1 - Business Core */}
             <View style={styles.quickRow}>
@@ -533,7 +558,7 @@ export default function HomeScreen() {
         )}
 
         {/* FINANCIAL SCORE (Personal mode only) */}
-        {tabMode === 'personal' && (
+        {activeMode === 'personal' && (
           <>
         <Text style={styles.sectionTitle}>Financial Score</Text>
         <View style={styles.scoreGrid}>
@@ -638,11 +663,18 @@ const styles = StyleSheet.create({
     shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 32, shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
-  balanceTabs: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  balanceTab: { paddingVertical: 8, paddingHorizontal: 16 },
-  balanceTabActive: { borderBottomWidth: 2, borderBottomColor: PRIMARY },
-  balanceTabText: { fontSize: 13, color: TEXT_SECONDARY },
-  balanceTabTextActive: { fontSize: 13, fontWeight: '700', color: PRIMARY },
+  modeHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
+  },
+  modeLabel: { fontSize: 13, fontWeight: '700', color: TEXT_MAIN },
+  modeToggle: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: PRIMARY + '10', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12,
+    borderWidth: 1, borderColor: PRIMARY + '30',
+  },
+  modeToggleIcon: { fontSize: 14, color: PRIMARY },
+  modeToggleText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
   balanceContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   balanceLeft: { flex: 1 },
   balanceLabel: { fontSize: 13, color: TEXT_SECONDARY },
