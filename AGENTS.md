@@ -49,14 +49,14 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 737e655 (Business Mode stats cards in Dashboard)
+**Latest Commit:** fc6e66c (Full UI switch Personal & Business mode)
 
 ---
 
 ## LATEST SESSION (2026-06-08 s/d 2026-06-09) - BUSINESS MODE COMPLETE ✅
 
 **💼 BUSINESS MODE: PRODUCTION READY** - Complete Business Management System  
-**11 Commits, 40 Files Created/Updated, Supabase Migration SUCCESS ✅**
+**13 Commits, 40 Files Created/Updated, Supabase Migration SUCCESS ✅**
 
 **IMPLEMENTED FEATURES:**
 
@@ -107,12 +107,22 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - Quick links ke business screens (Projects, Inventory, Receivables)
 - Auto-save to user_preferences table
 
-**8. Dashboard Business Stats (NEW!):**
-- Conditional render: Show only if business_mode active + tab business/all
-- 4 stat cards: Piutang (green), Hutang (red), Project Aktif (blue), Stok Rendah (yellow)
-- Real-time data: RPC get_low_stock_count + Supabase queries
-- Clickable cards navigate to respective screens
-- Quick links row: Projects, Inventory, Receivables
+**8. Dashboard Full Mode Switch (NEW!):**
+- Remove "Semua" tab - only "👤 Pribadi" & "💼 Bisnis"
+- Full UI switch per mode (bukan cuma nambah section)
+- Balance calculation filtered by wallet_function
+- **Personal Mode:**
+  - Quick Actions: AI, Scan, Laporan, Budget, Intel, Investasi, Leaderboard, Reminder
+  - Financial Score cards (4 metrics)
+  - Market Data widget (crypto prices)
+  - Stock Widget (IHSG + stocks)
+- **Business Mode:**
+  - Business Stats cards: Piutang, Hutang, Project Aktif, Stok Rendah
+  - Quick Actions: Projects, Inventory, Receivables, Transaksi, AI, Laporan, Reminder, Intel
+  - Quick Links: Projects, Inventory, Receivables
+- Transactions section: show in both modes (filtered)
+- Tabs only visible if business_mode = true
+- Default: personal mode
 
 **FILES CREATED (39 total):**
 - 2 migrations (004_business_mode.sql, 005_hpp_and_ppn.sql)
