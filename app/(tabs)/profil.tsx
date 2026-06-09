@@ -553,11 +553,15 @@ export default function ProfilScreen() {
       )}
 
       {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+      <TouchableOpacity
+        style={styles.logoutBtn}
+        onPress={handleLogout}
+        activeOpacity={0.7}
+      >
         <Text style={styles.logoutText}>🚪 Keluar dari Akun</Text>
       </TouchableOpacity>
 
-      <View style={{ height: 40 }} />
+      <View style={{ height: 100 }} />
     </ScrollView>
   )
 }
@@ -591,9 +595,16 @@ const styles = StyleSheet.create({
   disconnectBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#2A1A1A', borderRadius: 8 },
   disconnectText: { fontSize: 12, color: '#E24B4A', fontWeight: '600' },
   logoutBtn: {
-    marginHorizontal: 20, marginTop: 32, backgroundColor: '#2A1A1A',
-    borderRadius: 12, paddingVertical: 16, alignItems: 'center',
-    borderWidth: 0.5, borderColor: '#E24B4A30',
+    marginHorizontal: 20,
+    marginTop: 32,
+    marginBottom: 20,
+    backgroundColor: '#2A1A1A',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E24B4A',
+    zIndex: 999,
   },
   logoutText: { fontSize: 15, color: '#E24B4A', fontWeight: '600' },
   loadingWrap: { flex: 1, backgroundColor: '#0F0F0F', alignItems: 'center', justifyContent: 'center' },
