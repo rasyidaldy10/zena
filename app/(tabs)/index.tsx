@@ -35,6 +35,12 @@ export default function HomeScreen() {
   const [rincianExpanded, setRincianExpanded] = useState(false)
   const [showCEOWelcome, setShowCEOWelcome] = useState(false)
   const channelRef = useRef<any>(null)
+  const [businessStats, setBusinessStats] = useState({
+    totalPiutang: 0,
+    totalHutang: 0,
+    lowStockCount: 0,
+    activeProjectsCount: 0,
+  })
 
   const fetchData = async () => {
     const { data: { session } } = await supabase.auth.getSession()
@@ -56,6 +62,29 @@ export default function HomeScreen() {
     setWallets((w ?? []) as UserWallet[])
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
+
+    // Fetch business stats if business mode active
+    if (p?.business_mode) {
+      const [
+        { data: piutang },
+        { data: hutang },
+        { data: lowStock },
+        { data: activeProjects }
+      ] = await Promise.all([
+        supabase.from('receivables').select('amount').eq('user_id', session.user.id).eq('type', 'piutang').eq('status', 'pending'),
+        supabase.from('receivables').select('amount').eq('user_id', session.user.id).eq('type', 'hutang').eq('status', 'pending'),
+        supabase.rpc('get_low_stock_count', { p_user_id: session.user.id }),
+        supabase.from('projects').select('id').eq('user_id', session.user.id).eq('status', 'aktif')
+      ])
+
+      setBusinessStats({
+        totalPiutang: piutang?.reduce((sum, r: any) => sum + r.amount, 0) || 0,
+        totalHutang: hutang?.reduce((sum, r: any) => sum + r.amount, 0) || 0,
+        lowStockCount: lowStock || 0,
+        activeProjectsCount: activeProjects?.length || 0,
+      })
+    }
+
     setLoading(false)
 
     // Check if user is new (show CEO welcome once)
@@ -273,6 +302,99 @@ export default function HomeScreen() {
             <Text style={styles.xpText}>{score?.total ?? 0}% XP</Text>
           </View>
         </View>
+
+        {/* BUSINESS STATS (show if business mode active) */}
+        {prefs?.business_mode && (tabMode === 'business' || tabMode === 'all') && (
+          <View style={styles.businessStatsSection}>
+            <View style={styles.businessStatsHeader}>
+              <Text style={styles.businessStatsTitle}>💼 Ringkasan Bisnis</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
+                <Text style={styles.businessStatsLink}>Kelola →</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.businessStatsGrid}>
+              {/* Piutang */}
+              <TouchableOpacity
+                style={[styles.businessStatCard, { borderLeftColor: '#16A34A' }]}
+                onPress={() => router.push('/business-receivables')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessStatIcon}>💰</Text>
+                <Text style={styles.businessStatLabel}>Piutang</Text>
+                <Text style={[styles.businessStatValue, { color: '#16A34A' }]}>
+                  Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Hutang */}
+              <TouchableOpacity
+                style={[styles.businessStatCard, { borderLeftColor: '#E24B4A' }]}
+                onPress={() => router.push('/business-receivables')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessStatIcon}>🔴</Text>
+                <Text style={styles.businessStatLabel}>Hutang</Text>
+                <Text style={[styles.businessStatValue, { color: '#E24B4A' }]}>
+                  Rp {businessStats.totalHutang.toLocaleString('id-ID')}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Projects */}
+              <TouchableOpacity
+                style={[styles.businessStatCard, { borderLeftColor: '#185FA5' }]}
+                onPress={() => router.push('/business-projects')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessStatIcon}>📊</Text>
+                <Text style={styles.businessStatLabel}>Project Aktif</Text>
+                <Text style={[styles.businessStatValue, { color: '#185FA5' }]}>
+                  {businessStats.activeProjectsCount} Project
+                </Text>
+              </TouchableOpacity>
+
+              {/* Low Stock */}
+              <TouchableOpacity
+                style={[styles.businessStatCard, { borderLeftColor: '#F59E0B' }]}
+                onPress={() => router.push('/business-inventory')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessStatIcon}>⚠️</Text>
+                <Text style={styles.businessStatLabel}>Stok Rendah</Text>
+                <Text style={[styles.businessStatValue, { color: '#F59E0B' }]}>
+                  {businessStats.lowStockCount} Produk
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Quick Links */}
+            <View style={styles.businessQuickLinks}>
+              <TouchableOpacity
+                style={styles.businessQuickLinkBtn}
+                onPress={() => router.push('/business-projects')}
+              >
+                <Text style={styles.businessQuickLinkIcon}>📋</Text>
+                <Text style={styles.businessQuickLinkText}>Projects</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.businessQuickLinkBtn}
+                onPress={() => router.push('/business-inventory')}
+              >
+                <Text style={styles.businessQuickLinkIcon}>📦</Text>
+                <Text style={styles.businessQuickLinkText}>Inventory</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.businessQuickLinkBtn}
+                onPress={() => router.push('/business-receivables')}
+              >
+                <Text style={styles.businessQuickLinkIcon}>💸</Text>
+                <Text style={styles.businessQuickLinkText}>Receivables</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         {/* QUICK ACTIONS */}
         <View style={styles.quickActions}>
@@ -514,4 +636,34 @@ const styles = StyleSheet.create({
   txnAmount: { fontSize: 14, fontWeight: '700' },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyText: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 8 },
+  businessStatsSection: {
+    marginHorizontal: 20, marginTop: 20,
+    backgroundColor: CARD_BG, borderRadius: 16, padding: 16,
+  },
+  businessStatsHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    marginBottom: 16,
+  },
+  businessStatsTitle: { fontSize: 16, fontWeight: '700', color: TEXT_MAIN },
+  businessStatsLink: { fontSize: 13, fontWeight: '600', color: PRIMARY },
+  businessStatsGrid: {
+    flexDirection: 'row', flexWrap: 'wrap', gap: 10,
+  },
+  businessStatCard: {
+    flex: 1, minWidth: '47%', backgroundColor: '#F9FAFB',
+    borderRadius: 12, padding: 14, borderLeftWidth: 4,
+  },
+  businessStatIcon: { fontSize: 24, marginBottom: 8 },
+  businessStatLabel: { fontSize: 11, color: TEXT_SECONDARY, marginBottom: 4 },
+  businessStatValue: { fontSize: 15, fontWeight: '700' },
+  businessQuickLinks: {
+    flexDirection: 'row', gap: 8, marginTop: 12,
+  },
+  businessQuickLinkBtn: {
+    flex: 1, backgroundColor: '#EFF6FF', borderRadius: 10,
+    paddingVertical: 10, alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: PRIMARY + '30',
+  },
+  businessQuickLinkIcon: { fontSize: 20 },
+  businessQuickLinkText: { fontSize: 11, fontWeight: '600', color: PRIMARY },
 })
