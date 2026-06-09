@@ -34,6 +34,7 @@ export interface UserPreferences {
   has_seen_ceo_welcome?: boolean
   business_mode?: boolean
   active_mode?: 'personal' | 'business'
+  business_name?: string
   ppn_rate?: number
   ppn_enabled?: boolean
   created_at: string

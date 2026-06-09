@@ -26,7 +26,8 @@ export default function ProfilScreen() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [tapCount, setTapCount] = useState(0)
   const [lastTapTime, setLastTapTime] = useState(0)
-  const [businessMode, setBusinessMode] = useState(false)
+  const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
+  const [businessName, setBusinessName] = useState('')
   const [ppnEnabled, setPpnEnabled] = useState(false)
   const [ppnRate, setPpnRate] = useState('11')
 
@@ -44,7 +45,8 @@ export default function ProfilScreen() {
       setPrefs(prefsData)
       setNickname(prefsData.nickname || '')
       setIncome(prefsData.monthly_income?.toLocaleString('id-ID') || '')
-      setBusinessMode(prefsData.business_mode || false)
+      setActiveMode(prefsData.active_mode || 'personal')
+      setBusinessName(prefsData.business_name || '')
       setPpnEnabled(prefsData.ppn_enabled || false)
       setPpnRate(prefsData.ppn_rate?.toString() || '11')
     }
@@ -82,12 +84,21 @@ export default function ProfilScreen() {
   const handleSave = async () => {
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('user_preferences').upsert({
+
+    const updateData: any = {
       user_id: user?.id,
-      nickname,
-      monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
       updated_at: new Date().toISOString(),
-    })
+    }
+
+    // Save based on active mode
+    if (activeMode === 'personal') {
+      updateData.nickname = nickname
+      updateData.monthly_income = parseFloat(income.replace(/\./g, '')) || 0
+    } else {
+      updateData.business_name = businessName
+    }
+
+    await supabase.from('user_preferences').upsert(updateData)
     setEditing(false)
     fetchData()
     setSaving(false)
@@ -107,24 +118,6 @@ export default function ProfilScreen() {
       user_id: user?.id, budget_method: m, updated_at: new Date().toISOString(),
     })
     fetchData()
-  }
-
-  const handleBusinessModeToggle = async () => {
-    const newValue = !businessMode
-    setBusinessMode(newValue)
-    const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('user_preferences').upsert({
-      user_id: user?.id,
-      business_mode: newValue,
-      updated_at: new Date().toISOString(),
-    })
-    if (newValue) {
-      Alert.alert(
-        '💼 Mode Bisnis Aktif!',
-        'Fitur bisnis sudah bisa diakses:\n\n• Projects & Receivables\n• Inventory Management\n• HPP & PPN Tracking\n\nAkses via dashboard atau direct URL.',
-        [{ text: 'OK' }]
-      )
-    }
   }
 
   const handlePpnToggle = async () => {
@@ -322,7 +315,7 @@ export default function ProfilScreen() {
         </View>
       </View>
 
-      {/* Info */}
+      {/* Info - Conditional by active_mode */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Informasi</Text>
@@ -331,34 +324,55 @@ export default function ProfilScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Nama panggilan</Text>
-          {editing ? (
-            <TextInput
-              style={styles.infoInput}
-              value={nickname}
-              onChangeText={setNickname}
-              placeholderTextColor="#888780"
-            />
-          ) : (
-            <Text style={styles.infoValue}>{prefs?.nickname || '-'}</Text>
-          )}
-        </View>
+        {activeMode === 'personal' ? (
+          <>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Nama panggilan</Text>
+              {editing ? (
+                <TextInput
+                  style={styles.infoInput}
+                  value={nickname}
+                  onChangeText={setNickname}
+                  placeholder="Nama"
+                  placeholderTextColor="#888780"
+                />
+              ) : (
+                <Text style={styles.infoValue}>{prefs?.nickname || '-'}</Text>
+              )}
+            </View>
 
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Penghasilan/bulan</Text>
-          {editing ? (
-            <TextInput
-              style={styles.infoInput}
-              value={income}
-              onChangeText={(t) => setIncome(t.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'))}
-              keyboardType="numeric"
-              placeholderTextColor="#888780"
-            />
-          ) : (
-            <Text style={styles.infoValue}>Rp {prefs?.monthly_income?.toLocaleString('id-ID') || '0'}</Text>
-          )}
-        </View>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Penghasilan/bulan</Text>
+              {editing ? (
+                <TextInput
+                  style={styles.infoInput}
+                  value={income}
+                  onChangeText={(t) => setIncome(t.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, '.'))}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor="#888780"
+                />
+              ) : (
+                <Text style={styles.infoValue}>Rp {prefs?.monthly_income?.toLocaleString('id-ID') || '0'}</Text>
+              )}
+            </View>
+          </>
+        ) : (
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Nama Perusahaan</Text>
+            {editing ? (
+              <TextInput
+                style={styles.infoInput}
+                value={businessName}
+                onChangeText={setBusinessName}
+                placeholder="PT Nama Perusahaan"
+                placeholderTextColor="#888780"
+              />
+            ) : (
+              <Text style={styles.infoValue}>{prefs?.business_name || 'Belum diisi'}</Text>
+            )}
+          </View>
+        )}
 
         <View style={styles.infoRow}>
           <Text style={styles.infoLabel}>Metode budget</Text>
@@ -400,100 +414,43 @@ export default function ProfilScreen() {
         ))}
       </View>
 
-      {/* Business Mode Settings */}
+      {/* PPN Settings (always available) */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Mode Bisnis</Text>
+        <Text style={styles.sectionTitle}>Pengaturan PPN</Text>
 
-        {/* Business Mode Toggle */}
         <TouchableOpacity
-          style={[styles.toggleRow, businessMode && styles.toggleRowActive]}
-          onPress={handleBusinessModeToggle}
+          style={[styles.toggleRow, ppnEnabled && styles.toggleRowActive]}
+          onPress={handlePpnToggle}
           activeOpacity={0.7}
         >
           <View style={styles.toggleLeft}>
-            <Text style={styles.toggleIcon}>💼</Text>
+            <Text style={styles.toggleIcon}>🧾</Text>
             <View style={styles.toggleInfo}>
-              <Text style={[styles.toggleName, businessMode && styles.toggleNameActive]}>
-                Aktifkan Mode Bisnis
+              <Text style={[styles.toggleName, ppnEnabled && styles.toggleNameActive]}>
+                Aktifkan PPN
               </Text>
               <Text style={styles.toggleDesc}>
-                Projects, Inventory, HPP, PPN
+                Pajak Pertambahan Nilai
               </Text>
             </View>
           </View>
-          <View style={[styles.toggleSwitch, businessMode && styles.toggleSwitchActive]}>
-            <View style={[styles.toggleKnob, businessMode && styles.toggleKnobActive]} />
+          <View style={[styles.toggleSwitch, ppnEnabled && styles.toggleSwitchActive]}>
+            <View style={[styles.toggleKnob, ppnEnabled && styles.toggleKnobActive]} />
           </View>
         </TouchableOpacity>
 
-        {/* PPN Settings (only show if business mode active) */}
-        {businessMode && (
-          <>
-            <TouchableOpacity
-              style={[styles.toggleRow, ppnEnabled && styles.toggleRowActive]}
-              onPress={handlePpnToggle}
-              activeOpacity={0.7}
-            >
-              <View style={styles.toggleLeft}>
-                <Text style={styles.toggleIcon}>🧾</Text>
-                <View style={styles.toggleInfo}>
-                  <Text style={[styles.toggleName, ppnEnabled && styles.toggleNameActive]}>
-                    Aktifkan PPN
-                  </Text>
-                  <Text style={styles.toggleDesc}>
-                    Pajak Pertambahan Nilai
-                  </Text>
-                </View>
-              </View>
-              <View style={[styles.toggleSwitch, ppnEnabled && styles.toggleSwitchActive]}>
-                <View style={[styles.toggleKnob, ppnEnabled && styles.toggleKnobActive]} />
-              </View>
-            </TouchableOpacity>
-
-            {ppnEnabled && (
-              <View style={styles.ppnRateCard}>
-                <Text style={styles.ppnRateLabel}>Tarif PPN (%)</Text>
-                <TextInput
-                  style={styles.ppnRateInput}
-                  value={ppnRate}
-                  onChangeText={handlePpnRateChange}
-                  keyboardType="decimal-pad"
-                  placeholder="11"
-                  placeholderTextColor="#888780"
-                />
-              </View>
-            )}
-
-            {/* Quick Links to Business Screens */}
-            <View style={styles.businessLinks}>
-              <TouchableOpacity
-                style={styles.businessLinkBtn}
-                onPress={() => router.push('/business-projects')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.businessLinkIcon}>📊</Text>
-                <Text style={styles.businessLinkText}>Projects</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.businessLinkBtn}
-                onPress={() => router.push('/business-inventory')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.businessLinkIcon}>📦</Text>
-                <Text style={styles.businessLinkText}>Inventory</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.businessLinkBtn}
-                onPress={() => router.push('/business-receivables')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.businessLinkIcon}>💰</Text>
-                <Text style={styles.businessLinkText}>Receivables</Text>
-              </TouchableOpacity>
-            </View>
-          </>
+        {ppnEnabled && (
+          <View style={styles.ppnRateCard}>
+            <Text style={styles.ppnRateLabel}>Tarif PPN (%)</Text>
+            <TextInput
+              style={styles.ppnRateInput}
+              value={ppnRate}
+              onChangeText={handlePpnRateChange}
+              keyboardType="decimal-pad"
+              placeholder="11"
+              placeholderTextColor="#888780"
+            />
+          </View>
         )}
       </View>
 

@@ -243,7 +243,11 @@ export default function HomeScreen() {
           />
           <View>
             <Text style={styles.headerGreeting}>{greeting}</Text>
-            <Text style={styles.headerName}>{prefs?.nickname || 'User'}</Text>
+            <Text style={styles.headerName}>
+              {activeMode === 'business' && prefs?.business_name
+                ? prefs.business_name
+                : prefs?.nickname || 'User'}
+            </Text>
           </View>
         </View>
         <View style={styles.headerRight}>
@@ -272,19 +276,17 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {/* Toggle Switch (only show if business_mode enabled) */}
-            {prefs?.business_mode && (
-              <TouchableOpacity
-                style={styles.modeToggle}
-                onPress={handleToggleMode}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.modeToggleIcon}>⇄</Text>
-                <Text style={styles.modeToggleText}>
-                  {activeMode === 'personal' ? 'Bisnis' : 'Pribadi'}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {/* Toggle Switch (always available) */}
+            <TouchableOpacity
+              style={styles.modeToggle}
+              onPress={handleToggleMode}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.modeToggleIcon}>⇄</Text>
+              <Text style={styles.modeToggleText}>
+                {activeMode === 'personal' ? 'Bisnis' : 'Pribadi'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* Balance */}
