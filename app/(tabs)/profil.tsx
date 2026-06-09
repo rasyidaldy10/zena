@@ -26,6 +26,9 @@ export default function ProfilScreen() {
   const [gmailConnected, setGmailConnected] = useState(false)
   const [tapCount, setTapCount] = useState(0)
   const [lastTapTime, setLastTapTime] = useState(0)
+  const [businessMode, setBusinessMode] = useState(false)
+  const [ppnEnabled, setPpnEnabled] = useState(false)
+  const [ppnRate, setPpnRate] = useState('11')
 
   const fetchData = async () => {
     setLoading(true)
@@ -41,6 +44,9 @@ export default function ProfilScreen() {
       setPrefs(prefsData)
       setNickname(prefsData.nickname || '')
       setIncome(prefsData.monthly_income?.toLocaleString('id-ID') || '')
+      setBusinessMode(prefsData.business_mode || false)
+      setPpnEnabled(prefsData.ppn_enabled || false)
+      setPpnRate(prefsData.ppn_rate?.toString() || '11')
     }
 
     const { data: txns } = await supabase
@@ -101,6 +107,48 @@ export default function ProfilScreen() {
       user_id: user?.id, budget_method: m, updated_at: new Date().toISOString(),
     })
     fetchData()
+  }
+
+  const handleBusinessModeToggle = async () => {
+    const newValue = !businessMode
+    setBusinessMode(newValue)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('user_preferences').upsert({
+      user_id: user?.id,
+      business_mode: newValue,
+      updated_at: new Date().toISOString(),
+    })
+    if (newValue) {
+      Alert.alert(
+        '💼 Mode Bisnis Aktif!',
+        'Fitur bisnis sudah bisa diakses:\n\n• Projects & Receivables\n• Inventory Management\n• HPP & PPN Tracking\n\nAkses via dashboard atau direct URL.',
+        [{ text: 'OK' }]
+      )
+    }
+  }
+
+  const handlePpnToggle = async () => {
+    const newValue = !ppnEnabled
+    setPpnEnabled(newValue)
+    const { data: { user } } = await supabase.auth.getUser()
+    await supabase.from('user_preferences').upsert({
+      user_id: user?.id,
+      ppn_enabled: newValue,
+      updated_at: new Date().toISOString(),
+    })
+  }
+
+  const handlePpnRateChange = async (value: string) => {
+    setPpnRate(value)
+    const rateNum = parseFloat(value) || 11
+    if (rateNum > 0 && rateNum <= 100) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('user_preferences').upsert({
+        user_id: user?.id,
+        ppn_rate: rateNum,
+        updated_at: new Date().toISOString(),
+      })
+    }
   }
 
   const handleConnectGmail = async () => {
@@ -352,6 +400,103 @@ export default function ProfilScreen() {
         ))}
       </View>
 
+      {/* Business Mode Settings */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Mode Bisnis</Text>
+
+        {/* Business Mode Toggle */}
+        <TouchableOpacity
+          style={[styles.toggleRow, businessMode && styles.toggleRowActive]}
+          onPress={handleBusinessModeToggle}
+          activeOpacity={0.7}
+        >
+          <View style={styles.toggleLeft}>
+            <Text style={styles.toggleIcon}>💼</Text>
+            <View style={styles.toggleInfo}>
+              <Text style={[styles.toggleName, businessMode && styles.toggleNameActive]}>
+                Aktifkan Mode Bisnis
+              </Text>
+              <Text style={styles.toggleDesc}>
+                Projects, Inventory, HPP, PPN
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.toggleSwitch, businessMode && styles.toggleSwitchActive]}>
+            <View style={[styles.toggleKnob, businessMode && styles.toggleKnobActive]} />
+          </View>
+        </TouchableOpacity>
+
+        {/* PPN Settings (only show if business mode active) */}
+        {businessMode && (
+          <>
+            <TouchableOpacity
+              style={[styles.toggleRow, ppnEnabled && styles.toggleRowActive]}
+              onPress={handlePpnToggle}
+              activeOpacity={0.7}
+            >
+              <View style={styles.toggleLeft}>
+                <Text style={styles.toggleIcon}>🧾</Text>
+                <View style={styles.toggleInfo}>
+                  <Text style={[styles.toggleName, ppnEnabled && styles.toggleNameActive]}>
+                    Aktifkan PPN
+                  </Text>
+                  <Text style={styles.toggleDesc}>
+                    Pajak Pertambahan Nilai
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.toggleSwitch, ppnEnabled && styles.toggleSwitchActive]}>
+                <View style={[styles.toggleKnob, ppnEnabled && styles.toggleKnobActive]} />
+              </View>
+            </TouchableOpacity>
+
+            {ppnEnabled && (
+              <View style={styles.ppnRateCard}>
+                <Text style={styles.ppnRateLabel}>Tarif PPN (%)</Text>
+                <TextInput
+                  style={styles.ppnRateInput}
+                  value={ppnRate}
+                  onChangeText={handlePpnRateChange}
+                  keyboardType="decimal-pad"
+                  placeholder="11"
+                  placeholderTextColor="#888780"
+                />
+              </View>
+            )}
+
+            {/* Quick Links to Business Screens */}
+            <View style={styles.businessLinks}>
+              <TouchableOpacity
+                style={styles.businessLinkBtn}
+                onPress={() => router.push('/business-projects')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessLinkIcon}>📊</Text>
+                <Text style={styles.businessLinkText}>Projects</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.businessLinkBtn}
+                onPress={() => router.push('/business-inventory')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessLinkIcon}>📦</Text>
+                <Text style={styles.businessLinkText}>Inventory</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.businessLinkBtn}
+                onPress={() => router.push('/business-receivables')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.businessLinkIcon}>💰</Text>
+                <Text style={styles.businessLinkText}>Receivables</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+
       {/* Dompet Saya */}
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
@@ -500,4 +645,43 @@ const styles = StyleSheet.create({
   walletType: { fontSize: 11, color: '#888780', marginTop: 2 },
   walletBalance: { fontSize: 13, fontWeight: '600', color: '#fff' },
   walletEdit: { fontSize: 11, color: PRIMARY, marginTop: 4 },
+  toggleRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14,
+    marginBottom: 10, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  toggleRowActive: { borderColor: PRIMARY, borderWidth: 2, backgroundColor: PRIMARY + '10' },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  toggleIcon: { fontSize: 24 },
+  toggleInfo: { flex: 1 },
+  toggleName: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 2 },
+  toggleNameActive: { color: PRIMARY },
+  toggleDesc: { fontSize: 11, color: '#888780' },
+  toggleSwitch: {
+    width: 48, height: 28, borderRadius: 14, backgroundColor: '#2A2A2A',
+    justifyContent: 'center', padding: 2,
+  },
+  toggleSwitchActive: { backgroundColor: PRIMARY },
+  toggleKnob: {
+    width: 24, height: 24, borderRadius: 12, backgroundColor: '#fff',
+  },
+  toggleKnobActive: { alignSelf: 'flex-end' },
+  ppnRateCard: {
+    backgroundColor: '#1A1A1A', borderRadius: 10, padding: 14,
+    marginBottom: 10, borderWidth: 0.5, borderColor: PRIMARY,
+  },
+  ppnRateLabel: { fontSize: 12, color: '#888780', marginBottom: 8 },
+  ppnRateInput: {
+    fontSize: 18, fontWeight: '600', color: '#fff',
+    backgroundColor: '#2A2A2A', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 10,
+  },
+  businessLinks: {
+    flexDirection: 'row', gap: 10, marginTop: 6,
+  },
+  businessLinkBtn: {
+    flex: 1, backgroundColor: '#0D1A2E', borderRadius: 10, padding: 12,
+    alignItems: 'center', gap: 6, borderWidth: 0.5, borderColor: PRIMARY + '60',
+  },
+  businessLinkIcon: { fontSize: 24 },
+  businessLinkText: { fontSize: 11, color: PRIMARY, fontWeight: '600' },
 })
