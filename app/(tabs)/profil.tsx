@@ -193,15 +193,27 @@ export default function ProfilScreen() {
   }
 
   const handleLogout = () => {
+    console.log('🔵 Logout button pressed')
     Alert.alert('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', [
       { text: 'Batal', style: 'cancel' },
       {
         text: 'Keluar',
         style: 'destructive',
         onPress: async () => {
-          await supabase.auth.signOut()
-          if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            window.location.href = '/'
+          console.log('🔵 Logging out...')
+          try {
+            await supabase.auth.signOut()
+            console.log('✅ Signed out successfully')
+
+            // Force redirect to login
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.location.href = '/'
+            } else {
+              router.replace('/(auth)/login')
+            }
+          } catch (error) {
+            console.error('❌ Logout error:', error)
+            Alert.alert('Error', 'Gagal logout. Coba lagi.')
           }
         },
       },
@@ -319,7 +331,13 @@ export default function ProfilScreen() {
       <View style={styles.section}>
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Informasi</Text>
-          <TouchableOpacity onPress={() => editing ? handleSave() : setEditing(true)}>
+          <TouchableOpacity
+            onPress={() => {
+              console.log('🔵 Edit button pressed, current editing:', editing)
+              editing ? handleSave() : setEditing(true)
+            }}
+            activeOpacity={0.7}
+          >
             <Text style={styles.editBtn}>{editing ? (saving ? 'Menyimpan...' : 'Simpan') : 'Edit'}</Text>
           </TouchableOpacity>
         </View>
