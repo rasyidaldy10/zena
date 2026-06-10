@@ -84,9 +84,8 @@ export default function EditWalletScreen() {
     if (error) {
       Alert.alert('Error', 'Gagal menyimpan perubahan')
     } else {
-      Alert.alert('Berhasil! ✅', 'Dompet berhasil diperbarui', [
-        { text: 'OK', onPress: () => router.back() }
-      ])
+      // Navigate to profil tab
+      router.replace('/(tabs)/profil')
     }
   }
 

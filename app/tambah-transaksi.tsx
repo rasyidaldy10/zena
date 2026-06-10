@@ -30,6 +30,7 @@ type TxType = 'expense' | 'income' | 'transfer'
 type Wallet = {
   id: string
   wallet_name: string
+  wallet_function?: 'personal' | 'business'
   icon: string
   color: string
   current_balance: number
@@ -243,6 +244,9 @@ export default function TambahTransaksiScreen() {
       ])
       return
     } else {
+      // Get wallet to determine wallet_function
+      const wallet = wallets.find(w => w.id === selectedWallet)
+
       const { error } = await supabase.from('transactions').insert({
         user_id: user?.id,
         amount: nominal,
@@ -254,6 +258,7 @@ export default function TambahTransaksiScreen() {
         is_wallet_transfer: false,
         wallet_source: selectedWallet,
         wallet_id: selectedWallet,
+        wallet_function: wallet?.wallet_function || 'personal',
         date: selectedDate,
       })
 
@@ -263,7 +268,6 @@ export default function TambahTransaksiScreen() {
         return
       }
 
-      const wallet = wallets.find(w => w.id === selectedWallet)
       if (wallet) {
         const newBalance = type === 'income'
           ? wallet.current_balance + nominal
