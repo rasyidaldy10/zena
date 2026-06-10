@@ -219,7 +219,7 @@ export default function EditTransaksiScreen() {
     }
 
     Alert.alert('Berhasil! ✅', 'Transaksi berhasil diperbarui', [
-      { text: 'OK', onPress: () => router.back() }
+      { text: 'OK', onPress: () => router.replace('/(tabs)') }
     ])
     setSaving(false)
   }
@@ -248,7 +248,7 @@ export default function EditTransaksiScreen() {
             }
 
             await supabase.from('transactions').delete().eq('id', id)
-            router.back()
+            router.replace('/(tabs)')
           }
         }
       ]
@@ -267,7 +267,7 @@ export default function EditTransaksiScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.backBtn}>
             <Text style={styles.backText}>← Kembali</Text>
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Detail Transaksi</Text>
@@ -291,7 +291,7 @@ export default function EditTransaksiScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)')} style={styles.backBtn}>
           <Text style={styles.backText}>← Kembali</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Transaksi</Text>

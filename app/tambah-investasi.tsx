@@ -100,7 +100,7 @@ export default function TambahInvestasiScreen() {
     }
 
     Alert.alert('Berhasil! 🎉', 'Investasi berhasil ditambahkan', [
-      { text: 'OK', onPress: () => router.back() },
+      { text: 'OK', onPress: () => router.replace('/investment-portfolio') },
     ])
   }
 
@@ -122,7 +122,7 @@ export default function TambahInvestasiScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.replace('/investment-portfolio')}>
           <Text style={styles.backText}>← Kembali</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Tambah Investasi</Text>
