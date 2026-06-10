@@ -40,7 +40,7 @@ export default function LoginScreen() {
       return
     }
     if (password.length < 6) {
-      Alert.alert('Error', 'Password minimal 6 karakter')
+      Alert.alert('Error', 'Password harus minimal 6 karakter')
       return
     }
 
@@ -88,6 +88,13 @@ export default function LoginScreen() {
   const handleGoogleLogin = async () => {
     console.log('🔵 Google login clicked')
     setLoadingGoogle(true)
+
+    // Safety timeout: reset loading if OAuth doesn't complete within 30s
+    const timeoutId = setTimeout(() => {
+      console.log('⚠️ OAuth timeout - resetting loading state')
+      setLoadingGoogle(false)
+    }, 30000)
+
     try {
       if (Platform.OS === 'web') {
         console.log('🔵 Web OAuth flow')
@@ -100,26 +107,32 @@ export default function LoginScreen() {
         })
         if (error) {
           console.error('❌ OAuth error:', error.message)
+          clearTimeout(timeoutId)
           throw error
         }
         console.log('✅ Redirecting to Google...')
-        // Web will auto-redirect, loading stays ON
+        // Web will auto-redirect, timeout will handle if user cancels
       } else {
-        // Native mobile flow (not used in web deployment)
+        // Native mobile flow
         const redirectTo = Linking.createURL('/')
         const { data, error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo, skipBrowserRedirect: true },
         })
+        clearTimeout(timeoutId)
         if (error) throw error
         if (data?.url) {
           const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
           if (result.type === 'success' && result.url) {
             await Linking.openURL(result.url)
+          } else {
+            // User cancelled
+            setLoadingGoogle(false)
           }
         }
       }
     } catch (error: any) {
+      clearTimeout(timeoutId)
       console.error('❌ Google login error:', error.message)
       Alert.alert('Login Gagal', error.message || 'Terjadi kesalahan saat login dengan Google')
       setLoadingGoogle(false)

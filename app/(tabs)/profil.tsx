@@ -82,6 +82,15 @@ export default function ProfilScreen() {
   useFocusEffect(useCallback(() => { fetchData() }, []))
 
   const handleSave = async () => {
+    // Validate income if in personal mode
+    if (activeMode === 'personal') {
+      const incomeValue = parseFloat(income.replace(/\./g, ''))
+      if (isNaN(incomeValue) || incomeValue < 0) {
+        Alert.alert('Error', 'Penghasilan harus diisi dengan angka yang valid')
+        return
+      }
+    }
+
     setSaving(true)
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -93,7 +102,7 @@ export default function ProfilScreen() {
     // Save based on active mode
     if (activeMode === 'personal') {
       updateData.nickname = nickname
-      updateData.monthly_income = parseFloat(income.replace(/\./g, '')) || 0
+      updateData.monthly_income = parseFloat(income.replace(/\./g, ''))
     } else {
       updateData.business_name = businessName
     }
@@ -132,15 +141,21 @@ export default function ProfilScreen() {
   }
 
   const handlePpnRateChange = async (value: string) => {
-    setPpnRate(value)
     const rateNum = parseFloat(value) || 11
+
+    // Validate before updating state
     if (rateNum > 0 && rateNum <= 100) {
+      setPpnRate(value)
       const { data: { user } } = await supabase.auth.getUser()
       await supabase.from('user_preferences').upsert({
         user_id: user?.id,
         ppn_rate: rateNum,
         updated_at: new Date().toISOString(),
       })
+    } else {
+      // Revert to previous valid value
+      Alert.alert('Error', 'PPN harus antara 0-100%')
+      setPpnRate(prefs?.ppn_rate?.toString() || '11')
     }
   }
 

@@ -64,22 +64,27 @@ export default function RootLayout() {
 
       setSession(session)
 
-      // Ignore events if already handling or haven't done initial nav
-      if (isHandlingAuthRef.current || !hasNavigatedRef.current) {
+      // Haven't done initial nav yet - skip event handling
+      if (!hasNavigatedRef.current) {
         return
       }
 
       // Handle SIGNED_OUT
       if (event === 'SIGNED_OUT') {
+        // Don't block logout with isHandlingAuthRef
         console.log('🔴 SIGNED_OUT')
-        isHandlingAuthRef.current = true
         router.replace('/(auth)/login')
-        setTimeout(() => { isHandlingAuthRef.current = false }, 1000)
         return
       }
 
-      // Handle SIGNED_IN - only once
+      // Handle SIGNED_IN - with per-event debounce
       if (event === 'SIGNED_IN' && session) {
+        // Only block if ALREADY handling THIS SPECIFIC signed-in event
+        if (isHandlingAuthRef.current) {
+          console.log('⚠️ SIGNED_IN already being handled, skipping duplicate')
+          return
+        }
+
         isHandlingAuthRef.current = true
         console.log('🔵 SIGNED_IN, checking preferences...')
 
@@ -104,7 +109,8 @@ export default function RootLayout() {
           console.error('❌ Catch:', err.message)
           router.replace('/onboarding')
         } finally {
-          setTimeout(() => { isHandlingAuthRef.current = false }, 1000)
+          // Shorter timeout - 500ms is enough to prevent duplicates
+          setTimeout(() => { isHandlingAuthRef.current = false }, 500)
         }
       }
     })
