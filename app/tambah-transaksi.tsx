@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  ScrollView, KeyboardAvoidingView, Platform
+  ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 
@@ -110,7 +110,17 @@ const dpStyles = StyleSheet.create({
   cellTextToday: { color: PRIMARY, fontWeight: '600' },
 })
 
+type Project = {
+  id: string
+  name: string
+  client_name: string | null
+}
+
 export default function TambahTransaksiScreen() {
+  const params = useLocalSearchParams()
+  const projectIdParam = params.project_id as string | undefined
+  const modeParam = params.mode as string | undefined
+
   const [type, setType] = useState<TxType>('expense')
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
@@ -121,27 +131,69 @@ export default function TambahTransaksiScreen() {
   const [toWallet, setToWallet] = useState<string>('')
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<string>('')
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
 
   useEffect(() => {
     fetchWallets()
+    fetchProjects()
   }, [])
+
+  // Auto-select project from query param
+  useEffect(() => {
+    if (projectIdParam && projects.length > 0) {
+      setSelectedProject(projectIdParam)
+    }
+  }, [projectIdParam, projects])
+
+  // Auto-select business wallet if mode=business
+  useEffect(() => {
+    if (modeParam === 'business' && wallets.length > 0) {
+      const businessWallet = wallets.find(w => w.wallet_function === 'business')
+      if (businessWallet) {
+        setSelectedWallet(businessWallet.id)
+      }
+    }
+  }, [modeParam, wallets])
 
   // Reset category when type changes (income vs expense have different categories)
   useEffect(() => {
     setCategory('')
   }, [type])
 
+  // Reset project when switching wallet (in case new wallet is not business)
+  useEffect(() => {
+    const wallet = wallets.find(w => w.id === selectedWallet)
+    if (wallet?.wallet_function !== 'business') {
+      setSelectedProject('')
+    }
+  }, [selectedWallet])
+
   const fetchWallets = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     const { data } = await supabase
       .from('user_wallets')
-      .select('id, wallet_name, icon, color, current_balance')
+      .select('id, wallet_name, wallet_function, icon, color, current_balance')
       .eq('user_id', user?.id)
       .eq('is_active', true)
     if (data && data.length > 0) {
       setWallets(data)
       setSelectedWallet(data[0].id)
       setToWallet(data.length > 1 ? data[1].id : data[0].id)
+    }
+  }
+
+  const fetchProjects = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('projects')
+      .select('id, name, client_name')
+      .eq('user_id', user?.id)
+      .eq('status', 'aktif')
+      .order('created_at', { ascending: false })
+    if (data) {
+      setProjects(data)
     }
   }
 
@@ -259,6 +311,7 @@ export default function TambahTransaksiScreen() {
         wallet_source: selectedWallet,
         wallet_id: selectedWallet,
         wallet_function: wallet?.wallet_function || 'personal',
+        project_id: selectedProject || null,
         date: selectedDate,
       })
 
@@ -447,6 +500,32 @@ export default function TambahTransaksiScreen() {
           </>
         )}
 
+        {/* Project (hanya untuk business wallet) */}
+        {type !== 'transfer' && wallets.find(w => w.id === selectedWallet)?.wallet_function === 'business' && projects.length > 0 && (
+          <>
+            <Text style={styles.label}>Project (opsional)</Text>
+            <TouchableOpacity
+              style={styles.projectPicker}
+              onPress={() => setShowProjectPicker(true)}
+            >
+              <Text style={styles.projectPickerText}>
+                {selectedProject
+                  ? projects.find(p => p.id === selectedProject)?.name || 'Pilih Project'
+                  : 'Pilih Project (Opsional)'}
+              </Text>
+              <Text style={styles.projectPickerArrow}>›</Text>
+            </TouchableOpacity>
+            {selectedProject && (
+              <TouchableOpacity
+                style={styles.clearProjectBtn}
+                onPress={() => setSelectedProject('')}
+              >
+                <Text style={styles.clearProjectText}>✕ Hapus Project</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
         {/* Note */}
         <Text style={styles.label}>Catatan (opsional)</Text>
         <TextInput
@@ -473,6 +552,42 @@ export default function TambahTransaksiScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      {/* Project Picker Modal */}
+      <Modal visible={showProjectPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Project</Text>
+              <TouchableOpacity onPress={() => setShowProjectPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {projects.map((project) => (
+                <TouchableOpacity
+                  key={project.id}
+                  style={styles.projectOption}
+                  onPress={() => {
+                    setSelectedProject(project.id)
+                    setShowProjectPicker(false)
+                  }}
+                >
+                  <View>
+                    <Text style={styles.projectOptionName}>{project.name}</Text>
+                    {project.client_name && (
+                      <Text style={styles.projectOptionClient}>{project.client_name}</Text>
+                    )}
+                  </View>
+                  {selectedProject === project.id && (
+                    <Text style={styles.projectOptionCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -543,4 +658,37 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#BA7517', marginBottom: 16,
   },
   transferWarningText: { fontSize: 13, color: '#BA7517', lineHeight: 20 },
+  projectPicker: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 8, borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  projectPickerText: { fontSize: 14, color: '#fff' },
+  projectPickerArrow: { fontSize: 18, color: '#888780' },
+  clearProjectBtn: {
+    alignSelf: 'flex-start', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8, backgroundColor: '#2A1A1A', borderWidth: 0.5, borderColor: '#E24B4A30',
+  },
+  clearProjectText: { fontSize: 12, color: '#E24B4A' },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#1A1A1A', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    paddingBottom: 40,
+  },
+  modalHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+  },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  modalClose: { fontSize: 24, color: '#888780' },
+  projectOption: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+  },
+  projectOptionName: { fontSize: 15, fontWeight: '600', color: '#fff' },
+  projectOptionClient: { fontSize: 12, color: '#888780', marginTop: 2 },
+  projectOptionCheck: { fontSize: 20, color: PRIMARY },
 })
