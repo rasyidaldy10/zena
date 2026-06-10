@@ -1,35 +1,31 @@
 import { createClient } from '@supabase/supabase-js'
 import { Platform } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 
-// Custom storage for web to use localStorage
-const customStorage = Platform.OS === 'web' ? {
-  getItem: (key: string) => {
-    if (typeof window !== 'undefined') {
-      return window.localStorage.getItem(key)
+// Storage: localStorage di web, AsyncStorage di native (iOS/Android)
+// Ini bikin session persistent — gak logout/onboarding ulang saat app ditutup
+const storage = Platform.OS === 'web'
+  ? {
+      getItem: (key: string) =>
+        typeof window !== 'undefined' ? window.localStorage.getItem(key) : null,
+      setItem: (key: string, value: string) => {
+        if (typeof window !== 'undefined') window.localStorage.setItem(key, value)
+      },
+      removeItem: (key: string) => {
+        if (typeof window !== 'undefined') window.localStorage.removeItem(key)
+      },
     }
-    return null
-  },
-  setItem: (key: string, value: string) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(key, value)
-    }
-  },
-  removeItem: (key: string) => {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem(key)
-    }
-  },
-} : undefined
+  : AsyncStorage
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: Platform.OS === 'web',
-    storage: customStorage,
+    detectSessionInUrl: false,
+    storage,
     storageKey: 'zena-auth',
   },
 })

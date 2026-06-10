@@ -23,7 +23,6 @@ export default function ProfilScreen() {
   const [score, setScore] = useState(0)
   const [tier, setTier] = useState('Starter')
   const [wallets, setWallets] = useState<UserWallet[]>([])
-  const [gmailConnected, setGmailConnected] = useState(false)
   const [tapCount, setTapCount] = useState(0)
   const [lastTapTime, setLastTapTime] = useState(0)
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
@@ -69,12 +68,6 @@ export default function ProfilScreen() {
       .eq('is_active', true)
       .order('created_at', { ascending: true })
     if (walletsData) setWallets(walletsData)
-
-    // Check Gmail connection (provider_refresh_token = Gmail scope granted)
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.provider_refresh_token) {
-      setGmailConnected(true)
-    }
 
     setLoading(false)
   }
@@ -159,53 +152,6 @@ export default function ProfilScreen() {
     }
   }
 
-  const handleConnectGmail = async () => {
-    try {
-      if (Platform.OS === 'web') {
-        const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: window.location.origin + '/(tabs)/profil',
-            scopes: 'openid email profile https://www.googleapis.com/auth/gmail.readonly',
-            skipBrowserRedirect: false,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent', // Force consent screen untuk Gmail scope
-            },
-          },
-        })
-        if (error) throw error
-        // Akan redirect ke Google consent screen
-      } else {
-        Alert.alert('Info', 'Fitur Gmail auto-import hanya tersedia di web/PWA untuk saat ini.')
-      }
-    } catch (error: any) {
-      Alert.alert('Gagal', error.message || 'Tidak bisa connect ke Gmail')
-    }
-  }
-
-  const handleDisconnectGmail = () => {
-    Alert.alert(
-      'Putuskan Koneksi Gmail?',
-      'Transaksi tidak akan auto-import lagi. Kamu bisa hubungkan ulang kapan saja.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Putuskan',
-          style: 'destructive',
-          onPress: async () => {
-            // Hapus semua mapping
-            const { data: { session } } = await supabase.auth.getSession()
-            if (session) {
-              await supabase.from('gmail_wallet_mappings').delete().eq('user_id', session.user.id)
-              setGmailConnected(false)
-              Alert.alert('Berhasil', 'Koneksi Gmail diputus. Hubungkan lagi kapan saja dari Profil.')
-            }
-          },
-        },
-      ]
-    )
-  }
 
   const handleLogout = () => {
     console.log('🔵 Logout button pressed')
@@ -292,29 +238,6 @@ export default function ProfilScreen() {
           <Text style={styles.zenaBannerArrow}>→</Text>
         </View>
       </TouchableOpacity>
-
-      {/* Gmail Auto-Import Banner */}
-      <View style={[styles.gmailBanner, gmailConnected && styles.gmailBannerConnected]}>
-        <Text style={styles.gmailIcon}>📧</Text>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={styles.gmailTitle}>Gmail Auto-Import</Text>
-            {gmailConnected && <View style={styles.connectedDot} />}
-          </View>
-          <Text style={[styles.gmailSub, gmailConnected && { color: '#1D9E75' }]}>
-            {gmailConnected ? '✓ Terhubung' : 'Auto-catat transaksi dari email bank'}
-          </Text>
-        </View>
-        {gmailConnected ? (
-          <TouchableOpacity onPress={handleDisconnectGmail} style={styles.disconnectBtn}>
-            <Text style={styles.disconnectText}>Putus</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity onPress={handleConnectGmail} style={styles.connectBtn}>
-            <Text style={styles.connectText}>Hubungkan</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
       {/* Tier Card */}
       <View style={[styles.tierCard, { borderTopColor: tierConfig?.color || PRIMARY }]}>
@@ -594,21 +517,6 @@ const styles = StyleSheet.create({
   zenaBannerRight: { alignItems: 'flex-end' },
   zenaBannerAgents: { fontSize: 12, color: '#1D9E75', fontWeight: '600', marginBottom: 4 },
   zenaBannerArrow: { fontSize: 18, color: PRIMARY },
-  gmailBanner: {
-    marginHorizontal: 20, marginBottom: 16, backgroundColor: '#1A1A1A',
-    borderRadius: 12, padding: 14, flexDirection: 'row', alignItems: 'center',
-    gap: 12, borderWidth: 0.5, borderColor: '#2A2A2A',
-  },
-  gmailIcon: { fontSize: 28 },
-  gmailTitle: { fontSize: 14, fontWeight: '600', color: '#fff', marginBottom: 2 },
-  gmailSub: { fontSize: 11, color: '#888780' },
-  gmailArrow: { fontSize: 16, color: '#888780' },
-  gmailBannerConnected: { borderColor: '#1D9E75', backgroundColor: '#0A1A14' },
-  connectedDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1D9E75' },
-  connectBtn: { paddingHorizontal: 14, paddingVertical: 8, backgroundColor: PRIMARY, borderRadius: 8 },
-  connectText: { fontSize: 12, color: '#fff', fontWeight: '700' },
-  disconnectBtn: { paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#2A1A1A', borderRadius: 8 },
-  disconnectText: { fontSize: 12, color: '#E24B4A', fontWeight: '600' },
   logoutBtn: {
     marginHorizontal: 20,
     marginTop: 32,

@@ -239,6 +239,15 @@ export default function BusinessInventoryScreen() {
         />
       )}
 
+      {/* Floating Action Button - always visible */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.fabText}>+</Text>
+      </TouchableOpacity>
+
       {/* Add Product Modal */}
       <ModalTambahProduk
         visible={showAddModal}
@@ -259,6 +268,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: COLORS.PRIMARY,
     marginRight: 16,
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: COLORS.PRIMARY,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 999,
+  },
+  fabText: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '600',
   },
   summaryCard: {
     backgroundColor: COLORS.CARD,

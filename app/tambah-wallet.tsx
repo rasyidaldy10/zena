@@ -23,8 +23,6 @@ export default function TambahWalletScreen() {
   const [selectedColor, setSelectedColor] = useState('#185FA5')
   const [selectedIcon, setSelectedIcon] = useState('💵')
   const [initialBalance, setInitialBalance] = useState('')
-  const [bankName, setBankName] = useState('')
-  const [last4Digits, setLast4Digits] = useState('')
   const [loading, setLoading] = useState(false)
   const [showBankConnect, setShowBankConnect] = useState(false)
   const [userId, setUserId] = useState('')
@@ -98,8 +96,6 @@ export default function TambahWalletScreen() {
       color: selectedColor,
       icon: selectedIcon,
       current_balance: balance,
-      bank_name: bankName.trim() || null,
-      last_4_digits: last4Digits.trim() || null,
       is_active: true,
     })
 
@@ -109,10 +105,11 @@ export default function TambahWalletScreen() {
       return
     }
 
-    Alert.alert('Berhasil! 🎉', 'Dompet baru berhasil ditambahkan', [
-      { text: 'OK', onPress: () => router.back() },
-    ])
     setLoading(false)
+    router.replace('/(tabs)/profil')
+    setTimeout(() => {
+      Alert.alert('Berhasil! 🎉', 'Dompet baru berhasil ditambahkan')
+    }, 300)
   }
 
   const previewBalance = parseFloat(initialBalance.replace(/\./g, '')) || 0
@@ -255,34 +252,6 @@ export default function TambahWalletScreen() {
             value={initialBalance}
             onChangeText={formatBalance}
             keyboardType="numeric"
-          />
-        </View>
-
-        {/* Bank Info (Optional - untuk Gmail auto-import) */}
-        <View style={styles.bankInfoCard}>
-          <Text style={styles.bankInfoTitle}>📧 Gmail Auto-Import (Opsional)</Text>
-          <Text style={styles.bankInfoDesc}>
-            Isi data bank jika ingin transaksi dari email bank otomatis masuk ke dompet ini
-          </Text>
-
-          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>Nama Bank</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Contoh: BCA, Mandiri, BRI"
-            placeholderTextColor="#444"
-            value={bankName}
-            onChangeText={setBankName}
-          />
-
-          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>4 Digit Terakhir Rekening</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Contoh: 1234"
-            placeholderTextColor="#444"
-            value={last4Digits}
-            onChangeText={(text) => setLast4Digits(text.replace(/\D/g, '').slice(0, 4))}
-            keyboardType="numeric"
-            maxLength={4}
           />
         </View>
 

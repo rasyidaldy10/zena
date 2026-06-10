@@ -291,9 +291,10 @@ export default function TambahTransaksiScreen() {
       await supabase.from('user_wallets').update({ current_balance: toWalletData.current_balance + nominal }).eq('id', toWallet)
 
       setLoading(false)
-      Alert.alert('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`, [
-        { text: 'OK', onPress: () => router.back() }
-      ])
+      router.replace('/(tabs)')
+      setTimeout(() => {
+        Alert.alert('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`)
+      }, 300)
       return
     } else {
       // Get wallet to determine wallet_function
@@ -338,7 +339,7 @@ export default function TambahTransaksiScreen() {
       setLoading(false)
 
       // Auto redirect tanpa tunggu OK (prevent double submission)
-      router.back()
+      router.replace('/(tabs)')
 
       // Show success toast di home (jangan blocking)
       setTimeout(() => {

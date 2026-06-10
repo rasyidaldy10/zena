@@ -192,9 +192,8 @@ export default function BusinessProjectDetailScreen() {
 
               if (error) throw error
 
-              Alert.alert('Berhasil', 'Project ditandai selesai', [
-                { text: 'OK', onPress: () => router.back() },
-              ])
+              router.replace('/business-projects')
+              setTimeout(() => Alert.alert('Berhasil', 'Project ditandai selesai'), 300)
             } catch (error: any) {
               Alert.alert('Error', error.message || 'Gagal menandai selesai')
             }

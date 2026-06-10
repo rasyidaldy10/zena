@@ -20,8 +20,6 @@ export default function EditWalletScreen() {
   const [balance, setBalance] = useState('')
   const [icon, setIcon] = useState('💵')
   const [color, setColor] = useState(PRIMARY)
-  const [bankName, setBankName] = useState('')
-  const [last4Digits, setLast4Digits] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
@@ -46,8 +44,6 @@ export default function EditWalletScreen() {
       setBalance(data.current_balance.toString())
       setIcon(data.icon || '💵')
       setColor(data.color || PRIMARY)
-      setBankName(data.bank_name || '')
-      setLast4Digits(data.last_4_digits || '')
     }
     setLoading(false)
   }
@@ -73,8 +69,6 @@ export default function EditWalletScreen() {
         current_balance: parseFloat(balance.replace(/\./g, '')) || 0,
         icon,
         color,
-        bank_name: bankName.trim() || null,
-        last_4_digits: last4Digits.trim() || null,
       })
       .eq('id', walletId)
       .eq('user_id', session.user.id)
@@ -112,7 +106,7 @@ export default function EditWalletScreen() {
     if (error) {
       Alert.alert('Error', 'Gagal menghapus dompet')
     } else {
-      router.back()
+      router.replace('/(tabs)/profil')
     }
   }
 
@@ -221,34 +215,6 @@ export default function EditWalletScreen() {
               />
             ))}
           </View>
-        </View>
-
-        {/* Bank Info */}
-        <View style={styles.bankInfoCard}>
-          <Text style={styles.bankInfoTitle}>📧 Gmail Auto-Import</Text>
-          <Text style={styles.bankInfoDesc}>
-            Isi data bank agar transaksi dari email bank otomatis masuk ke dompet ini
-          </Text>
-
-          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>Nama Bank</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Contoh: BCA, Mandiri, BRI"
-            placeholderTextColor="#555"
-            value={bankName}
-            onChangeText={setBankName}
-          />
-
-          <Text style={[styles.label, { marginTop: 12, marginBottom: 8 }]}>4 Digit Terakhir Rekening</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Contoh: 1234"
-            placeholderTextColor="#555"
-            value={last4Digits}
-            onChangeText={(text) => setLast4Digits(text.replace(/\D/g, '').slice(0, 4))}
-            keyboardType="numeric"
-            maxLength={4}
-          />
         </View>
 
         {/* Delete Button */}
