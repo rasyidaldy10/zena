@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { Platform, ActivityIndicator, View } from 'react-native'
+import { ActivityIndicator, View } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
@@ -8,114 +8,78 @@ import { ErrorBoundary } from '../lib/ErrorBoundary'
 export default function RootLayout() {
   const [session, setSession] = useState<Session | null>(null)
   const [initializing, setInitializing] = useState(true)
-  const hasNavigatedRef = useRef(false)
-  const isHandlingAuthRef = useRef(false)
+  // Track user id yang SUDAH di-route. Mencegah navigasi ulang saat
+  // tab di-refocus (Supabase fire SIGNED_IN lagi pas session recovery).
+  const routedUserRef = useRef<string | null>(null)
+
+  // Tentukan tujuan berdasarkan session + status onboarding
+  const routeForSession = async (s: Session | null) => {
+    if (!s) {
+      routedUserRef.current = null
+      router.replace('/(auth)/login')
+      return
+    }
+    try {
+      const { data } = await supabase
+        .from('user_preferences')
+        .select('id')
+        .eq('user_id', s.user.id)
+        .maybeSingle()
+      router.replace(data ? '/(tabs)' : '/onboarding')
+    } catch (err) {
+      // Error baca prefs → anggap user baru, arahkan ke onboarding
+      router.replace('/onboarding')
+    }
+  }
 
   useEffect(() => {
-    // Initial check with routing
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session)
-
-      // Route based on session - only on first load
-      if (!hasNavigatedRef.current) {
-        try {
-          if (session) {
-            // Check onboarding status
-            const { data, error } = await supabase
-              .from('user_preferences')
-              .select('id')
-              .eq('user_id', session.user.id)
-              .maybeSingle()
-
-            if (error) {
-              console.error('Error fetching user_preferences:', error)
-              // If DB error, go to login
-              router.replace('/(auth)/login')
-            } else if (data) {
-              router.replace('/(tabs)')
-            } else {
-              router.replace('/onboarding')
-            }
-          } else {
-            router.replace('/(auth)/login')
-          }
-        } catch (error) {
-          console.error('Routing error:', error)
-          // Fallback to login on any error
-          router.replace('/(auth)/login')
-        }
-        hasNavigatedRef.current = true
+    // Safety: kalau INITIAL_SESSION tak kunjung datang dalam 3s, route manual
+    const fallback = setTimeout(async () => {
+      if (initializing) {
+        const { data: { session: s } } = await supabase.auth.getSession()
+        routedUserRef.current = s?.user?.id ?? null
+        await routeForSession(s)
+        setInitializing(false)
       }
+    }, 3000)
 
-      setInitializing(false)
-    }).catch((error) => {
-      console.error('Auth session error:', error)
-      setInitializing(false)
-      router.replace('/(auth)/login')
-    })
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+      setSession(newSession)
 
-    // Listen to auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      // Suppress noisy events
-      const silentEvents = ['TOKEN_REFRESHED', 'INITIAL_SESSION', 'USER_UPDATED']
-      if (!silentEvents.includes(event)) {
-        console.log('🔔 Auth event:', event)
-      }
-
-      setSession(session)
-
-      // Haven't done initial nav yet - skip event handling
-      if (!hasNavigatedRef.current) {
+      // INITIAL_SESSION: dipanggil sekali saat app start (sumber routing awal)
+      if (event === 'INITIAL_SESSION') {
+        clearTimeout(fallback)
+        routedUserRef.current = newSession?.user?.id ?? null
+        await routeForSession(newSession)
+        setInitializing(false)
         return
       }
 
-      // Handle SIGNED_OUT
+      // SIGNED_IN: navigasi HANYA kalau ini login user baru (bukan refocus
+      // recovery untuk user yang sudah di-route).
+      if (event === 'SIGNED_IN' && newSession) {
+        if (routedUserRef.current === newSession.user.id) {
+          return // session recovery / refocus — jangan navigasi
+        }
+        routedUserRef.current = newSession.user.id
+        await routeForSession(newSession)
+        return
+      }
+
+      // SIGNED_OUT: balik ke login
       if (event === 'SIGNED_OUT') {
-        // Don't block logout with isHandlingAuthRef
-        console.log('🔴 SIGNED_OUT')
+        routedUserRef.current = null
         router.replace('/(auth)/login')
         return
       }
 
-      // Handle SIGNED_IN - with per-event debounce
-      if (event === 'SIGNED_IN' && session) {
-        // Only block if ALREADY handling THIS SPECIFIC signed-in event
-        if (isHandlingAuthRef.current) {
-          console.log('⚠️ SIGNED_IN already being handled, skipping duplicate')
-          return
-        }
-
-        isHandlingAuthRef.current = true
-        console.log('🔵 SIGNED_IN, checking preferences...')
-
-        try {
-          const { data, error } = await supabase
-            .from('user_preferences')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle()
-
-          if (error) {
-            console.error('❌ Prefs error:', error.message)
-            router.replace('/onboarding')
-          } else if (data) {
-            console.log('✅ Has prefs → dashboard')
-            router.replace('/(tabs)')
-          } else {
-            console.log('✅ New user → onboarding')
-            router.replace('/onboarding')
-          }
-        } catch (err: any) {
-          console.error('❌ Catch:', err.message)
-          router.replace('/onboarding')
-        } finally {
-          // Shorter timeout - 500ms is enough to prevent duplicates
-          setTimeout(() => { isHandlingAuthRef.current = false }, 500)
-        }
-      }
+      // TOKEN_REFRESHED & USER_UPDATED: tidak perlu navigasi apa-apa
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      clearTimeout(fallback)
+      subscription.unsubscribe()
+    }
   }, [])
 
   // Show loader only during first initialization
