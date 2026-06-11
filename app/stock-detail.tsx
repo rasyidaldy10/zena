@@ -16,6 +16,7 @@ import { COLORS } from '../constants/theme'
 import { formatRupiah, formatDateTime } from '../lib/format'
 import ModalStockIn from '../components/ModalStockIn'
 import ModalStockAdjust from '../components/ModalStockAdjust'
+import ModalTambahProduk from '../components/ModalTambahProduk'
 
 export default function StockDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -25,6 +26,7 @@ export default function StockDetailScreen() {
   const [refreshing, setRefreshing] = useState(false)
   const [showStockInModal, setShowStockInModal] = useState(false)
   const [showAdjustModal, setShowAdjustModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -71,14 +73,9 @@ export default function StockDetailScreen() {
     fetchStockDetail()
   }
 
-  async function handleEditProduct() {
+  function handleEditProduct() {
     if (!product) return
-
-    Alert.alert(
-      'Edit Produk',
-      'Fitur edit produk akan segera tersedia',
-      [{ text: 'OK' }]
-    )
+    setShowEditModal(true)
   }
 
   function renderMovementItem({ item }: { item: StockMovement }) {
@@ -299,6 +296,13 @@ export default function StockDetailScreen() {
       <ModalStockAdjust
         visible={showAdjustModal}
         onClose={() => setShowAdjustModal(false)}
+        onSuccess={fetchStockDetail}
+        product={product}
+      />
+
+      <ModalTambahProduk
+        visible={showEditModal}
+        onClose={() => setShowEditModal(false)}
         onSuccess={fetchStockDetail}
         product={product}
       />

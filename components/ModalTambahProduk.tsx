@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -14,14 +14,17 @@ import { supabase } from '../lib/supabase'
 import { notify } from '../lib/alert'
 import { COLORS } from '../constants/theme'
 import { PRODUCT_UNITS } from '../constants/business'
+import { Product } from '../types'
 
 interface Props {
   visible: boolean
   onClose: () => void
   onSuccess: () => void
+  product?: Product | null // kalau diisi → mode edit
 }
 
-export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props) {
+export default function ModalTambahProduk({ visible, onClose, onSuccess, product }: Props) {
+  const isEdit = !!product
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [unit, setUnit] = useState('pcs')
@@ -30,6 +33,18 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
   const [initialStock, setInitialStock] = useState('')
   const [minAlert, setMinAlert] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Prefill saat mode edit / modal dibuka
+  useEffect(() => {
+    if (visible && product) {
+      setName(product.name || '')
+      setCategory(product.category || '')
+      setUnit(product.unit || 'pcs')
+      setBuyPrice(product.buy_price ? product.buy_price.toLocaleString('id-ID') : '')
+      setSellPrice(product.sell_price ? product.sell_price.toLocaleString('id-ID') : '')
+      setMinAlert(product.stock_min_alert ? String(product.stock_min_alert) : '')
+    }
+  }, [visible, product])
 
   async function handleSave() {
     if (!name.trim()) {
@@ -53,46 +68,68 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) throw new Error('Not authenticated')
 
-      // Insert product
-      const { data: product, error: productError } = await supabase
-        .from('products')
-        .insert({
-          user_id: session.user.id,
-          name: name.trim(),
-          category: category.trim() || null,
-          unit,
-          buy_price: buyPriceNum,
-          sell_price: sellPriceNum,
-          stock_qty: initialStockNum,
-          stock_min_alert: minAlertNum,
-          is_active: true,
-        })
-        .select()
-        .single()
+      if (isEdit && product) {
+        // MODE EDIT — update field produk (stok TIDAK diubah di sini,
+        // stok dikelola lewat Stok Masuk / Adjustment)
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            name: name.trim(),
+            category: category.trim() || null,
+            unit,
+            buy_price: buyPriceNum,
+            sell_price: sellPriceNum,
+            stock_min_alert: minAlertNum,
+          })
+          .eq('id', product.id)
 
-      if (productError) throw productError
+        if (updateError) throw updateError
 
-      // If initial stock > 0, create stock movement
-      if (initialStockNum > 0) {
-        const { error: movementError } = await supabase.from('stock_movements').insert({
-          user_id: session.user.id,
-          product_id: product.id,
-          type: 'in',
-          qty: initialStockNum,
-          price_per_unit: buyPriceNum,
-          note: 'Stok awal saat produk dibuat',
-        })
+        onSuccess()
+        onClose()
+        notify('Berhasil', 'Produk berhasil diperbarui')
+      } else {
+        // MODE TAMBAH — insert produk baru
+        const { data: newProduct, error: productError } = await supabase
+          .from('products')
+          .insert({
+            user_id: session.user.id,
+            name: name.trim(),
+            category: category.trim() || null,
+            unit,
+            buy_price: buyPriceNum,
+            sell_price: sellPriceNum,
+            stock_qty: initialStockNum,
+            stock_min_alert: minAlertNum,
+            is_active: true,
+          })
+          .select()
+          .single()
 
-        if (movementError) console.error('Error creating initial stock movement:', movementError)
+        if (productError) throw productError
+
+        // If initial stock > 0, create stock movement
+        if (initialStockNum > 0) {
+          const { error: movementError } = await supabase.from('stock_movements').insert({
+            user_id: session.user.id,
+            product_id: newProduct.id,
+            type: 'in',
+            qty: initialStockNum,
+            price_per_unit: buyPriceNum,
+            note: 'Stok awal saat produk dibuat',
+          })
+
+          if (movementError) console.error('Error creating initial stock movement:', movementError)
+        }
+
+        resetForm()
+        onSuccess()
+        onClose()
+        notify('Berhasil', 'Produk berhasil ditambahkan')
       }
-
-      resetForm()
-      onSuccess()
-      onClose()
-      notify('Berhasil', 'Produk berhasil ditambahkan')
     } catch (error: any) {
-      console.error('Error creating product:', error)
-      notify('Error', error.message || 'Gagal menambahkan produk')
+      console.error('Error saving product:', error)
+      notify('Error', error.message || 'Gagal menyimpan produk')
     } finally {
       setLoading(false)
     }
@@ -119,7 +156,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <View style={styles.header}>
-            <Text style={styles.title}>Tambah Produk</Text>
+            <Text style={styles.title}>{isEdit ? 'Edit Produk' : 'Tambah Produk'}</Text>
             <TouchableOpacity onPress={onClose} disabled={loading}>
               <Text style={styles.closeButton}>✕</Text>
             </TouchableOpacity>
@@ -215,19 +252,21 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
               </View>
             </View>
 
-            {/* Initial Stock */}
-            <View style={styles.field}>
-              <Text style={styles.label}>Stok Awal</Text>
-              <TextInput
-                style={styles.input}
-                value={initialStock}
-                onChangeText={setInitialStock}
-                placeholder="0"
-                placeholderTextColor={COLORS.TEXT_LIGHT}
-                keyboardType="numeric"
-                editable={!loading}
-              />
-            </View>
+            {/* Initial Stock — hanya saat tambah (edit: stok via Stok Masuk/Adjustment) */}
+            {!isEdit && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Stok Awal</Text>
+                <TextInput
+                  style={styles.input}
+                  value={initialStock}
+                  onChangeText={setInitialStock}
+                  placeholder="0"
+                  placeholderTextColor={COLORS.TEXT_LIGHT}
+                  keyboardType="numeric"
+                  editable={!loading}
+                />
+              </View>
+            )}
 
             {/* Min Alert */}
             <View style={styles.field}>
@@ -264,7 +303,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
               {loading ? (
                 <ActivityIndicator color={COLORS.WHITE} />
               ) : (
-                <Text style={styles.buttonSaveText}>Simpan</Text>
+                <Text style={styles.buttonSaveText}>{isEdit ? 'Simpan Perubahan' : 'Simpan'}</Text>
               )}
             </TouchableOpacity>
           </View>
