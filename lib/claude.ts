@@ -28,8 +28,9 @@ export const claudeChat = async (
       max_tokens: maxTokens,
       system: systemPrompt,
       messages,
-      // SPEED: Enable prompt caching (5-min TTL)
-      anthropic_version: '2023-06-01',
+      // CATATAN: anthropic_version DIHAPUS dari body — itu header, bukan field
+      // body. Kalau dikirim di body, Anthropic nolak 400 "Extra inputs not
+      // permitted" -> AI selalu gagal. Edge function sudah set header-nya.
     }),
   })
 
