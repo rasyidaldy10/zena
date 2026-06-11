@@ -38,36 +38,57 @@ export default function RootLayout() {
   }
 
   useEffect(() => {
-    // Safety: kalau INITIAL_SESSION tak kunjung datang dalam 3s, route manual
-    const fallback = setTimeout(async () => {
-      if (initializing) {
+    let done = false
+    const finishInit = () => {
+      if (!done) {
+        done = true
+        setInitializing(false)
+      }
+    }
+
+    // Hard safety net: kalau INITIAL_SESSION tak kunjung datang dalam 4s,
+    // route manual via getSession (di luar callback = aman, tak deadlock).
+    const hardStop = setTimeout(async () => {
+      if (done) return
+      try {
         const { data: { session: s } } = await supabase.auth.getSession()
         routedUserRef.current = s?.user?.id ?? null
         await routeForSession(s)
-        setInitializing(false)
+      } catch {
+        router.replace('/(auth)/login')
+      } finally {
+        finishInit()
       }
-    }, 3000)
+    }, 4000)
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    // PENTING: jangan await query Supabase LANGSUNG di dalam callback
+    // onAuthStateChange — bisa deadlock (auth client lagi megang lock).
+    // Defer pakai setTimeout(0) supaya query jalan di luar lock.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
       setSession(newSession)
 
-      // INITIAL_SESSION: dipanggil sekali saat app start (sumber routing awal)
+      // INITIAL_SESSION: routing awal saat app start
       if (event === 'INITIAL_SESSION') {
-        clearTimeout(fallback)
         routedUserRef.current = newSession?.user?.id ?? null
-        await routeForSession(newSession)
-        setInitializing(false)
+        setTimeout(async () => {
+          try {
+            await routeForSession(newSession)
+          } catch {
+            router.replace(newSession ? '/(tabs)' : '/(auth)/login')
+          } finally {
+            finishInit()
+          }
+        }, 0)
         return
       }
 
-      // SIGNED_IN: navigasi HANYA kalau ini login user baru (bukan refocus
-      // recovery untuk user yang sudah di-route).
+      // SIGNED_IN: navigasi HANYA kalau login user baru (bukan refocus recovery)
       if (event === 'SIGNED_IN' && newSession) {
-        if (routedUserRef.current === newSession.user.id) {
-          return // session recovery / refocus — jangan navigasi
-        }
+        if (routedUserRef.current === newSession.user.id) return
         routedUserRef.current = newSession.user.id
-        await routeForSession(newSession)
+        setTimeout(() => {
+          routeForSession(newSession).catch(() => router.replace('/(tabs)'))
+        }, 0)
         return
       }
 
@@ -82,7 +103,7 @@ export default function RootLayout() {
     })
 
     return () => {
-      clearTimeout(fallback)
+      clearTimeout(hardStop)
       subscription.unsubscribe()
     }
   }, [])
