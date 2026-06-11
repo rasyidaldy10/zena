@@ -117,6 +117,17 @@ type Project = {
   client_name: string | null
 }
 
+type Product = {
+  id: string
+  name: string
+  unit: string
+  buy_price: number
+  sell_price: number
+  stock_qty: number
+}
+
+type LinkType = 'none' | 'project' | 'product'
+
 export default function TambahTransaksiScreen() {
   const params = useLocalSearchParams()
   const projectIdParam = params.project_id as string | undefined
@@ -135,16 +146,24 @@ export default function TambahTransaksiScreen() {
   const [projects, setProjects] = useState<Project[]>([])
   const [selectedProject, setSelectedProject] = useState<string>('')
   const [showProjectPicker, setShowProjectPicker] = useState(false)
+  // Kaitkan ke: none | project | product
+  const [linkType, setLinkType] = useState<LinkType>('none')
+  const [products, setProducts] = useState<Product[]>([])
+  const [selectedProduct, setSelectedProduct] = useState<string>('')
+  const [productQty, setProductQty] = useState('1')
+  const [showProductPicker, setShowProductPicker] = useState(false)
 
   useEffect(() => {
     fetchWallets()
     fetchProjects()
+    fetchProducts()
   }, [])
 
   // Auto-select project from query param
   useEffect(() => {
     if (projectIdParam && projects.length > 0) {
       setSelectedProject(projectIdParam)
+      setLinkType('project')
     }
   }, [projectIdParam, projects])
 
@@ -190,6 +209,39 @@ export default function TambahTransaksiScreen() {
       setProjects(data)
     }
   }
+
+  const fetchProducts = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data } = await supabase
+      .from('products')
+      .select('id, name, unit, buy_price, sell_price, stock_qty')
+      .eq('user_id', user?.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+    if (data) {
+      setProducts(data)
+    }
+  }
+
+  // Auto-hitung nominal saat jual produk: harga jual × qty
+  useEffect(() => {
+    if (linkType === 'product' && selectedProduct) {
+      const product = products.find(p => p.id === selectedProduct)
+      const qty = parseInt(productQty) || 0
+      if (product) {
+        const total = product.sell_price * qty
+        setAmount(total ? total.toLocaleString('id-ID') : '')
+      }
+    }
+  }, [linkType, selectedProduct, productQty, products])
+
+  // Jual produk = penjualan = income. Reset produk kalau ganti ke expense.
+  useEffect(() => {
+    if (type === 'expense' && linkType === 'product') {
+      setLinkType('none')
+      setSelectedProduct('')
+    }
+  }, [type])
 
   const formatRupiah = (n: number) => 'Rp ' + n.toLocaleString('id-ID')
 
@@ -292,11 +344,26 @@ export default function TambahTransaksiScreen() {
       return
     } else {
       const wallet = wallets.find(w => w.id === selectedWallet)
+      const isProductSale = linkType === 'product' && !!selectedProduct
+      const product = isProductSale ? products.find(p => p.id === selectedProduct) : undefined
+      const qty = parseInt(productQty) || 0
+
+      // Validasi jual produk
+      if (isProductSale) {
+        if (!product || qty <= 0) {
+          notify('Oops', 'Pilih produk dan jumlah yang valid')
+          setLoading(false)
+          return
+        }
+        if (qty > product.stock_qty) {
+          notify('Stok Kurang', `Stok ${product.name} cuma ${product.stock_qty} ${product.unit}`)
+          setLoading(false)
+          return
+        }
+      }
 
       // Catatan: kolom wallet_function ADA di tabel wallets, BUKAN transactions.
-      // Personal/bisnis ditentukan dari wallet yang dipilih, jadi tak perlu
-      // disimpan di transaksi (dulu bikin error "column not found").
-      const { error } = await supabase.from('transactions').insert({
+      const { data: txn, error } = await supabase.from('transactions').insert({
         user_id: user?.id,
         amount: nominal,
         type,
@@ -305,16 +372,42 @@ export default function TambahTransaksiScreen() {
         source: 'manual',
         is_categorized: true,
         is_wallet_transfer: false,
+        has_items: isProductSale,
         wallet_source: selectedWallet,
         wallet_id: selectedWallet,
-        project_id: selectedProject || null,
+        project_id: linkType === 'project' ? (selectedProject || null) : null,
         date: selectedDate,
-      })
+      }).select().single()
 
       if (error) {
         notify('Gagal', error.message)
         setLoading(false)
         return
+      }
+
+      // Jual produk: catat item (HPP), stock movement (out), potong stok
+      if (isProductSale && product && txn) {
+        await supabase.from('transaction_items').insert({
+          transaction_id: txn.id,
+          product_id: product.id,
+          qty,
+          price_per_unit: product.sell_price,
+          subtotal: product.sell_price * qty,
+          hpp_per_unit: product.buy_price,
+          hpp_total: product.buy_price * qty,
+        })
+        await supabase.from('stock_movements').insert({
+          user_id: user?.id,
+          product_id: product.id,
+          transaction_id: txn.id,
+          type: 'out',
+          qty,
+          price_per_unit: product.sell_price,
+          note: `Penjualan - ${product.name}`,
+        })
+        await supabase.from('products')
+          .update({ stock_qty: product.stock_qty - qty })
+          .eq('id', product.id)
       }
 
       if (wallet) {
@@ -496,29 +589,96 @@ export default function TambahTransaksiScreen() {
           </>
         )}
 
-        {/* Kaitkan ke Project (opsional) — tampil kalau ada proyek aktif,
-            untuk wallet personal maupun bisnis. Kalau tak dipilih = transaksi biasa. */}
-        {type !== 'transfer' && projects.length > 0 && (
+        {/* Kaitkan ke (opsional): Tidak ada / Project / Produk.
+            Tampil kalau ada proyek atau produk. Kalau "Tidak ada" = transaksi biasa. */}
+        {type !== 'transfer' && (projects.length > 0 || products.length > 0) && (
           <>
-            <Text style={styles.label}>Kaitkan ke Project (opsional)</Text>
-            <TouchableOpacity
-              style={styles.projectPicker}
-              onPress={() => setShowProjectPicker(true)}
-            >
-              <Text style={styles.projectPickerText}>
-                {selectedProject
-                  ? projects.find(p => p.id === selectedProject)?.name || 'Pilih Project'
-                  : 'Pilih Project (Opsional)'}
-              </Text>
-              <Text style={styles.projectPickerArrow}>›</Text>
-            </TouchableOpacity>
-            {selectedProject && (
+            <Text style={styles.label}>Kaitkan ke (opsional)</Text>
+            <View style={styles.linkTabs}>
               <TouchableOpacity
-                style={styles.clearProjectBtn}
-                onPress={() => setSelectedProject('')}
+                style={[styles.linkTab, linkType === 'none' && styles.linkTabActive]}
+                onPress={() => { setLinkType('none'); setSelectedProject(''); setSelectedProduct('') }}
               >
-                <Text style={styles.clearProjectText}>✕ Hapus Project</Text>
+                <Text style={[styles.linkTabText, linkType === 'none' && styles.linkTabTextActive]}>Tidak ada</Text>
               </TouchableOpacity>
+              {projects.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.linkTab, linkType === 'project' && styles.linkTabActive]}
+                  onPress={() => { setLinkType('project'); setSelectedProduct('') }}
+                >
+                  <Text style={[styles.linkTabText, linkType === 'project' && styles.linkTabTextActive]}>📁 Project</Text>
+                </TouchableOpacity>
+              )}
+              {products.length > 0 && type === 'income' && (
+                <TouchableOpacity
+                  style={[styles.linkTab, linkType === 'product' && styles.linkTabActive]}
+                  onPress={() => { setLinkType('product'); setSelectedProject('') }}
+                >
+                  <Text style={[styles.linkTabText, linkType === 'product' && styles.linkTabTextActive]}>📦 Jual Produk</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Picker Project */}
+            {linkType === 'project' && (
+              <TouchableOpacity style={styles.projectPicker} onPress={() => setShowProjectPicker(true)}>
+                <Text style={styles.projectPickerText}>
+                  {selectedProject
+                    ? projects.find(p => p.id === selectedProject)?.name || 'Pilih Project'
+                    : 'Pilih Project'}
+                </Text>
+                <Text style={styles.projectPickerArrow}>›</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Picker Produk + Qty (nominal auto = harga jual × qty) */}
+            {linkType === 'product' && (
+              <>
+                <TouchableOpacity style={styles.projectPicker} onPress={() => setShowProductPicker(true)}>
+                  <Text style={styles.projectPickerText}>
+                    {selectedProduct
+                      ? products.find(p => p.id === selectedProduct)?.name || 'Pilih Produk'
+                      : 'Pilih Produk'}
+                  </Text>
+                  <Text style={styles.projectPickerArrow}>›</Text>
+                </TouchableOpacity>
+                {selectedProduct && (
+                  <>
+                    <Text style={[styles.label, { marginTop: 12 }]}>Jumlah (Qty)</Text>
+                    <View style={styles.qtyRow}>
+                      <TouchableOpacity
+                        style={styles.qtyBtn}
+                        onPress={() => setProductQty(String(Math.max(1, (parseInt(productQty) || 1) - 1)))}
+                      >
+                        <Text style={styles.qtyBtnText}>−</Text>
+                      </TouchableOpacity>
+                      <TextInput
+                        style={styles.qtyInput}
+                        value={productQty}
+                        onChangeText={(t) => setProductQty(t.replace(/\D/g, '') || '')}
+                        keyboardType="numeric"
+                      />
+                      <TouchableOpacity
+                        style={styles.qtyBtn}
+                        onPress={() => setProductQty(String((parseInt(productQty) || 0) + 1))}
+                      >
+                        <Text style={styles.qtyBtnText}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {(() => {
+                      const p = products.find(p => p.id === selectedProduct)
+                      const qty = parseInt(productQty) || 0
+                      if (!p) return null
+                      return (
+                        <Text style={styles.productInfo}>
+                          Stok: {p.stock_qty} {p.unit} · Harga: {formatRupiah(p.sell_price)} · Total: {formatRupiah(p.sell_price * qty)}
+                          {qty > p.stock_qty ? '  ⚠️ Stok kurang!' : ''}
+                        </Text>
+                      )
+                    })()}
+                  </>
+                )}
+              </>
             )}
           </>
         )}
@@ -577,6 +737,43 @@ export default function TambahTransaksiScreen() {
                     )}
                   </View>
                   {selectedProject === project.id && (
+                    <Text style={styles.projectOptionCheck}>✓</Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Product Picker Modal */}
+      <Modal visible={showProductPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Produk</Text>
+              <TouchableOpacity onPress={() => setShowProductPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              {products.map((product) => (
+                <TouchableOpacity
+                  key={product.id}
+                  style={styles.projectOption}
+                  onPress={() => {
+                    setSelectedProduct(product.id)
+                    setProductQty('1')
+                    setShowProductPicker(false)
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.projectOptionName}>{product.name}</Text>
+                    <Text style={styles.projectOptionClient}>
+                      Stok: {product.stock_qty} {product.unit} · {formatRupiah(product.sell_price)}
+                    </Text>
+                  </View>
+                  {selectedProduct === product.id && (
                     <Text style={styles.projectOptionCheck}>✓</Text>
                   )}
                 </TouchableOpacity>
@@ -655,6 +852,25 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#BA7517', marginBottom: 16,
   },
   transferWarningText: { fontSize: 13, color: '#BA7517', lineHeight: 20 },
+  linkTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
+  linkTab: {
+    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  linkTabActive: { backgroundColor: PRIMARY + '30', borderColor: PRIMARY },
+  linkTabText: { fontSize: 13, color: '#888780' },
+  linkTabTextActive: { color: '#fff', fontWeight: '600' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  qtyBtn: {
+    width: 44, height: 44, borderRadius: 12, backgroundColor: '#1A1A1A',
+    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  qtyBtnText: { fontSize: 22, color: '#fff', fontWeight: '600' },
+  qtyInput: {
+    flex: 1, height: 44, backgroundColor: '#1A1A1A', borderRadius: 12,
+    textAlign: 'center', fontSize: 16, color: '#fff', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  productInfo: { fontSize: 12, color: '#888780', marginBottom: 16, lineHeight: 18 },
   projectPicker: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
