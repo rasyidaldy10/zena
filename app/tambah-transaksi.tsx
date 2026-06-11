@@ -163,13 +163,6 @@ export default function TambahTransaksiScreen() {
     setCategory('')
   }, [type])
 
-  // Reset project when switching wallet (in case new wallet is not business)
-  useEffect(() => {
-    const wallet = wallets.find(w => w.id === selectedWallet)
-    if (wallet?.wallet_function !== 'business') {
-      setSelectedProject('')
-    }
-  }, [selectedWallet])
 
   const fetchWallets = async () => {
     const { data: { user } } = await supabase.auth.getUser()
@@ -298,9 +291,11 @@ export default function TambahTransaksiScreen() {
       }, 300)
       return
     } else {
-      // Get wallet to determine wallet_function
       const wallet = wallets.find(w => w.id === selectedWallet)
 
+      // Catatan: kolom wallet_function ADA di tabel wallets, BUKAN transactions.
+      // Personal/bisnis ditentukan dari wallet yang dipilih, jadi tak perlu
+      // disimpan di transaksi (dulu bikin error "column not found").
       const { error } = await supabase.from('transactions').insert({
         user_id: user?.id,
         amount: nominal,
@@ -312,7 +307,6 @@ export default function TambahTransaksiScreen() {
         is_wallet_transfer: false,
         wallet_source: selectedWallet,
         wallet_id: selectedWallet,
-        wallet_function: wallet?.wallet_function || 'personal',
         project_id: selectedProject || null,
         date: selectedDate,
       })
@@ -502,10 +496,11 @@ export default function TambahTransaksiScreen() {
           </>
         )}
 
-        {/* Project (hanya untuk business wallet) */}
-        {type !== 'transfer' && wallets.find(w => w.id === selectedWallet)?.wallet_function === 'business' && projects.length > 0 && (
+        {/* Kaitkan ke Project (opsional) — tampil kalau ada proyek aktif,
+            untuk wallet personal maupun bisnis. Kalau tak dipilih = transaksi biasa. */}
+        {type !== 'transfer' && projects.length > 0 && (
           <>
-            <Text style={styles.label}>Project (opsional)</Text>
+            <Text style={styles.label}>Kaitkan ke Project (opsional)</Text>
             <TouchableOpacity
               style={styles.projectPicker}
               onPress={() => setShowProjectPicker(true)}

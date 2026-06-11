@@ -69,8 +69,9 @@ export default function HomeScreen() {
       setActiveMode(prefsObj.active_mode as TabMode)
     }
 
-    // Fetch business stats if business mode active
-    if (prefsObj?.business_mode) {
+    // Fetch business stats kalau sedang di mode bisnis (active_mode), supaya
+    // proyek aktif/piutang/dll muncul walau flag business_mode belum di-set.
+    if (prefsObj?.active_mode === 'business' || prefsObj?.business_mode) {
       const [
         { data: piutang },
         { data: hutang },
