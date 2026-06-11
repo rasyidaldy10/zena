@@ -42,7 +42,7 @@ export default function LaporanScreen() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    const [{ data }, { data: prefs }] = await Promise.all([
+    const [{ data }, { data: prefsRows }] = await Promise.all([
       supabase
         .from('transactions')
         .select('*')
@@ -54,10 +54,12 @@ export default function LaporanScreen() {
         .from('user_preferences')
         .select('monthly_income, budget_method')
         .eq('user_id', user?.id)
-        .single(),
+        .order('created_at', { ascending: true })
+        .limit(1),
     ])
 
     if (data) setTransactions(data)
+    const prefs = prefsRows?.[0]
     if (prefs) {
       setMonthlyIncome(prefs.monthly_income || 0)
       setBudgetMethod((prefs.budget_method as BudgetMethod) || '503020')

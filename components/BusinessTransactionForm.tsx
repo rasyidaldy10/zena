@@ -85,11 +85,13 @@ export default function BusinessTransactionForm({ onSuccess, prefilledProjectId 
       setProjects(projectsData || [])
 
       // Fetch user PPN settings
-      const { data: prefs } = await supabase
+      const { data: prefsRows } = await supabase
         .from('user_preferences')
         .select('ppn_enabled, ppn_rate')
         .eq('user_id', session.user.id)
-        .single()
+        .order('created_at', { ascending: true })
+        .limit(1)
+      const prefs = prefsRows?.[0]
 
       if (prefs) {
         setPpnEnabled(prefs.ppn_enabled || false)

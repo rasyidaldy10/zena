@@ -95,11 +95,13 @@ export default function ChatScreen() {
       return null
     }
 
-    const { data: prefs } = await supabase
+    const { data: prefsRows } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user.id)
-      .single()
+      .order('created_at', { ascending: true })
+      .limit(1)
+    const prefs = prefsRows?.[0]
 
     if (prefs?.persona) setPersona(prefs.persona)
     if (prefs?.language) setLanguage(prefs.language)

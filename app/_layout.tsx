@@ -19,17 +19,22 @@ export default function RootLayout() {
       router.replace('/(auth)/login')
       return
     }
-    try {
-      const { data } = await supabase
-        .from('user_preferences')
-        .select('id')
-        .eq('user_id', s.user.id)
-        .maybeSingle()
-      router.replace(data ? '/(tabs)' : '/onboarding')
-    } catch (err) {
-      // Error baca prefs → anggap user baru, arahkan ke onboarding
-      router.replace('/onboarding')
+    // Pakai limit(1) — TIDAK pakai maybeSingle karena maybeSingle ERROR
+    // kalau ada baris duplikat (yang bikin user nyangkut di onboarding loop).
+    const { data, error } = await supabase
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', s.user.id)
+      .limit(1)
+
+    if (error) {
+      // Error baca prefs (network/RLS) → jangan tendang ke onboarding.
+      // User punya session = kemungkinan besar returning user → ke dashboard.
+      console.error('Prefs check error:', error.message)
+      router.replace('/(tabs)')
+      return
     }
+    router.replace(data && data.length > 0 ? '/(tabs)' : '/onboarding')
   }
 
   useEffect(() => {

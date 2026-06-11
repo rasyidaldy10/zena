@@ -52,24 +52,25 @@ export default function HomeScreen() {
       { data: t },
       { data: n }
     ] = await Promise.all([
-      supabase.from('user_preferences').select('*').eq('user_id', session.user.id).single(),
+      supabase.from('user_preferences').select('*').eq('user_id', session.user.id).order('created_at', { ascending: true }).limit(1),
       supabase.from('user_wallets').select('*').eq('user_id', session.user.id).eq('is_active', true),
       supabase.from('transactions').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
       supabase.from('notifications').select('id').eq('user_id', session.user.id).eq('is_read', false)
     ])
 
-    setPrefs(p as UserPreferences)
+    const prefsObj = (Array.isArray(p) ? p[0] : p) as UserPreferences | undefined
+    setPrefs(prefsObj as UserPreferences)
     setWallets((w ?? []) as UserWallet[])
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
 
     // Set active mode from preferences
-    if (p?.active_mode) {
-      setActiveMode(p.active_mode as TabMode)
+    if (prefsObj?.active_mode) {
+      setActiveMode(prefsObj.active_mode as TabMode)
     }
 
     // Fetch business stats if business mode active
-    if (p?.business_mode) {
+    if (prefsObj?.business_mode) {
       const [
         { data: piutang },
         { data: hutang },
@@ -97,9 +98,10 @@ export default function HomeScreen() {
       .from('user_preferences')
       .select('has_seen_ceo_welcome')
       .eq('user_id', session.user.id)
-      .single()
+      .order('created_at', { ascending: true })
+      .limit(1)
 
-    if (p && !hasSeenWelcome.data?.has_seen_ceo_welcome) {
+    if (prefsObj && !hasSeenWelcome.data?.[0]?.has_seen_ceo_welcome) {
       setTimeout(() => setShowCEOWelcome(true), 1000) // Show after 1 second
     }
   }

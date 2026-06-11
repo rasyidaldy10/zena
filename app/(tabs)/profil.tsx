@@ -34,11 +34,13 @@ export default function ProfilScreen() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
-    const { data: prefsData } = await supabase
+    const { data: prefsRows } = await supabase
       .from('user_preferences')
       .select('*')
       .eq('user_id', user?.id)
-      .single()
+      .order('created_at', { ascending: true })
+      .limit(1)
+    const prefsData = prefsRows?.[0]
 
     if (prefsData) {
       setPrefs(prefsData)
@@ -88,7 +90,6 @@ export default function ProfilScreen() {
     const { data: { user } } = await supabase.auth.getUser()
 
     const updateData: any = {
-      user_id: user?.id,
       updated_at: new Date().toISOString(),
     }
 
@@ -100,7 +101,8 @@ export default function ProfilScreen() {
       updateData.business_name = businessName
     }
 
-    await supabase.from('user_preferences').upsert(updateData)
+    // UPDATE by user_id (bukan upsert) — cegah duplikat baris prefs
+    await supabase.from('user_preferences').update(updateData).eq('user_id', user?.id)
     setEditing(false)
     fetchData()
     setSaving(false)
@@ -108,17 +110,17 @@ export default function ProfilScreen() {
 
   const handlePersonaChange = async (p: Persona) => {
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('user_preferences').upsert({
-      user_id: user?.id, persona: p, updated_at: new Date().toISOString(),
-    })
+    await supabase.from('user_preferences')
+      .update({ persona: p, updated_at: new Date().toISOString() })
+      .eq('user_id', user?.id)
     fetchData()
   }
 
   const handleMethodChange = async (m: BudgetMethod) => {
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('user_preferences').upsert({
-      user_id: user?.id, budget_method: m, updated_at: new Date().toISOString(),
-    })
+    await supabase.from('user_preferences')
+      .update({ budget_method: m, updated_at: new Date().toISOString() })
+      .eq('user_id', user?.id)
     fetchData()
   }
 
@@ -126,11 +128,9 @@ export default function ProfilScreen() {
     const newValue = !ppnEnabled
     setPpnEnabled(newValue)
     const { data: { user } } = await supabase.auth.getUser()
-    await supabase.from('user_preferences').upsert({
-      user_id: user?.id,
-      ppn_enabled: newValue,
-      updated_at: new Date().toISOString(),
-    })
+    await supabase.from('user_preferences')
+      .update({ ppn_enabled: newValue, updated_at: new Date().toISOString() })
+      .eq('user_id', user?.id)
   }
 
   const handlePpnRateChange = async (value: string) => {
@@ -140,11 +140,9 @@ export default function ProfilScreen() {
     if (rateNum > 0 && rateNum <= 100) {
       setPpnRate(value)
       const { data: { user } } = await supabase.auth.getUser()
-      await supabase.from('user_preferences').upsert({
-        user_id: user?.id,
-        ppn_rate: rateNum,
-        updated_at: new Date().toISOString(),
-      })
+      await supabase.from('user_preferences')
+        .update({ ppn_rate: rateNum, updated_at: new Date().toISOString() })
+        .eq('user_id', user?.id)
     } else {
       // Revert to previous valid value
       Alert.alert('Error', 'PPN harus antara 0-100%')

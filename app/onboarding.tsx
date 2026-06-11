@@ -132,24 +132,31 @@ export default function OnboardingScreen() {
       .eq('user_id', userId)
 
     try {
-      // Execute upsert and wait for result
-      const { data: prefsData, error: prefsError } = await supabase
+      const prefsPayload = {
+        user_id: userId,
+        nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
+        persona,
+        language,
+        budget_method: budgetMethod,
+        monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
+        active_mode: 'personal', // Default personal mode
+        business_mode: false, // Business mode inactive by default
+        ppn_enabled: false, // PPN disabled by default
+        ppn_rate: 11, // Default PPN rate 11%
+        updated_at: new Date().toISOString(),
+      }
+
+      // Cek dulu apakah prefs sudah ada (cegah duplikat — upsert tanpa
+      // onConflict selalu INSERT baris baru yang bikin onboarding loop)
+      const { data: existing } = await supabase
         .from('user_preferences')
-        .upsert({
-          user_id: userId,
-          nickname: nickname || user?.user_metadata?.full_name?.split(' ')[0] || '',
-          persona,
-          language,
-          budget_method: budgetMethod,
-          monthly_income: parseFloat(income.replace(/\./g, '')) || 0,
-          active_mode: 'personal', // Default personal mode
-          business_mode: false, // Business mode inactive by default
-          ppn_enabled: false, // PPN disabled by default
-          ppn_rate: 11, // Default PPN rate 11%
-          updated_at: new Date().toISOString(),
-        })
-        .select()
-        .single()
+        .select('id')
+        .eq('user_id', userId)
+        .limit(1)
+
+      const prefsError = existing && existing.length > 0
+        ? (await supabase.from('user_preferences').update(prefsPayload).eq('user_id', userId)).error
+        : (await supabase.from('user_preferences').insert(prefsPayload)).error
 
       if (prefsError) {
         throw new Error(`Failed to save preferences: ${prefsError.message}`)
