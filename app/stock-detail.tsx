@@ -190,6 +190,13 @@ export default function StockDetailScreen() {
       <Stack.Screen
         options={{
           title: product.name,
+          headerShown: true,
+          headerBackTitle: 'Kembali',
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
+              <Text style={{ fontSize: 15, color: COLORS.PRIMARY, fontWeight: '600' }}>‹ Kembali</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
 

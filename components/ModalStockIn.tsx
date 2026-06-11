@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { Product, Project } from '../types'
 import { COLORS } from '../constants/theme'
 
@@ -60,7 +61,7 @@ export default function ModalStockIn({ visible, onClose, onSuccess, product }: P
     const priceNum = parseFloat(pricePerUnit.replace(/[^0-9]/g, '')) || 0
 
     if (qtyNum <= 0) {
-      Alert.alert('Error', 'Qty harus lebih dari 0')
+      notify('Error', 'Qty harus lebih dari 0')
       return
     }
 
@@ -93,19 +94,13 @@ export default function ModalStockIn({ visible, onClose, onSuccess, product }: P
 
       if (updateError) throw updateError
 
-      Alert.alert('Berhasil', 'Stok masuk berhasil dicatat', [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm()
-            onSuccess()
-            onClose()
-          },
-        },
-      ])
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', 'Stok masuk berhasil dicatat')
     } catch (error: any) {
       console.error('Error saving stock in:', error)
-      Alert.alert('Error', error.message || 'Gagal menyimpan')
+      notify('Error', error.message || 'Gagal menyimpan')
     } finally {
       setLoading(false)
     }

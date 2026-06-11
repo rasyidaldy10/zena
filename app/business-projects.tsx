@@ -202,6 +202,12 @@ export default function BusinessProjectsScreen() {
       <Stack.Screen
         options={{
           title: 'Projects',
+          headerShown: true,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
+              <Text style={{ fontSize: 15, color: COLORS.PRIMARY, fontWeight: '600' }}>‹ Kembali</Text>
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <TouchableOpacity onPress={() => setShowAddModal(true)}>
               <Text style={styles.addButton}>+ Baru</Text>

@@ -10,7 +10,7 @@ import {
   Alert,
   Linking,
 } from 'react-native'
-import { Stack } from 'expo-router'
+import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { confirmAsync, notify } from '../lib/alert'
 import { Receivable } from '../types'
@@ -261,6 +261,12 @@ export default function BusinessReceivablesScreen() {
       <Stack.Screen
         options={{
           title: 'Piutang & Hutang',
+          headerShown: true,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
+              <Text style={{ fontSize: 15, color: COLORS.PRIMARY, fontWeight: '600' }}>‹ Kembali</Text>
+            </TouchableOpacity>
+          ),
           headerRight: () => (
             <TouchableOpacity onPress={() => setShowAddModal(true)}>
               <Text style={styles.addButton}>+ Baru</Text>

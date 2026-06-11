@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { Product } from '../types'
 import { COLORS } from '../constants/theme'
 
@@ -29,19 +30,19 @@ export default function ModalStockAdjust({ visible, onClose, onSuccess, product 
     const newQtyNum = parseFloat(newQty) || 0
 
     if (newQtyNum < 0) {
-      Alert.alert('Error', 'Stok tidak boleh negatif')
+      notify('Error', 'Stok tidak boleh negatif')
       return
     }
 
     if (!note.trim()) {
-      Alert.alert('Error', 'Catatan alasan adjustment wajib diisi')
+      notify('Error', 'Catatan alasan adjustment wajib diisi')
       return
     }
 
     const difference = newQtyNum - product.stock_qty
 
     if (difference === 0) {
-      Alert.alert('Info', 'Tidak ada perubahan stok')
+      notify('Info', 'Tidak ada perubahan stok')
       return
     }
 
@@ -73,23 +74,13 @@ export default function ModalStockAdjust({ visible, onClose, onSuccess, product 
 
       if (updateError) throw updateError
 
-      Alert.alert(
-        'Berhasil',
-        `Stok disesuaikan dari ${product.stock_qty} menjadi ${newQtyNum} ${product.unit}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              resetForm()
-              onSuccess()
-              onClose()
-            },
-          },
-        ]
-      )
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', `Stok disesuaikan dari ${product.stock_qty} menjadi ${newQtyNum} ${product.unit}`)
     } catch (error: any) {
       console.error('Error saving stock adjustment:', error)
-      Alert.alert('Error', error.message || 'Gagal menyimpan')
+      notify('Error', error.message || 'Gagal menyimpan')
     } finally {
       setLoading(false)
     }

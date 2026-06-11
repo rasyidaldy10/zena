@@ -222,6 +222,12 @@ export default function BusinessProjectDetailScreen() {
       <Stack.Screen
         options={{
           title: project.name,
+          headerShown: true,
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
+              <Text style={{ fontSize: 15, color: COLORS.PRIMARY, fontWeight: '600' }}>‹ Kembali</Text>
+            </TouchableOpacity>
+          ),
         }}
       />
 

@@ -314,10 +314,11 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Expanded Wallet List */}
+          {/* Expanded Wallet List — difilter sesuai mode aktif biar konsisten
+              dengan Total Saldo (personal mode → wallet pribadi, dst) */}
           {rincianExpanded && (
             <View style={styles.walletList}>
-              {wallets.map(w => (
+              {wallets.filter(w => w.wallet_function === activeMode).map(w => (
                 <View key={w.id} style={styles.walletItem}>
                   <Text style={styles.walletIcon}>{w.icon}</Text>
                   <View style={styles.walletInfo}>
@@ -327,6 +328,13 @@ export default function HomeScreen() {
                   <Text style={styles.walletBalance}>Rp {w.current_balance.toLocaleString('id-ID')}</Text>
                 </View>
               ))}
+              {wallets.filter(w => w.wallet_function === activeMode).length === 0 && (
+                <Text style={styles.walletEmptyHint}>
+                  {activeMode === 'business'
+                    ? 'Belum ada dompet bisnis. Tambah di Profil (pilih "Bisnis").'
+                    : 'Belum ada dompet pribadi.'}
+                </Text>
+              )}
             </View>
           )}
 
@@ -690,6 +698,7 @@ const styles = StyleSheet.create({
   },
   rincianBtnText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
   walletList: { marginTop: 16, gap: 12 },
+  walletEmptyHint: { fontSize: 12, color: '#888780', lineHeight: 18, paddingVertical: 4 },
   walletItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   walletIcon: { fontSize: 24 },
   walletInfo: { flex: 1 },
