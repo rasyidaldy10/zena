@@ -18,6 +18,7 @@ export default function EditWalletScreen() {
 
   const [name, setName] = useState('')
   const [type, setType] = useState<WalletType>('personal')
+  const [walletFunction, setWalletFunction] = useState<'personal' | 'business'>('personal')
   const [balance, setBalance] = useState('')
   const [icon, setIcon] = useState('💵')
   const [color, setColor] = useState(PRIMARY)
@@ -42,6 +43,7 @@ export default function EditWalletScreen() {
     if (data) {
       setName(data.wallet_name)
       setType(data.wallet_type || 'personal')
+      setWalletFunction(data.wallet_function || 'personal')
       setBalance(data.current_balance.toString())
       setIcon(data.icon || '💵')
       setColor(data.color || PRIMARY)
@@ -51,7 +53,7 @@ export default function EditWalletScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Oops', 'Nama dompet harus diisi')
+      notify('Oops', 'Nama dompet harus diisi')
       return
     }
 
@@ -67,6 +69,7 @@ export default function EditWalletScreen() {
       .update({
         wallet_name: name.trim(),
         wallet_type: type,
+        wallet_function: walletFunction,
         current_balance: parseFloat(balance.replace(/\./g, '')) || 0,
         icon,
         color,
@@ -77,7 +80,7 @@ export default function EditWalletScreen() {
     setSaving(false)
 
     if (error) {
-      Alert.alert('Error', 'Gagal menyimpan perubahan')
+      notify('Error', 'Gagal menyimpan perubahan')
     } else {
       // Navigate to profil tab
       router.replace('/(tabs)/profil')
@@ -154,6 +157,30 @@ export default function EditWalletScreen() {
             placeholder="Misal: Rekening BCA"
             placeholderTextColor="#555"
           />
+        </View>
+
+        {/* Untuk Keperluan: Pribadi / Bisnis — menentukan dompet ini masuk
+            hitungan saldo Pribadi atau Bisnis */}
+        <View style={styles.section}>
+          <Text style={styles.label}>Untuk Keperluan</Text>
+          <View style={styles.functionToggle}>
+            <TouchableOpacity
+              style={[styles.functionBtn, walletFunction === 'personal' && styles.functionBtnActive]}
+              onPress={() => setWalletFunction('personal')}
+            >
+              <Text style={[styles.functionText, walletFunction === 'personal' && styles.functionTextActive]}>
+                👤 Pribadi
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.functionBtn, walletFunction === 'business' && styles.functionBtnActive]}
+              onPress={() => setWalletFunction('business')}
+            >
+              <Text style={[styles.functionText, walletFunction === 'business' && styles.functionTextActive]}>
+                💼 Bisnis
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -263,6 +290,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
     fontSize: 15, color: '#fff', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
+  functionToggle: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  functionBtn: {
+    flex: 1, height: 48, backgroundColor: '#1A1A1A', borderRadius: 12,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  functionBtnActive: { backgroundColor: PRIMARY + '20', borderColor: PRIMARY, borderWidth: 2 },
+  functionText: { fontSize: 15, fontWeight: '600', color: '#888780' },
+  functionTextActive: { color: '#fff' },
   typeChip: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10,
