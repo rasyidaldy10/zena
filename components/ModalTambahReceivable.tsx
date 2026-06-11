@@ -12,6 +12,7 @@ import {
   Platform,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { Project } from '../types'
 import { COLORS } from '../constants/theme'
 
@@ -58,13 +59,13 @@ export default function ModalTambahReceivable({ visible, onClose, onSuccess }: P
 
   async function handleSave() {
     if (!partyName.trim()) {
-      Alert.alert('Error', 'Nama pihak wajib diisi')
+      notify('Error', 'Nama pihak wajib diisi')
       return
     }
 
     const amountNum = parseFloat(amount.replace(/[^0-9]/g, '')) || 0
     if (amountNum <= 0) {
-      Alert.alert('Error', 'Nominal harus lebih dari 0')
+      notify('Error', 'Nominal harus lebih dari 0')
       return
     }
 
@@ -87,19 +88,14 @@ export default function ModalTambahReceivable({ visible, onClose, onSuccess }: P
 
       if (error) throw error
 
-      Alert.alert('Berhasil', `${type === 'piutang' ? 'Piutang' : 'Hutang'} berhasil ditambahkan`, [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm()
-            onSuccess()
-            onClose()
-          },
-        },
-      ])
+      const label = type === 'piutang' ? 'Piutang' : 'Hutang'
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', `${label} berhasil ditambahkan`)
     } catch (error: any) {
       console.error('Error creating receivable:', error)
-      Alert.alert('Error', error.message || 'Gagal menambahkan')
+      notify('Error', error.message || 'Gagal menambahkan')
     } finally {
       setLoading(false)
     }

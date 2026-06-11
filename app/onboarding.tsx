@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { PERSONA_CONFIG, LANGUAGE_CONFIG, BUDGET_METHODS } from '../constants'
 import { Persona, Language, BudgetMethod } from '../types'
 
@@ -120,7 +121,7 @@ export default function OnboardingScreen() {
     // Guard: session null atau userId undefined
     if (!session || !userId) {
       setLoading(false)
-      Alert.alert('Error', 'Sesi login tidak valid. Silakan login kembali.')
+      notify('Error', 'Sesi login tidak valid. Silakan login kembali.')
       router.replace('/(auth)/login')
       return
     }
@@ -181,7 +182,7 @@ export default function OnboardingScreen() {
     } catch (error) {
       setLoading(false)
       console.error('Onboarding error:', error)
-      Alert.alert('Error', 'Gagal menyimpan data. Silakan coba lagi.')
+      notify('Error', 'Gagal menyimpan data. Silakan coba lagi.')
     }
   }
 

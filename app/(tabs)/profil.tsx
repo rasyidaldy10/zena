@@ -6,6 +6,7 @@ import {
 import { useFocusEffect, router } from 'expo-router'
 
 import { supabase } from '../../lib/supabase'
+import { confirmAsync, notify } from '../../lib/alert'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG, WALLET_TYPE_CONFIG, UserWallet } from '../../types'
@@ -81,7 +82,7 @@ export default function ProfilScreen() {
     if (activeMode === 'personal') {
       const incomeValue = parseFloat(income.replace(/\./g, ''))
       if (isNaN(incomeValue) || incomeValue < 0) {
-        Alert.alert('Error', 'Penghasilan harus diisi dengan angka yang valid')
+        notify('Error', 'Penghasilan harus diisi dengan angka yang valid')
         return
       }
     }
@@ -145,38 +146,31 @@ export default function ProfilScreen() {
         .eq('user_id', user?.id)
     } else {
       // Revert to previous valid value
-      Alert.alert('Error', 'PPN harus antara 0-100%')
+      notify('Error', 'PPN harus antara 0-100%')
       setPpnRate(prefs?.ppn_rate?.toString() || '11')
     }
   }
 
 
-  const handleLogout = () => {
-    console.log('🔵 Logout button pressed')
-    Alert.alert('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', [
-      { text: 'Batal', style: 'cancel' },
-      {
-        text: 'Keluar',
-        style: 'destructive',
-        onPress: async () => {
-          console.log('🔵 Logging out...')
-          try {
-            await supabase.auth.signOut()
-            console.log('✅ Signed out successfully')
+  const handleLogout = async () => {
+    const ok = await confirmAsync(
+      'Keluar dari Zena?',
+      'Kamu perlu login lagi untuk mengakses akunmu.',
+      'Keluar'
+    )
+    if (!ok) return
 
-            // Force redirect to login
-            if (Platform.OS === 'web' && typeof window !== 'undefined') {
-              window.location.href = '/'
-            } else {
-              router.replace('/(auth)/login')
-            }
-          } catch (error) {
-            console.error('❌ Logout error:', error)
-            Alert.alert('Error', 'Gagal logout. Coba lagi.')
-          }
-        },
-      },
-    ])
+    try {
+      await supabase.auth.signOut()
+      // Force redirect ke login (web reload bersih, native router)
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.location.href = '/'
+      } else {
+        router.replace('/(auth)/login')
+      }
+    } catch (error) {
+      notify('Error', 'Gagal logout. Coba lagi.')
+    }
   }
 
   // Hidden Marketing Dashboard access (tap 5x on header)
@@ -193,14 +187,11 @@ export default function ProfilScreen() {
       // Open Marketing Dashboard after 5 taps
       if (newCount >= 5) {
         setTapCount(0)
-        Alert.alert(
+        confirmAsync(
           '🎨 Marketing Manager',
           'Akses admin - Generate content dengan Higgsfield AI',
-          [
-            { text: 'Batal', style: 'cancel' },
-            { text: 'Buka', onPress: () => router.push('/marketing-dashboard') },
-          ]
-        )
+          'Buka'
+        ).then((ok) => { if (ok) router.push('/marketing-dashboard') })
       }
     }
 

@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { COLORS } from '../constants/theme'
 import { PRODUCT_UNITS } from '../constants/business'
 
@@ -32,7 +33,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert('Error', 'Nama produk wajib diisi')
+      notify('Error', 'Nama produk wajib diisi')
       return
     }
 
@@ -42,7 +43,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
     const minAlertNum = parseFloat(minAlert.replace(/[^0-9]/g, '')) || 0
 
     if (buyPriceNum < 0 || sellPriceNum < 0) {
-      Alert.alert('Error', 'Harga tidak boleh negatif')
+      notify('Error', 'Harga tidak boleh negatif')
       return
     }
 
@@ -85,19 +86,13 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess }: Props
         if (movementError) console.error('Error creating initial stock movement:', movementError)
       }
 
-      Alert.alert('Berhasil', 'Produk berhasil ditambahkan', [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm()
-            onSuccess()
-            onClose()
-          },
-        },
-      ])
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', 'Produk berhasil ditambahkan')
     } catch (error: any) {
       console.error('Error creating product:', error)
-      Alert.alert('Error', error.message || 'Gagal menambahkan produk')
+      notify('Error', error.message || 'Gagal menambahkan produk')
     } finally {
       setLoading(false)
     }

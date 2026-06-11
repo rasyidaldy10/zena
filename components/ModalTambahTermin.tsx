@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { COLORS } from '../constants/theme'
 
 interface Props {
@@ -27,13 +28,13 @@ export default function ModalTambahTermin({ visible, onClose, onSuccess, project
 
   async function handleSave() {
     if (!label.trim()) {
-      Alert.alert('Error', 'Label termin wajib diisi')
+      notify('Error', 'Label termin wajib diisi')
       return
     }
 
     const amountNum = parseFloat(amount.replace(/[^0-9]/g, '')) || 0
     if (amountNum <= 0) {
-      Alert.alert('Error', 'Nominal harus lebih dari 0')
+      notify('Error', 'Nominal harus lebih dari 0')
       return
     }
 
@@ -49,19 +50,13 @@ export default function ModalTambahTermin({ visible, onClose, onSuccess, project
 
       if (error) throw error
 
-      Alert.alert('Berhasil', 'Termin berhasil ditambahkan', [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm()
-            onSuccess()
-            onClose()
-          },
-        },
-      ])
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', 'Termin berhasil ditambahkan')
     } catch (error: any) {
       console.error('Error creating term:', error)
-      Alert.alert('Error', error.message || 'Gagal menambahkan termin')
+      notify('Error', error.message || 'Gagal menambahkan termin')
     } finally {
       setLoading(false)
     }

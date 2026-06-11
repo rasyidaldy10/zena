@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { WALLET_TYPE_CONFIG } from '../types'
 import BankConnectModal from '../components/BankConnectModal'
 
@@ -43,7 +44,7 @@ export default function TambahWalletScreen() {
   }
 
   const handleBankConnect = (bankCode: string, bankName: string) => {
-    Alert.alert(
+    notify(
       'Coming Soon! 🚀',
       `Connect ${bankName} sedang dalam tahap development.\n\nSilakan tambah wallet manual terlebih dahulu.`
     )
@@ -57,11 +58,11 @@ export default function TambahWalletScreen() {
 
   const handleSave = async () => {
     if (!walletName.trim()) {
-      Alert.alert('Oops', 'Nama dompet harus diisi ya')
+      notify('Oops', 'Nama dompet harus diisi ya')
       return
     }
     if (!walletType) {
-      Alert.alert('Oops', 'Pilih tipe / fungsi dompet dulu')
+      notify('Oops', 'Pilih tipe / fungsi dompet dulu')
       return
     }
 
@@ -80,7 +81,7 @@ export default function TambahWalletScreen() {
     const walletTypeLabel = walletFunction === 'personal' ? 'pribadi' : 'bisnis'
 
     if (count && count >= maxWallets) {
-      Alert.alert('Batas Maksimal', `Kamu hanya bisa memiliki maksimal ${maxWallets} dompet ${walletTypeLabel}. Hapus dulu salah satu dompet lama untuk menambah yang baru.`)
+      notify('Batas Maksimal', `Kamu hanya bisa memiliki maksimal ${maxWallets} dompet ${walletTypeLabel}. Hapus dulu salah satu dompet lama untuk menambah yang baru.`)
       return
     }
 
@@ -100,7 +101,7 @@ export default function TambahWalletScreen() {
     })
 
     if (error) {
-      Alert.alert('Gagal', error.message)
+      notify('Gagal', error.message)
       setLoading(false)
       return
     }
@@ -108,7 +109,7 @@ export default function TambahWalletScreen() {
     setLoading(false)
     router.replace('/(tabs)/profil')
     setTimeout(() => {
-      Alert.alert('Berhasil! 🎉', 'Dompet baru berhasil ditambahkan')
+      notify('Berhasil! 🎉', 'Dompet baru berhasil ditambahkan')
     }, 300)
   }
 

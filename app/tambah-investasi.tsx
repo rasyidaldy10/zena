@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { UserWallet } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -46,15 +47,15 @@ export default function TambahInvestasiScreen() {
 
   const handleSave = async () => {
     if (!ticker.trim()) {
-      Alert.alert('Oops', 'Masukkan kode saham (ticker)')
+      notify('Oops', 'Masukkan kode saham (ticker)')
       return
     }
     if (!quantity || parseInt(quantity.replace(/\./g, '')) <= 0) {
-      Alert.alert('Oops', 'Jumlah lot harus lebih dari 0')
+      notify('Oops', 'Jumlah lot harus lebih dari 0')
       return
     }
     if (!buyPrice || parseFloat(buyPrice.replace(/\./g, '')) <= 0) {
-      Alert.alert('Oops', 'Harga beli harus lebih dari 0')
+      notify('Oops', 'Harga beli harus lebih dari 0')
       return
     }
 
@@ -80,7 +81,7 @@ export default function TambahInvestasiScreen() {
     setSaving(false)
 
     if (error) {
-      Alert.alert('Gagal', error.message)
+      notify('Gagal', error.message)
       return
     }
 
@@ -99,9 +100,8 @@ export default function TambahInvestasiScreen() {
         .eq('id', walletId)
     }
 
-    Alert.alert('Berhasil! 🎉', 'Investasi berhasil ditambahkan', [
-      { text: 'OK', onPress: () => router.replace('/investment-portfolio') },
-    ])
+    router.replace('/investment-portfolio')
+    setTimeout(() => notify('Berhasil! 🎉', 'Investasi berhasil ditambahkan'), 300)
   }
 
   if (loading) {

@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { Stack, router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { confirmAsync, notify } from '../lib/alert'
 import { Project, ProjectTerm, Transaction, UserWallet } from '../types'
 import { getProjectTypeIcon, getProjectTypeLabel } from '../constants/business'
 import { COLORS } from '../constants/theme'
@@ -82,7 +83,7 @@ export default function BusinessProjectDetailScreen() {
       setExpenses(expensesData || [])
     } catch (error: any) {
       console.error('Error fetching project detail:', error)
-      Alert.alert('Error', error.message || 'Gagal memuat detail project')
+      notify('Error', error.message || 'Gagal memuat detail project')
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -164,43 +165,35 @@ export default function BusinessProjectDetailScreen() {
         if (receivableError) console.error('Error updating receivable:', receivableError)
       }
 
-      Alert.alert('Berhasil', 'Termin berhasil ditandai lunas')
+      notify('Berhasil', 'Termin berhasil ditandai lunas')
       fetchProjectDetail()
     } catch (error: any) {
       console.error('Error marking term as paid:', error)
-      Alert.alert('Error', error.message || 'Gagal menandai termin lunas')
+      notify('Error', error.message || 'Gagal menandai termin lunas')
     } finally {
       setSelectedTerm(null)
     }
   }
 
   async function handleTandaiSelesai() {
-    Alert.alert(
+    const ok = await confirmAsync(
       'Tandai Selesai',
       'Project akan ditandai selesai. Lanjutkan?',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Ya, Selesai',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('projects')
-                .update({ status: 'selesai' })
-                .eq('id', id)
-
-              if (error) throw error
-
-              router.replace('/business-projects')
-              setTimeout(() => Alert.alert('Berhasil', 'Project ditandai selesai'), 300)
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Gagal menandai selesai')
-            }
-          },
-        },
-      ]
+      'Ya, Selesai'
     )
+    if (!ok) return
+
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .update({ status: 'selesai' })
+        .eq('id', id)
+      if (error) throw error
+      router.replace('/business-projects')
+      setTimeout(() => notify('Berhasil', 'Project ditandai selesai'), 300)
+    } catch (error: any) {
+      notify('Error', error.message || 'Gagal menandai selesai')
+    }
   }
 
   if (loading) {

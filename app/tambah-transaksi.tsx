@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -209,23 +210,23 @@ export default function TambahTransaksiScreen() {
 
   const handleSave = async () => {
     if (!amount) {
-      Alert.alert('Oops', 'Nominal harus diisi ya')
+      notify('Oops', 'Nominal harus diisi ya')
       return
     }
     if (type !== 'transfer' && !category) {
-      Alert.alert('Oops', 'Kategori harus diisi ya')
+      notify('Oops', 'Kategori harus diisi ya')
       return
     }
     if (!selectedWallet) {
-      Alert.alert('Oops', 'Pilih dompet dulu ya')
+      notify('Oops', 'Pilih dompet dulu ya')
       return
     }
     if (type === 'transfer' && wallets.length <= 1) {
-      Alert.alert('Oops', 'Butuh minimal 2 dompet untuk transfer')
+      notify('Oops', 'Butuh minimal 2 dompet untuk transfer')
       return
     }
     if (type === 'transfer' && toWallet === selectedWallet) {
-      Alert.alert('Oops', 'Dompet asal dan tujuan tidak boleh sama')
+      notify('Oops', 'Dompet asal dan tujuan tidak boleh sama')
       return
     }
 
@@ -238,13 +239,13 @@ export default function TambahTransaksiScreen() {
       const toWalletData = wallets.find(w => w.id === toWallet)
 
       if (!fromWalletData || !toWalletData) {
-        Alert.alert('Error', 'Data dompet tidak ditemukan')
+        notify('Error', 'Data dompet tidak ditemukan')
         setLoading(false)
         return
       }
 
       if (fromWalletData.current_balance < nominal) {
-        Alert.alert('Saldo Tidak Cukup', `Saldo ${fromWalletData.wallet_name}: ${formatRupiah(fromWalletData.current_balance)}`)
+        notify('Saldo Tidak Cukup', `Saldo ${fromWalletData.wallet_name}: ${formatRupiah(fromWalletData.current_balance)}`)
         setLoading(false)
         return
       }
@@ -267,7 +268,7 @@ export default function TambahTransaksiScreen() {
         date: selectedDate,
       }).select().single()
 
-      if (e1) { Alert.alert('Gagal', e1.message); setLoading(false); return }
+      if (e1) { notify('Gagal', e1.message); setLoading(false); return }
 
       const { error: e2 } = await supabase.from('transactions').insert({
         user_id: user?.id,
@@ -285,7 +286,7 @@ export default function TambahTransaksiScreen() {
         date: selectedDate,
       })
 
-      if (e2) { Alert.alert('Gagal', e2.message); setLoading(false); return }
+      if (e2) { notify('Gagal', e2.message); setLoading(false); return }
 
       await supabase.from('user_wallets').update({ current_balance: fromWalletData.current_balance - nominal }).eq('id', selectedWallet)
       await supabase.from('user_wallets').update({ current_balance: toWalletData.current_balance + nominal }).eq('id', toWallet)
@@ -293,7 +294,7 @@ export default function TambahTransaksiScreen() {
       setLoading(false)
       router.replace('/(tabs)')
       setTimeout(() => {
-        Alert.alert('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`)
+        notify('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`)
       }, 300)
       return
     } else {
@@ -317,7 +318,7 @@ export default function TambahTransaksiScreen() {
       })
 
       if (error) {
-        Alert.alert('Gagal', error.message)
+        notify('Gagal', error.message)
         setLoading(false)
         return
       }
@@ -343,7 +344,7 @@ export default function TambahTransaksiScreen() {
 
       // Show success toast di home (jangan blocking)
       setTimeout(() => {
-        Alert.alert('Berhasil! ✅', 'Transaksi berhasil dicatat')
+        notify('Berhasil! ✅', 'Transaksi berhasil dicatat')
       }, 300)
       return
     }

@@ -6,6 +6,7 @@ import {
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { confirmAsync, notify } from '../lib/alert'
 import { CATEGORIES, Transaction } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -218,41 +219,35 @@ export default function EditTransaksiScreen() {
       await supabase.from('user_wallets').update({ current_balance: newBalance }).eq('id', selectedWallet)
     }
 
-    Alert.alert('Berhasil! ✅', 'Transaksi berhasil diperbarui', [
-      { text: 'OK', onPress: () => router.replace('/(tabs)') }
-    ])
     setSaving(false)
+    router.replace('/(tabs)')
+    setTimeout(() => notify('Berhasil! ✅', 'Transaksi berhasil diperbarui'), 300)
   }
 
-  const handleDelete = () => {
-    Alert.alert(
+  const handleDelete = async () => {
+    const ok = await confirmAsync(
       'Hapus Transaksi',
       'Yakin mau hapus transaksi ini? Saldo dompet akan dikembalikan.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus', style: 'destructive',
-          onPress: async () => {
-            const oldWalletId = transaction?.wallet_id || transaction?.wallet_source || ''
-            const oldAmount = transaction?.amount || 0
-            const oldType = transaction?.type || 'expense'
-
-            if (oldWalletId && !transaction?.is_wallet_transfer) {
-              const oldWallet = wallets.find(w => w.id === oldWalletId)
-              if (oldWallet) {
-                const restoredBalance = oldType === 'income'
-                  ? oldWallet.current_balance - oldAmount
-                  : oldWallet.current_balance + oldAmount
-                await supabase.from('user_wallets').update({ current_balance: restoredBalance }).eq('id', oldWalletId)
-              }
-            }
-
-            await supabase.from('transactions').delete().eq('id', id)
-            router.replace('/(tabs)')
-          }
-        }
-      ]
+      'Hapus'
     )
+    if (!ok) return
+
+    const oldWalletId = transaction?.wallet_id || transaction?.wallet_source || ''
+    const oldAmount = transaction?.amount || 0
+    const oldType = transaction?.type || 'expense'
+
+    if (oldWalletId && !transaction?.is_wallet_transfer) {
+      const oldWallet = wallets.find(w => w.id === oldWalletId)
+      if (oldWallet) {
+        const restoredBalance = oldType === 'income'
+          ? oldWallet.current_balance - oldAmount
+          : oldWallet.current_balance + oldAmount
+        await supabase.from('user_wallets').update({ current_balance: restoredBalance }).eq('id', oldWalletId)
+      }
+    }
+
+    await supabase.from('transactions').delete().eq('id', id)
+    router.replace('/(tabs)')
   }
 
   const typeColor = type === 'expense' ? RED : GREEN

@@ -11,6 +11,7 @@ import {
 } from 'react-native'
 import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { confirmAsync, notify } from '../lib/alert'
 import { Product } from '../types'
 import { COLORS } from '../constants/theme'
 import { formatRupiah } from '../lib/format'
@@ -54,32 +55,24 @@ export default function BusinessInventoryScreen() {
   }
 
   async function handleToggleActive(product: Product) {
-    Alert.alert(
+    const ok = await confirmAsync(
       'Nonaktifkan Produk',
       `Nonaktifkan produk "${product.name}"? Produk tidak akan muncul di list.`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Nonaktifkan',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('products')
-                .update({ is_active: false })
-                .eq('id', product.id)
-
-              if (error) throw error
-
-              Alert.alert('Berhasil', 'Produk dinonaktifkan')
-              fetchProducts()
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Gagal menonaktifkan produk')
-            }
-          },
-        },
-      ]
+      'Nonaktifkan'
     )
+    if (!ok) return
+
+    try {
+      const { error } = await supabase
+        .from('products')
+        .update({ is_active: false })
+        .eq('id', product.id)
+      if (error) throw error
+      notify('Berhasil', 'Produk dinonaktifkan')
+      fetchProducts()
+    } catch (error: any) {
+      notify('Error', error.message || 'Gagal menonaktifkan produk')
+    }
   }
 
   // Calculate stats

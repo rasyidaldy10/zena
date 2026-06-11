@@ -268,6 +268,13 @@ export default function ChatScreen() {
       }
     }
 
+    // Di web, Alert chooser tidak jalan + kamera browser terbatas → langsung galeri/file picker
+    if (Platform.OS === 'web') {
+      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
+      if (!result.canceled) await processStruk(result.assets[0].uri)
+      return
+    }
+
     Alert.alert('Scan Struk', 'Pilih sumber gambar:', [
       {
         text: 'Kamera', onPress: async () => {

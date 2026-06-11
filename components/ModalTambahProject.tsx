@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { supabase } from '../lib/supabase'
+import { notify } from '../lib/alert'
 import { ProjectType } from '../types'
 import { PROJECT_TYPES } from '../constants/business'
 import { COLORS } from '../constants/theme'
@@ -31,19 +32,19 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
 
   async function handleSave() {
     if (!name.trim()) {
-      Alert.alert('Error', 'Nama project wajib diisi')
+      notify('Error', 'Nama project wajib diisi')
       return
     }
 
     const contractNum = parseFloat(contractValue.replace(/[^0-9]/g, '')) || 0
     if (contractNum <= 0) {
-      Alert.alert('Error', 'Nilai kontrak harus lebih dari 0')
+      notify('Error', 'Nilai kontrak harus lebih dari 0')
       return
     }
 
     const dpNum = parseFloat(dpAmount.replace(/[^0-9]/g, '')) || 0
     if (dpNum > contractNum) {
-      Alert.alert('Error', 'DP tidak boleh lebih besar dari nilai kontrak')
+      notify('Error', 'DP tidak boleh lebih besar dari nilai kontrak')
       return
     }
 
@@ -98,20 +99,15 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
         if (receivableError) throw receivableError
       }
 
-      // Success
-      Alert.alert('Berhasil', 'Project berhasil ditambahkan', [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm()
-            onSuccess()
-            onClose()
-          },
-        },
-      ])
+      // Success — panggil callback LANGSUNG (jangan di dalam Alert onPress,
+      // karena di web onPress tidak jalan → modal tak menutup)
+      resetForm()
+      onSuccess()
+      onClose()
+      notify('Berhasil', 'Project berhasil ditambahkan')
     } catch (error: any) {
       console.error('Error creating project:', error)
-      Alert.alert('Error', error.message || 'Gagal menambahkan project')
+      notify('Error', error.message || 'Gagal menambahkan project')
     } finally {
       setLoading(false)
     }

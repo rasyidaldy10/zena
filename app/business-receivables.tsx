@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { Stack } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { confirmAsync, notify } from '../lib/alert'
 import { Receivable } from '../types'
 import { COLORS } from '../constants/theme'
 import { formatRupiah, formatDate } from '../lib/format'
@@ -59,63 +60,46 @@ export default function BusinessReceivablesScreen() {
   }
 
   async function handleTandaiLunas(receivable: Receivable) {
-    Alert.alert(
+    const label = receivable.type === 'piutang' ? 'Piutang' : 'Hutang'
+    const ok = await confirmAsync(
       'Tandai Lunas',
-      `${receivable.type === 'piutang' ? 'Piutang' : 'Hutang'} dari ${receivable.party_name} sebesar ${formatRupiah(receivable.amount)} akan ditandai lunas. Lanjutkan?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Ya, Lunas',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('receivables')
-                .update({
-                  status: 'lunas',
-                  settled_at: new Date().toISOString(),
-                })
-                .eq('id', receivable.id)
-
-              if (error) throw error
-
-              Alert.alert('Berhasil', `${receivable.type === 'piutang' ? 'Piutang' : 'Hutang'} ditandai lunas`)
-              fetchReceivables()
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Gagal menandai lunas')
-            }
-          },
-        },
-      ]
+      `${label} dari ${receivable.party_name} sebesar ${formatRupiah(receivable.amount)} akan ditandai lunas. Lanjutkan?`,
+      'Ya, Lunas'
     )
+    if (!ok) return
+
+    try {
+      const { error } = await supabase
+        .from('receivables')
+        .update({ status: 'lunas', settled_at: new Date().toISOString() })
+        .eq('id', receivable.id)
+      if (error) throw error
+      notify('Berhasil', `${label} ditandai lunas`)
+      fetchReceivables()
+    } catch (error: any) {
+      notify('Error', error.message || 'Gagal menandai lunas')
+    }
   }
 
   async function handleDelete(receivable: Receivable) {
-    Alert.alert(
+    const ok = await confirmAsync(
       'Hapus',
       `Hapus ${receivable.type === 'piutang' ? 'piutang' : 'hutang'} ini?`,
-      [
-        { text: 'Batal', style: 'cancel' },
-        {
-          text: 'Hapus',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const { error } = await supabase
-                .from('receivables')
-                .delete()
-                .eq('id', receivable.id)
-
-              if (error) throw error
-
-              Alert.alert('Berhasil', 'Data berhasil dihapus')
-              fetchReceivables()
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Gagal menghapus')
-            }
-          },
-        },
-      ]
+      'Hapus'
     )
+    if (!ok) return
+
+    try {
+      const { error } = await supabase
+        .from('receivables')
+        .delete()
+        .eq('id', receivable.id)
+      if (error) throw error
+      notify('Berhasil', 'Data berhasil dihapus')
+      fetchReceivables()
+    } catch (error: any) {
+      notify('Error', error.message || 'Gagal menghapus')
+    }
   }
 
   function handleKirimReminder(receivable: Receivable) {

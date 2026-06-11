@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import { confirmAsync, notify } from '../lib/alert'
 import { WALLET_TYPE_CONFIG, WalletType } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -83,18 +84,14 @@ export default function EditWalletScreen() {
     }
   }
 
-  const handleDelete = () => {
-    Alert.alert(
+  const handleDelete = async () => {
+    const ok = await confirmAsync(
       'Hapus Dompet?',
       'Semua transaksi dari dompet ini akan tetap ada, tapi tidak akan terlihat lagi di dompet ini.',
-      [
-        { text: 'Batal', style: 'cancel' },
-        { text: 'Hapus', style: 'destructive', onPress: confirmDelete }
-      ]
+      'Hapus'
     )
-  }
+    if (!ok) return
 
-  const confirmDelete = async () => {
     setSaving(true)
     const { error } = await supabase
       .from('user_wallets')
@@ -104,7 +101,7 @@ export default function EditWalletScreen() {
     setSaving(false)
 
     if (error) {
-      Alert.alert('Error', 'Gagal menghapus dompet')
+      notify('Error', 'Gagal menghapus dompet')
     } else {
       router.replace('/(tabs)/profil')
     }
