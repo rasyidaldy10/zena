@@ -1,13 +1,10 @@
-import { useEffect, useState, useRef } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { useEffect, useRef } from 'react'
 import { Stack, router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { Session } from '@supabase/supabase-js'
 import { ErrorBoundary } from '../lib/ErrorBoundary'
 
 export default function RootLayout() {
-  const [session, setSession] = useState<Session | null>(null)
-  const [initializing, setInitializing] = useState(true)
   // Track user id yang SUDAH di-route. Mencegah navigasi ulang saat
   // tab di-refocus (Supabase fire SIGNED_IN lagi pas session recovery).
   const routedUserRef = useRef<string | null>(null)
@@ -38,26 +35,19 @@ export default function RootLayout() {
   }
 
   useEffect(() => {
-    let done = false
-    const finishInit = () => {
-      if (!done) {
-        done = true
-        setInitializing(false)
-      }
-    }
+    let routedOnce = false
 
-    // Hard safety net: kalau INITIAL_SESSION tak kunjung datang dalam 4s,
-    // route manual via getSession (di luar callback = aman, tak deadlock).
+    // Hard safety net: kalau INITIAL_SESSION telat/tak fire, route manual via
+    // getSession (di luar callback = aman, tak deadlock).
     const hardStop = setTimeout(async () => {
-      if (done) return
+      if (routedOnce) return
       try {
         const { data: { session: s } } = await supabase.auth.getSession()
+        routedOnce = true
         routedUserRef.current = s?.user?.id ?? null
         await routeForSession(s)
       } catch {
         router.replace('/(auth)/login')
-      } finally {
-        finishInit()
       }
     }, 4000)
 
@@ -65,19 +55,14 @@ export default function RootLayout() {
     // onAuthStateChange — bisa deadlock (auth client lagi megang lock).
     // Defer pakai setTimeout(0) supaya query jalan di luar lock.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession)
-
       // INITIAL_SESSION: routing awal saat app start
       if (event === 'INITIAL_SESSION') {
+        routedOnce = true
         routedUserRef.current = newSession?.user?.id ?? null
-        setTimeout(async () => {
-          try {
-            await routeForSession(newSession)
-          } catch {
+        setTimeout(() => {
+          routeForSession(newSession).catch(() =>
             router.replace(newSession ? '/(tabs)' : '/(auth)/login')
-          } finally {
-            finishInit()
-          }
+          )
         }, 0)
         return
       }
@@ -108,18 +93,13 @@ export default function RootLayout() {
     }
   }, [])
 
-  // Show loader only during first initialization
-  if (initializing) {
-    return (
-      <View style={{ flex: 1, backgroundColor: '#0F0F0F', justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#185FA5" />
-      </View>
-    )
-  }
-
+  // PENTING: <Stack> SELALU di-render supaya router.replace selalu punya
+  // navigator. Loading awal ditampilkan oleh route index ("/") yang berupa
+  // loader. Auth listener di atas yang router.replace ke tujuan sebenarnya.
   return (
     <ErrorBoundary>
       <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="index" options={{ animation: 'none' }} />
         <Stack.Screen name="(auth)" options={{ animation: 'none' }} />
         <Stack.Screen name="(tabs)" options={{ animation: 'none' }} />
         <Stack.Screen name="onboarding" options={{ animation: 'none' }} />
