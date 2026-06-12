@@ -4,9 +4,11 @@ import {
   StyleSheet, Alert, ActivityIndicator,
   ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native'
+import * as ImagePicker from 'expo-image-picker'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { notify } from '../lib/alert'
+import { claudeVision } from '../lib/claude'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -152,6 +154,7 @@ export default function TambahTransaksiScreen() {
   const [selectedProduct, setSelectedProduct] = useState<string>('')
   const [productQty, setProductQty] = useState('1')
   const [showProductPicker, setShowProductPicker] = useState(false)
+  const [scanning, setScanning] = useState(false)
 
   useEffect(() => {
     fetchWallets()
@@ -220,6 +223,53 @@ export default function TambahTransaksiScreen() {
       .order('created_at', { ascending: false })
     if (data) {
       setProducts(data)
+    }
+  }
+
+  // Scan struk: kamera (native) / galeri (web) → Claude Vision baca → isi form
+  const CAT_MAP: Record<string, string> = {
+    makanan: 'Makan & Minum', belanja: 'Belanja', transport: 'Transport',
+    hiburan: 'Hiburan', kesehatan: 'Kesehatan', tagihan: 'Tagihan', pendidikan: 'Pendidikan',
+  }
+
+  const handleScanStruk = async () => {
+    try {
+      let result: ImagePicker.ImagePickerResult
+      if (Platform.OS === 'web') {
+        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true })
+      } else {
+        const perm = await ImagePicker.requestCameraPermissionsAsync()
+        result = perm.granted
+          ? await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true })
+      }
+      if (result.canceled || !result.assets?.[0]?.base64) return
+
+      const asset = result.assets[0]
+      const base64 = asset.base64 as string
+      const mimeType = asset.uri?.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
+      setScanning(true)
+
+      const prompt = `Analisis struk belanja ini, extract data sebagai JSON:
+{"store_name":"nama toko","date":"YYYY-MM-DD","total":<angka tanpa titik>,"category":"makanan/belanja/transport/hiburan/kesehatan/tagihan/pendidikan/lainnya"}
+Return ONLY valid JSON, tanpa markdown.`
+
+      const res = await claudeVision(base64, mimeType, prompt)
+      const clean = res.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const data = JSON.parse(clean)
+
+      // Isi form (user tinggal cek & Simpan)
+      setType('expense')
+      if (data.total) setAmount(Number(String(data.total).replace(/[^0-9]/g, '')).toLocaleString('id-ID'))
+      setCategory(CAT_MAP[String(data.category || '').toLowerCase()] || 'Lainnya')
+      if (data.store_name) setNote(`Struk: ${data.store_name}`)
+      if (typeof data.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(data.date)) setSelectedDate(data.date)
+
+      notify('Struk Terbaca ✅', 'Cek datanya dulu, lalu tap Simpan.')
+    } catch {
+      notify('Gagal Baca Struk', 'Pastikan foto struk jelas, lalu coba lagi.')
+    } finally {
+      setScanning(false)
     }
   }
 
@@ -483,6 +533,20 @@ export default function TambahTransaksiScreen() {
             </TouchableOpacity>
           ))}
         </View>
+
+        {/* Scan Struk — kamera/galeri → auto-isi form (hasil dikonfirmasi user) */}
+        {type !== 'transfer' && (
+          <TouchableOpacity style={styles.scanBtn} onPress={handleScanStruk} disabled={scanning}>
+            {scanning ? (
+              <>
+                <ActivityIndicator color={PRIMARY} size="small" />
+                <Text style={styles.scanBtnText}>Membaca struk...</Text>
+              </>
+            ) : (
+              <Text style={styles.scanBtnText}>📷 Scan Struk (auto-isi)</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         {/* Amount */}
         <View style={[styles.amountWrap, { borderColor: typeColor }]}>
@@ -804,6 +868,12 @@ const styles = StyleSheet.create({
   typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
   typeText: { fontSize: 12, color: '#888780', fontWeight: '500' },
   typeTextActive: { color: '#fff', fontWeight: '600' },
+  scanBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    backgroundColor: '#0D1A2E', borderRadius: 12, paddingVertical: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: PRIMARY + '50',
+  },
+  scanBtnText: { fontSize: 14, fontWeight: '600', color: PRIMARY },
   amountWrap: {
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1A1A',
     borderRadius: 16, paddingHorizontal: 20, marginBottom: 20,
