@@ -37,6 +37,9 @@ export default function LaporanScreen() {
   )
   const [monthlyIncome, setMonthlyIncome] = useState(0)
   const [budgetMethod, setBudgetMethod] = useState<BudgetMethod>('503020')
+  const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
+  const [wallets, setWallets] = useState<{ id: string; wallet_function: string }[]>([])
+  const [receivables, setReceivables] = useState<{ type: string; status: string; amount: number }[]>([])
 
   const fetchData = async () => {
     setLoading(true)
@@ -50,7 +53,7 @@ export default function LaporanScreen() {
       ? `${y + 1}-01-01`
       : `${y}-${String(m + 1).padStart(2, '0')}-01`
 
-    const [{ data }, { data: prefsRows }] = await Promise.all([
+    const [{ data }, { data: prefsRows }, { data: walletRows }, { data: receivableRows }] = await Promise.all([
       supabase
         .from('transactions')
         .select('*')
@@ -60,27 +63,52 @@ export default function LaporanScreen() {
         .order('date', { ascending: false }),
       supabase
         .from('user_preferences')
-        .select('monthly_income, budget_method')
+        .select('monthly_income, budget_method, active_mode')
         .eq('user_id', user?.id)
         .order('created_at', { ascending: true })
         .limit(1),
+      supabase
+        .from('user_wallets')
+        .select('id, wallet_function')
+        .eq('user_id', user?.id),
+      supabase
+        .from('receivables')
+        .select('type, status, amount')
+        .eq('user_id', user?.id),
     ])
 
     if (data) setTransactions(data)
+    if (walletRows) setWallets(walletRows)
+    if (receivableRows) setReceivables(receivableRows)
     const prefs = prefsRows?.[0]
     if (prefs) {
       setMonthlyIncome(prefs.monthly_income || 0)
       setBudgetMethod((prefs.budget_method as BudgetMethod) || '503020')
+      setActiveMode((prefs.active_mode as 'personal' | 'business') || 'personal')
     }
     setLoading(false)
   }
 
   useFocusEffect(useCallback(() => { fetchData() }, [selectedMonth]))
 
-  const realTransactions = transactions.filter(t => !t.is_wallet_transfer)
+  // Klasifikasi wallet → personal/business, lalu filter transaksi sesuai mode aktif.
+  // Laporan Pribadi hanya hitung transaksi dompet pribadi, Bisnis hanya dompet bisnis.
+  const walletFn = new Map(wallets.map(w => [w.id, w.wallet_function]))
+  const realTransactions = transactions.filter(
+    t => !t.is_wallet_transfer && walletFn.get(t.wallet_id || '') === activeMode
+  )
 
   const totalIncome = realTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
   const totalExpense = realTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+
+  // Metrik bisnis (piutang/hutang) — dari receivables pending
+  const totalPiutang = receivables
+    .filter(r => r.type === 'piutang' && r.status === 'pending')
+    .reduce((sum, r) => sum + r.amount, 0)
+  const totalHutang = receivables
+    .filter(r => r.type === 'hutang' && r.status === 'pending')
+    .reduce((sum, r) => sum + r.amount, 0)
+  const labaBersih = totalIncome - totalExpense
 
   const formatRupiah = (amount: number) => 'Rp ' + Math.abs(amount).toLocaleString('id-ID')
 
@@ -219,10 +247,18 @@ Dicatat pakai Zena 🌿`
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scroll}>
 
+          {/* Mode indicator */}
+          <View style={styles.modeRow}>
+            <Text style={[styles.modeChip, { color: activeMode === 'business' ? '#1D9E75' : PRIMARY,
+              borderColor: activeMode === 'business' ? '#1D9E75' : PRIMARY }]}>
+              {activeMode === 'business' ? '💼 Laporan Bisnis' : '👤 Laporan Pribadi'}
+            </Text>
+          </View>
+
           {/* Summary cards */}
           <View style={styles.summaryRow}>
             <View style={[styles.summaryCard, { borderTopColor: '#1D9E75' }]}>
-              <Text style={styles.summaryLabel}>Pemasukan</Text>
+              <Text style={styles.summaryLabel}>{activeMode === 'business' ? 'Omzet' : 'Pemasukan'}</Text>
               <Text style={[styles.summaryAmount, { color: '#1D9E75' }]}>
                 {formatRupiah(totalIncome)}
               </Text>
@@ -236,16 +272,34 @@ Dicatat pakai Zena 🌿`
           </View>
 
           <View style={[styles.summaryCard, styles.summaryCardFull,
-            { borderTopColor: totalIncome - totalExpense >= 0 ? '#1D9E75' : '#E24B4A' }]}>
-            <Text style={styles.summaryLabel}>Saldo bersih</Text>
+            { borderTopColor: labaBersih >= 0 ? '#1D9E75' : '#E24B4A' }]}>
+            <Text style={styles.summaryLabel}>{activeMode === 'business' ? 'Laba Bersih' : 'Saldo bersih'}</Text>
             <Text style={[styles.summaryAmount,
-              { color: totalIncome - totalExpense >= 0 ? '#1D9E75' : '#E24B4A' }]}>
-              {totalIncome - totalExpense >= 0 ? '+' : '-'}{formatRupiah(totalIncome - totalExpense)}
+              { color: labaBersih >= 0 ? '#1D9E75' : '#E24B4A' }]}>
+              {labaBersih >= 0 ? '+' : '-'}{formatRupiah(labaBersih)}
             </Text>
           </View>
 
-          {/* Budget tracking */}
-          {monthlyIncome > 0 && budgetBuckets.length > 0 && (
+          {/* BISNIS: Piutang & Hutang */}
+          {activeMode === 'business' && (
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryCard, { borderTopColor: '#1D9E75' }]}>
+                <Text style={styles.summaryLabel}>Piutang (belum ditagih)</Text>
+                <Text style={[styles.summaryAmount, { color: '#1D9E75', fontSize: 18 }]}>
+                  {formatRupiah(totalPiutang)}
+                </Text>
+              </View>
+              <View style={[styles.summaryCard, { borderTopColor: '#BA7517' }]}>
+                <Text style={styles.summaryLabel}>Hutang (belum dibayar)</Text>
+                <Text style={[styles.summaryAmount, { color: '#BA7517', fontSize: 18 }]}>
+                  {formatRupiah(totalHutang)}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Budget tracking — hanya mode Pribadi (konsep budget 50/30/20 dst) */}
+          {activeMode === 'personal' && monthlyIncome > 0 && budgetBuckets.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Budget Bulan Ini</Text>
               <Text style={styles.sectionSub}>Metode: {BUDGET_METHODS[budgetMethod]?.name}</Text>
@@ -273,8 +327,8 @@ Dicatat pakai Zena 🌿`
             </View>
           )}
 
-          {/* Savings rate */}
-          {monthlyIncome > 0 && (
+          {/* Savings rate — hanya mode Pribadi */}
+          {activeMode === 'personal' && monthlyIncome > 0 && (
             <View style={styles.savingsCard}>
               <Text style={styles.savingsLabel}>Saving Rate</Text>
               <Text style={styles.savingsValue}>
@@ -376,6 +430,11 @@ const styles = StyleSheet.create({
   monthArrow: { fontSize: 24, color: PRIMARY, fontWeight: '300' },
   monthLabel: { fontSize: 16, fontWeight: '600', color: '#fff', minWidth: 160, textAlign: 'center' },
   scroll: { flex: 1, paddingHorizontal: 20 },
+  modeRow: { marginBottom: 12, alignItems: 'flex-start' },
+  modeChip: {
+    fontSize: 13, fontWeight: '700', paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 20, borderWidth: 1, overflow: 'hidden',
+  },
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   summaryCard: {
     flex: 1, backgroundColor: '#1A1A1A', borderRadius: 12,

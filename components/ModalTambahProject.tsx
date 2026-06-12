@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   View,
   Text,
@@ -16,6 +16,8 @@ import { ProjectType } from '../types'
 import { PROJECT_TYPES } from '../constants/business'
 import { COLORS } from '../constants/theme'
 
+type BizWallet = { id: string; wallet_name: string; current_balance: number; icon: string }
+
 interface Props {
   visible: boolean
   onClose: () => void
@@ -28,7 +30,25 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
   const [type, setType] = useState<ProjectType>('alkes')
   const [contractValue, setContractValue] = useState('')
   const [dpAmount, setDpAmount] = useState('')
+  const [wallets, setWallets] = useState<BizWallet[]>([])
+  const [dpWalletId, setDpWalletId] = useState('')
   const [loading, setLoading] = useState(false)
+
+  // Ambil dompet bisnis untuk tujuan DP (income masuk ke sini)
+  useEffect(() => {
+    if (!visible) return
+    ;(async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data } = await supabase
+        .from('user_wallets')
+        .select('id, wallet_name, current_balance, icon')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .eq('wallet_function', 'business')
+      if (data) setWallets(data)
+    })()
+  }, [visible])
 
   async function handleSave() {
     if (!name.trim()) {
@@ -45,6 +65,10 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
     const dpNum = parseFloat(dpAmount.replace(/[^0-9]/g, '')) || 0
     if (dpNum > contractNum) {
       notify('Error', 'DP tidak boleh lebih besar dari nilai kontrak')
+      return
+    }
+    if (dpNum > 0 && !dpWalletId) {
+      notify('Error', 'Pilih dompet tujuan DP dulu (uang DP masuk ke sini)')
       return
     }
 
@@ -70,7 +94,7 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
 
       if (projectError) throw projectError
 
-      // 2. If DP > 0, create DP term
+      // 2. If DP > 0, create DP term (lunas) + transaksi PEMASUKAN + update saldo wallet
       if (dpNum > 0) {
         const { error: termError } = await supabase.from('project_terms').insert({
           project_id: project.id,
@@ -78,9 +102,33 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
           amount: dpNum,
           condition_text: 'Down Payment',
           paid_at: new Date().toISOString(),
+          wallet_id: dpWalletId,
         })
-
         if (termError) throw termError
+
+        // Transaksi pemasukan untuk DP (biar kecatat di laporan & saldo)
+        const { error: txError } = await supabase.from('transactions').insert({
+          user_id: session.user.id,
+          amount: dpNum,
+          type: 'income',
+          category: 'Bisnis',
+          wallet_id: dpWalletId,
+          wallet_source: dpWalletId,
+          project_id: project.id,
+          source: 'manual',
+          is_categorized: true,
+          note: `DP project: ${name.trim()}`,
+          date: new Date().toISOString(),
+        })
+        if (txError) throw txError
+
+        // Update saldo wallet (+DP)
+        const wallet = wallets.find(w => w.id === dpWalletId)
+        if (wallet) {
+          await supabase.from('user_wallets')
+            .update({ current_balance: wallet.current_balance + dpNum })
+            .eq('id', dpWalletId)
+        }
       }
 
       // 3. Create receivable for remaining amount
@@ -119,6 +167,7 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
     setType('alkes')
     setContractValue('')
     setDpAmount('')
+    setDpWalletId('')
   }
 
   function formatCurrency(value: string) {
@@ -234,6 +283,34 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
               </View>
               <Text style={styles.hint}>Jika sudah terima DP, masukkan nominalnya</Text>
             </View>
+
+            {/* Dompet tujuan DP — wajib kalau DP > 0 (uang DP masuk ke sini) */}
+            {(parseFloat(dpAmount.replace(/[^0-9]/g, '')) || 0) > 0 && (
+              <View style={styles.field}>
+                <Text style={styles.label}>
+                  DP Masuk ke Dompet <Text style={styles.required}>*</Text>
+                </Text>
+                {wallets.length === 0 ? (
+                  <Text style={[styles.hint, { color: COLORS.DANGER }]}>
+                    Belum ada dompet bisnis. Buat dulu di Profil (pilih "Bisnis").
+                  </Text>
+                ) : (
+                  <View style={{ gap: 8 }}>
+                    {wallets.map((w) => (
+                      <TouchableOpacity
+                        key={w.id}
+                        style={[styles.walletPick, dpWalletId === w.id && styles.walletPickActive]}
+                        onPress={() => setDpWalletId(w.id)}
+                        disabled={loading}
+                      >
+                        <Text style={styles.walletPickText}>{w.icon} {w.wallet_name}</Text>
+                        {dpWalletId === w.id && <Text style={styles.walletPickCheck}>✓</Text>}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
           </ScrollView>
 
           {/* Footer */}
@@ -380,6 +457,14 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_LIGHT,
     marginTop: 4,
   },
+  walletPick: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: COLORS.BACKGROUND, borderWidth: 1, borderColor: COLORS.BORDER,
+    borderRadius: 8, paddingHorizontal: 12, paddingVertical: 12,
+  },
+  walletPickActive: { backgroundColor: COLORS.PRIMARY + '10', borderColor: COLORS.PRIMARY },
+  walletPickText: { fontSize: 14, color: COLORS.TEXT, fontWeight: '500' },
+  walletPickCheck: { fontSize: 16, color: COLORS.PRIMARY, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
     gap: 12,
