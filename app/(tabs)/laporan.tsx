@@ -42,13 +42,21 @@ export default function LaporanScreen() {
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Batas akhir = awal bulan BERIKUTNYA (pakai .lt), supaya tidak pakai
+    // '-31' yang invalid untuk bulan <31 hari (Feb/Apr/Jun/Sep/Nov) yang
+    // bikin query error & laporan kosong.
+    const [y, m] = selectedMonth.split('-').map(Number)
+    const nextMonth = m === 12
+      ? `${y + 1}-01-01`
+      : `${y}-${String(m + 1).padStart(2, '0')}-01`
+
     const [{ data }, { data: prefsRows }] = await Promise.all([
       supabase
         .from('transactions')
         .select('*')
         .eq('user_id', user?.id)
         .gte('date', selectedMonth + '-01')
-        .lte('date', selectedMonth + '-31')
+        .lt('date', nextMonth)
         .order('date', { ascending: false }),
       supabase
         .from('user_preferences')

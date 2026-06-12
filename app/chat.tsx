@@ -167,8 +167,10 @@ export default function ChatScreen() {
       setMessages(prev => [...prev, { role: 'assistant', content: response }])
       // Voice output disabled - TODO: Implement with expo-audio
       // if (voiceEnabled) speak(response, persona, language === 'en' ? 'en-US' : language === 'zh' ? 'zh-CN' : language === 'my' ? 'ms-MY' : 'id-ID')
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, lagi gangguan bentar. Coba lagi ya!' }])
+    } catch (err: any) {
+      // Tampilkan error asli (sementara) supaya gampang debug kalau masih gagal
+      const detail = err?.message ? `\n\n(${String(err.message).slice(0, 200)})` : ''
+      setMessages(prev => [...prev, { role: 'assistant', content: `Maaf, lagi gangguan bentar. Coba lagi ya!${detail}` }])
     }
     setLoading(false)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)

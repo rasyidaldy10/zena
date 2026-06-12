@@ -13,6 +13,7 @@ import MarketWidget from '../../components/MarketWidget'
 import StockWidget from '../../components/StockWidget'
 
 const PRIMARY = '#185FA5'
+const BUSINESS = '#1D9E75' // hijau — aksen mode bisnis
 const BG_APP = '#F4F7FA'
 const CARD_BG = '#FFFFFF'
 const TEXT_MAIN = '#0D1B3E'
@@ -237,7 +238,7 @@ export default function HomeScreen() {
       />
 
       {/* HEADER */}
-      <View style={styles.header}>
+      <View style={[styles.header, activeMode === 'business' && { backgroundColor: BUSINESS }]}>
         <View style={styles.headerLeft}>
           <Image
             source={require('../../assets/icon.png')}
