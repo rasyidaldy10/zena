@@ -41,14 +41,53 @@ const ASSET_LABELS: Record<InvestmentAssetType, string> = {
   obligasi: 'Obligasi',
 }
 
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
+
 export default function InvestmentPortfolioScreen() {
   const [holdings, setHoldings] = useState<InvestmentHolding[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshingPrice, setRefreshingPrice] = useState(false)
   const [filter, setFilter] = useState<FilterType>('all')
 
   useEffect(() => {
     fetchHoldings()
   }, [])
+
+  // Refresh harga saham dari Yahoo Finance (edge function stock-price)
+  async function handleRefreshPrices() {
+    const stocks = holdings.filter(h => h.asset_type === 'stock')
+    if (stocks.length === 0) {
+      Alert.alert('Info', 'Belum ada saham untuk di-update harganya.')
+      return
+    }
+    try {
+      setRefreshingPrice(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const res = await fetch(`${SUPABASE_URL}/functions/v1/stock-price`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ symbols: stocks.map(h => h.symbol) }),
+      })
+      const { prices } = await res.json()
+
+      for (const h of stocks) {
+        const p = prices?.[h.symbol]
+        if (typeof p === 'number') {
+          await supabase.from('investment_holdings')
+            .update({ current_price: p, last_updated_at: new Date().toISOString() })
+            .eq('id', h.id)
+        }
+      }
+      await fetchHoldings()
+      Alert.alert('Harga Diupdate ✅', 'Harga saham terbaru dari Yahoo Finance (delay ~15 menit).')
+    } catch (e: any) {
+      Alert.alert('Gagal', 'Tidak bisa ambil harga. Coba lagi.')
+    } finally {
+      setRefreshingPrice(false)
+    }
+  }
 
   async function fetchHoldings() {
     try {
@@ -98,7 +137,7 @@ export default function InvestmentPortfolioScreen() {
           <Text style={styles.backText}>← Kembali</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Portfolio Investasi</Text>
-        <TouchableOpacity onPress={() => Alert.alert('Tambah Holding', 'Fitur tambah asset segera hadir!')}>
+        <TouchableOpacity onPress={() => router.push('/tambah-investasi')}>
           <Text style={styles.addBtn}>+</Text>
         </TouchableOpacity>
       </View>
@@ -128,6 +167,15 @@ export default function InvestmentPortfolioScreen() {
               </Text>
             </View>
             <Text style={styles.summaryDesc}>{filteredHoldings.length} asset dalam portfolio</Text>
+            <TouchableOpacity
+              style={styles.refreshPriceBtn}
+              onPress={handleRefreshPrices}
+              disabled={refreshingPrice}
+            >
+              {refreshingPrice
+                ? <ActivityIndicator color={PRIMARY} size="small" />
+                : <Text style={styles.refreshPriceText}>🔄 Update Harga Saham (Yahoo Finance)</Text>}
+            </TouchableOpacity>
           </View>
 
           {/* FILTER TABS */}
@@ -170,7 +218,7 @@ export default function InvestmentPortfolioScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.emptyBtn}
-                onPress={() => Alert.alert('Tambah Asset', 'Fitur ini sedang dalam pengembangan')}
+                onPress={() => router.push('/tambah-investasi')}
               >
                 <Text style={styles.emptyBtnText}>+ Tambah Asset</Text>
               </TouchableOpacity>
@@ -309,6 +357,11 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.7)',
     marginTop: 8,
   },
+  refreshPriceBtn: {
+    marginTop: 12, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10,
+    paddingVertical: 10, alignItems: 'center',
+  },
+  refreshPriceText: { fontSize: 12, fontWeight: '600', color: '#fff' },
 
   filterScroll: {
     paddingHorizontal: 20,
