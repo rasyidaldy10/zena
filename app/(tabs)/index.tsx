@@ -395,7 +395,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-receivables')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>💰</Text>
+                <Text style={styles.businessStatIcon}>📥</Text>
                 <Text style={styles.businessStatLabel}>Piutang</Text>
                 <Text style={[styles.businessStatValue, { color: '#16A34A' }]}>
                   Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
@@ -408,7 +408,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-receivables')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>🔴</Text>
+                <Text style={styles.businessStatIcon}>📤</Text>
                 <Text style={styles.businessStatLabel}>Hutang</Text>
                 <Text style={[styles.businessStatValue, { color: '#E24B4A' }]}>
                   Rp {businessStats.totalHutang.toLocaleString('id-ID')}
@@ -421,7 +421,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-projects')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>📊</Text>
+                <Text style={styles.businessStatIcon}>📋</Text>
                 <Text style={styles.businessStatLabel}>Project Aktif</Text>
                 <Text style={[styles.businessStatValue, { color: '#185FA5' }]}>
                   {businessStats.activeProjectsCount} Project
@@ -434,7 +434,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-inventory')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>⚠️</Text>
+                <Text style={styles.businessStatIcon}>📦</Text>
                 <Text style={styles.businessStatLabel}>Stok Rendah</Text>
                 <Text style={[styles.businessStatValue, { color: '#F59E0B' }]}>
                   {businessStats.lowStockCount} Produk
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG_APP },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 40,
+    paddingHorizontal: 20, paddingTop: 52, paddingBottom: 22,
     borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
@@ -699,9 +699,9 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
-  // Mode toggle pill (card putih)
+  // Mode toggle pill (card putih) — no negative margin biar TIDAK ke-clip ScrollView
   modeCard: {
-    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: -22,
+    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: 14,
     borderRadius: RADIUS.lg, padding: 5, ...SHADOW.card,
   },
   modePill: { flexDirection: 'row', backgroundColor: '#F1F4F9', borderRadius: RADIUS.md, padding: 4 },
