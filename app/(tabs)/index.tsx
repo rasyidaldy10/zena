@@ -283,7 +283,7 @@ export default function HomeScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(tabs)/profil')}>
+          <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/pengaturan')}>
             <Ionicons name="settings-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
