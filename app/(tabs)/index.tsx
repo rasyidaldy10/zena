@@ -9,8 +9,7 @@ import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
-import MarketWidget from '../../components/MarketWidget'
-import StockWidget from '../../components/StockWidget'
+import PortfolioWidget from '../../components/PortfolioWidget'
 
 const PRIMARY = '#185FA5'
 const BUSINESS = '#1D9E75' // hijau — aksen mode bisnis
@@ -595,11 +594,8 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        {/* MARKET DATA */}
-        <MarketWidget />
-
-        {/* STOCK MARKET - Temporarily hidden (mock data not valid) */}
-        {/* <StockWidget /> */}
+        {/* PORTOFOLIO INVESTASI — cuma aset yang user punya (bukan market umum) */}
+        <PortfolioWidget />
         </>
         )}
 

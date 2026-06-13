@@ -188,14 +188,25 @@ export default function TambahTransaksiScreen() {
 
   const fetchWallets = async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data } = await supabase
-      .from('user_wallets')
-      .select('id, wallet_name, wallet_function, icon, color, current_balance')
-      .eq('user_id', user?.id)
-      .eq('is_active', true)
+    const [{ data }, { data: prefsRows }] = await Promise.all([
+      supabase
+        .from('user_wallets')
+        .select('id, wallet_name, wallet_function, icon, color, current_balance')
+        .eq('user_id', user?.id)
+        .eq('is_active', true),
+      supabase
+        .from('user_preferences')
+        .select('active_mode')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: true })
+        .limit(1),
+    ])
     if (data && data.length > 0) {
       setWallets(data)
-      setSelectedWallet(data[0].id)
+      // Smart default: pilih wallet yang sesuai mode aktif (tetap bisa diganti)
+      const activeMode = prefsRows?.[0]?.active_mode || 'personal'
+      const matched = data.find(w => w.wallet_function === activeMode)
+      setSelectedWallet((matched || data[0]).id)
       setToWallet(data.length > 1 ? data[1].id : data[0].id)
     }
   }
@@ -592,6 +603,9 @@ Return ONLY valid JSON, tanpa markdown.`
                         {w.wallet_name}
                       </Text>
                       <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                      <Text style={[styles.walletBadge, { color: w.wallet_function === 'business' ? GREEN : PRIMARY }]}>
+                        {w.wallet_function === 'business' ? '💼 Bisnis' : '👤 Pribadi'}
+                      </Text>
                     </View>
                   </TouchableOpacity>
                 ))}
@@ -900,6 +914,7 @@ const styles = StyleSheet.create({
   walletName: { fontSize: 13, fontWeight: '600', color: '#fff' },
   walletNameActive: { color: PRIMARY },
   walletBalance: { fontSize: 11, color: '#888780', marginTop: 2 },
+  walletBadge: { fontSize: 10, fontWeight: '700', marginTop: 3 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   catBtn: {
     paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
