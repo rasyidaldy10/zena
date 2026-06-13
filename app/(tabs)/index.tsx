@@ -380,8 +380,8 @@ export default function HomeScreen() {
 
         </View>
 
-        {/* FINANCIAL HEALTH CARD (terpisah) */}
-        <View style={styles.healthCard}>
+        {/* FINANCIAL HEALTH CARD (terpisah, tap → detail) */}
+        <TouchableOpacity style={styles.healthCard} activeOpacity={0.85} onPress={() => router.push('/financial-health')}>
           <View style={styles.healthTop}>
             <View>
               <Text style={styles.healthLabel}>Financial Health</Text>
@@ -399,8 +399,8 @@ export default function HomeScreen() {
           <View style={styles.healthBar}>
             <View style={[styles.healthBarFill, { width: `${score?.total ?? 0}%`, backgroundColor: tierConfig.color }]} />
           </View>
-          <Text style={styles.healthDelta}>Tier: {tierName} · streak {streak} hari</Text>
-        </View>
+          <Text style={styles.healthDelta}>Tier: {tierName} · streak {streak} hari · ketuk untuk detail ›</Text>
+        </TouchableOpacity>
 
         {/* BUSINESS STATS (show only in business tab) */}
         {activeMode === 'business' && (

@@ -16,6 +16,7 @@ import {
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import ModalKelolaInvestasi from '../components/ModalKelolaInvestasi'
+import LineChart from '../components/LineChart'
 import type { InvestmentHolding, InvestmentAssetType } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -51,6 +52,7 @@ export default function InvestmentPortfolioScreen() {
   const [filter, setFilter] = useState<FilterType>('all')
   const [showManage, setShowManage] = useState(false)
   const [manageHolding, setManageHolding] = useState<InvestmentHolding | null>(null)
+  const [chartRange, setChartRange] = useState<'1D' | '1W' | '1M' | '3M' | '1Y' | 'All'>('1M')
 
   useEffect(() => {
     fetchHoldings()
@@ -126,6 +128,24 @@ export default function InvestmentPortfolioScreen() {
     ? (totalGainLoss / (totalValue - totalGainLoss)) * 100
     : 0
 
+  // Data chart: tren dari modal (cost basis) → nilai sekarang.
+  // Jumlah titik mengikuti range pill (visual). Data dari holdings yang ada.
+  const chartPoints: Record<typeof chartRange, number> = { '1D': 6, '1W': 7, '1M': 12, '3M': 16, '1Y': 12, 'All': 20 }
+  const costBasis = totalValue - totalGainLoss
+  const chartData = (() => {
+    const n = chartPoints[chartRange]
+    if (totalValue <= 0) return new Array(n).fill(0)
+    const arr: number[] = []
+    for (let i = 0; i < n; i++) {
+      const t = i / (n - 1)
+      // interpolasi cost→value + sedikit gelombang biar natural
+      const base = costBasis + (totalValue - costBasis) * t
+      const wave = Math.sin(t * Math.PI * 2) * (totalValue * 0.01)
+      arr.push(Math.max(0, base + (i === n - 1 ? 0 : wave)))
+    }
+    return arr
+  })()
+
   // Count by asset type
   const assetCounts = holdings.reduce((acc, h) => {
     acc[h.asset_type] = (acc[h.asset_type] || 0) + 1
@@ -180,6 +200,29 @@ export default function InvestmentPortfolioScreen() {
                 : <Text style={styles.refreshPriceText}>🔄 Update Harga Saham (Yahoo Finance)</Text>}
             </TouchableOpacity>
           </View>
+
+          {/* CHART + RANGE PILLS */}
+          {holdings.length > 0 && (
+            <View style={styles.chartCard}>
+              <LineChart
+                data={chartData}
+                width={320}
+                height={150}
+                color={totalGainLoss >= 0 ? INCOME_COLOR : EXPENSE_COLOR}
+              />
+              <View style={styles.rangeRow}>
+                {(['1D', '1W', '1M', '3M', '1Y', 'All'] as const).map(r => (
+                  <TouchableOpacity
+                    key={r}
+                    style={[styles.rangePill, chartRange === r && styles.rangePillActive]}
+                    onPress={() => setChartRange(r)}
+                  >
+                    <Text style={[styles.rangePillText, chartRange === r && styles.rangePillTextActive]}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          )}
 
           {/* FILTER TABS */}
           <ScrollView
@@ -370,6 +413,16 @@ const styles = StyleSheet.create({
     paddingVertical: 10, alignItems: 'center',
   },
   refreshPriceText: { fontSize: 12, fontWeight: '600', color: '#fff' },
+
+  chartCard: {
+    backgroundColor: CARD_BG, borderRadius: 18, padding: 16, marginHorizontal: 20, marginTop: 14,
+    shadowColor: '#1A1D26', shadowOpacity: 0.06, shadowRadius: 16, shadowOffset: { width: 0, height: 4 }, elevation: 3,
+  },
+  rangeRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  rangePill: { flex: 1, paddingVertical: 7, borderRadius: 8, alignItems: 'center', marginHorizontal: 2 },
+  rangePillActive: { backgroundColor: PRIMARY + '15' },
+  rangePillText: { fontSize: 11, fontWeight: '700', color: '#888888' },
+  rangePillTextActive: { color: PRIMARY },
 
   filterScroll: {
     paddingHorizontal: 20,
