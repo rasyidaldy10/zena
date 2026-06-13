@@ -11,6 +11,7 @@ import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
 import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
+import { setAppMode } from '../../lib/modeStore'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 import PortfolioWidget from '../../components/PortfolioWidget'
 
@@ -75,6 +76,7 @@ export default function HomeScreen() {
     // Set active mode from preferences
     if (prefsObj?.active_mode) {
       setActiveMode(prefsObj.active_mode as TabMode)
+      setAppMode(prefsObj.active_mode as TabMode)
     }
 
     // Fetch business stats kalau sedang di mode bisnis (active_mode), supaya
@@ -181,6 +183,7 @@ export default function HomeScreen() {
   const selectMode = async (newMode: TabMode) => {
     if (newMode === activeMode) return
     setActiveMode(newMode)
+    setAppMode(newMode)
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
       await supabase
@@ -323,14 +326,28 @@ export default function HomeScreen() {
               <Text style={styles.balanceAmount}>
                 {balanceVisible ? `Rp ${balance.toLocaleString('id-ID')}` : 'Rp ••••••'}
               </Text>
-              <Text style={styles.balanceChange}>↑ +12% bulan ini</Text>
+              <View style={styles.balanceChangeRow}>
+                <Ionicons name="trending-up" size={13} color={INCOME_COLOR} />
+                <Text style={styles.balanceChange}>12% bulan ini</Text>
+              </View>
             </View>
-            <TouchableOpacity
-              style={styles.rincianBtn}
-              onPress={() => setRincianExpanded(!rincianExpanded)}
-            >
-              <Text style={styles.rincianBtnText}>Rincian</Text>
-            </TouchableOpacity>
+            <View style={{ alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' }}>
+              <TouchableOpacity
+                style={styles.rincianBtn}
+                onPress={() => setRincianExpanded(!rincianExpanded)}
+              >
+                <Text style={styles.rincianBtnText}>Rincian</Text>
+                <Ionicons name="chevron-forward" size={13} color={activeMode === 'business' ? BUSINESS : PRIMARY} />
+              </TouchableOpacity>
+              {/* Ilustrasi dekoratif (icon, no copyright) */}
+              <View style={[styles.balanceArt, { backgroundColor: (activeMode === 'business' ? BUSINESS : PRIMARY) + '14' }]}>
+                <Ionicons
+                  name={activeMode === 'business' ? 'business' : 'wallet'}
+                  size={32}
+                  color={activeMode === 'business' ? BUSINESS : PRIMARY}
+                />
+              </View>
+            </View>
           </View>
 
           {/* Expanded Wallet List — difilter sesuai mode aktif biar konsisten
@@ -695,11 +712,14 @@ const styles = StyleSheet.create({
   balanceLeft: { flex: 1 },
   balanceLabel: { fontSize: 13, color: TEXT_SECONDARY },
   balanceAmount: { fontSize: 28, fontWeight: '800', color: TEXT_MAIN, marginTop: 4 },
-  balanceChange: { fontSize: 12, color: INCOME_COLOR, marginTop: 4 },
+  balanceChangeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 },
+  balanceChange: { fontSize: 12, color: INCOME_COLOR, fontWeight: '600' },
   rincianBtn: {
-    backgroundColor: PRIMARY + '10', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center', gap: 2,
+    backgroundColor: PRIMARY + '10', borderRadius: 12, paddingVertical: 8, paddingHorizontal: 14,
   },
   rincianBtnText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
+  balanceArt: { width: 56, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   walletList: { marginTop: 16, gap: 12 },
   walletEmptyHint: { fontSize: 12, color: '#888780', lineHeight: 18, paddingVertical: 4 },
   walletItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },

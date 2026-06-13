@@ -3,20 +3,23 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { COLORS } from '../../constants/theme'
+import { useAppMode } from '../../lib/modeStore'
 
-const PRIMARY = COLORS.primary
 const MUTED = COLORS.textMuted
 
-function TabIcon({ focused, icon, label }: { focused: boolean; icon: keyof typeof Ionicons.glyphMap; label: string }) {
+function TabIcon({ focused, icon, label, accent }: { focused: boolean; icon: keyof typeof Ionicons.glyphMap; label: string; accent: string }) {
   return (
     <View style={styles.tabItem}>
-      <Ionicons name={icon} size={22} color={focused ? PRIMARY : MUTED} />
-      <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{label}</Text>
+      <Ionicons name={icon} size={22} color={focused ? accent : MUTED} />
+      <Text style={[styles.tabLabel, focused && { color: accent, fontWeight: '600' }]}>{label}</Text>
     </View>
   )
 }
 
 export default function TabsLayout() {
+  // FAB + tab aktif ikut warna mode (biru pribadi / hijau bisnis)
+  const mode = useAppMode()
+  const accent = mode === 'business' ? COLORS.business : COLORS.primary
   return (
     <Tabs
       screenOptions={{
@@ -29,7 +32,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={focused ? 'home' : 'home-outline'} label="Home" />
+            <TabIcon accent={accent} focused={focused} icon={focused ? 'home' : 'home-outline'} label="Home" />
           ),
         }}
       />
@@ -37,7 +40,7 @@ export default function TabsLayout() {
         name="laporan"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={focused ? 'stats-chart' : 'stats-chart-outline'} label="Laporan" />
+            <TabIcon accent={accent} focused={focused} icon={focused ? 'stats-chart' : 'stats-chart-outline'} label="Laporan" />
           ),
         }}
       />
@@ -50,10 +53,10 @@ export default function TabsLayout() {
               style={styles.addBtnWrap}
               onPress={() => router.push('/tambah-transaksi')}
             >
-              <View style={styles.addBtn}>
+              <View style={[styles.addBtn, { backgroundColor: accent, shadowColor: accent }]}>
                 <Ionicons name="add" size={32} color="#fff" />
               </View>
-              <Text style={styles.zenaBtnLabel}>Catat</Text>
+              <Text style={[styles.zenaBtnLabel, { color: accent }]}>Catat</Text>
             </TouchableOpacity>
           ),
         }}
@@ -62,7 +65,7 @@ export default function TabsLayout() {
         name="reminder"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={focused ? 'notifications' : 'notifications-outline'} label="Reminder" />
+            <TabIcon accent={accent} focused={focused} icon={focused ? 'notifications' : 'notifications-outline'} label="Reminder" />
           ),
         }}
       />
@@ -70,7 +73,7 @@ export default function TabsLayout() {
         name="profil"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon={focused ? 'person' : 'person-outline'} label="Profil" />
+            <TabIcon accent={accent} focused={focused} icon={focused ? 'person' : 'person-outline'} label="Profil" />
           ),
         }}
       />
@@ -97,7 +100,7 @@ const styles = StyleSheet.create({
   tabIcon: { fontSize: 22, opacity: 0.4 },
   tabIconActive: { opacity: 1 },
   tabLabel: { fontSize: 10, color: '#888888', marginTop: 4 },
-  tabLabelActive: { color: PRIMARY, fontWeight: '600' },
+  tabLabelActive: { color: COLORS.primary, fontWeight: '600' },
   addBtnWrap: {
     flex: 1,
     alignItems: 'center',
@@ -108,10 +111,10 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: PRIMARY,
+    backgroundColor: COLORS.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: PRIMARY,
+    shadowColor: COLORS.primary,
     shadowOpacity: 0.4,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
@@ -121,7 +124,7 @@ const styles = StyleSheet.create({
   zenaBtnLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: PRIMARY,
+    color: COLORS.primary,
     marginTop: 6,
   },
 })
