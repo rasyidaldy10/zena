@@ -5,16 +5,21 @@ import {
   ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
+import { Ionicons } from '@expo/vector-icons'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { notify } from '../lib/alert'
 import { claudeVision } from '../lib/claude'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
+import { COLORS, RADIUS, SHADOW } from '../constants/theme'
 
-const PRIMARY = '#185FA5'
-const GREEN = '#1D9E75'
-const RED = '#E24B4A'
-const PURPLE = '#534AB7'
+const PRIMARY = COLORS.primary
+const GREEN = COLORS.income
+const RED = COLORS.expense
+const PURPLE = '#7C3AED'
+const TEXT_MAIN = COLORS.text
+const TEXT_MUTED = COLORS.textMuted
+const BG_APP = COLORS.bg
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? ''
 
 const triggerAgents = (
@@ -518,31 +523,37 @@ Return ONLY valid JSON, tanpa markdown.`
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Text style={styles.backText}>← Kembali</Text>
+        <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
+          <Ionicons name="close" size={24} color={TEXT_MAIN} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Catat Transaksi</Text>
-        <View style={{ width: 80 }} />
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* Type Toggle */}
+        {/* Type Toggle — segmented pill */}
         <View style={styles.typeToggle}>
-          {(['expense', 'income', 'transfer'] as TxType[]).map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[
-                styles.typeBtn,
-                type === t && { backgroundColor: t === 'expense' ? RED : t === 'income' ? GREEN : PURPLE }
-              ]}
-              onPress={() => setType(t)}
-            >
-              <Text style={[styles.typeText, type === t && styles.typeTextActive]}>
-                {t === 'expense' ? '💸 Keluar' : t === 'income' ? '💰 Masuk' : '🔄 Transfer'}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {(['income', 'expense', 'transfer'] as TxType[]).map((t) => {
+            const c = t === 'income' ? GREEN : t === 'expense' ? RED : PURPLE
+            return (
+              <TouchableOpacity
+                key={t}
+                style={[styles.typeBtn, type === t && { backgroundColor: c }]}
+                onPress={() => setType(t)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name={t === 'income' ? 'arrow-down' : t === 'expense' ? 'arrow-up' : 'swap-horizontal'}
+                  size={15}
+                  color={type === t ? '#fff' : c}
+                />
+                <Text style={[styles.typeText, type === t && styles.typeTextActive]}>
+                  {t === 'income' ? 'Pemasukan' : t === 'expense' ? 'Pengeluaran' : 'Transfer'}
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
         </View>
 
         {/* Scan Struk — kamera/galeri → auto-isi form (hasil dikonfirmasi user) */}
@@ -780,7 +791,7 @@ Return ONLY valid JSON, tanpa markdown.`
           {loading
             ? <ActivityIndicator color="#fff" />
             : <Text style={styles.saveBtnText}>
-                {type === 'transfer' ? '🔄 Simpan Transfer' : '✅ Simpan Transaksi'}
+                {type === 'transfer' ? 'Simpan Transfer' : 'Simpan Transaksi'}
               </Text>
           }
         </TouchableOpacity>
@@ -864,129 +875,130 @@ Return ONLY valid JSON, tanpa markdown.`
   )
 }
 
+const CARD = COLORS.card
+const BORDER = COLORS.border
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F' },
+  container: { flex: 1, backgroundColor: BG_APP },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
-    borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+    paddingHorizontal: 16, paddingTop: 52, paddingBottom: 14, backgroundColor: CARD,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  backBtn: { width: 80 },
-  backText: { fontSize: 14, color: PRIMARY },
-  headerTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
-  scroll: { flex: 1, paddingHorizontal: 20 },
+  closeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: BG_APP },
+  headerTitle: { fontSize: 17, fontWeight: '700', color: TEXT_MAIN },
+  scroll: { flex: 1, paddingHorizontal: 16 },
   typeToggle: {
-    flexDirection: 'row', backgroundColor: '#1A1A1A',
-    borderRadius: 12, padding: 3, marginTop: 20, marginBottom: 20, gap: 3,
+    flexDirection: 'row', backgroundColor: '#F1F4F9',
+    borderRadius: RADIUS.md, padding: 4, marginTop: 16, marginBottom: 20, gap: 4,
   },
-  typeBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-  typeText: { fontSize: 12, color: '#888780', fontWeight: '500' },
-  typeTextActive: { color: '#fff', fontWeight: '600' },
+  typeBtn: { flex: 1, flexDirection: 'row', gap: 5, paddingVertical: 11, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
+  typeText: { fontSize: 12.5, color: TEXT_MUTED, fontWeight: '700' },
+  typeTextActive: { color: '#fff', fontWeight: '700' },
   scanBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    backgroundColor: '#0D1A2E', borderRadius: 12, paddingVertical: 14, marginBottom: 16,
-    borderWidth: 1, borderColor: PRIMARY + '50',
+    backgroundColor: PRIMARY + '12', borderRadius: RADIUS.md, paddingVertical: 14, marginBottom: 16,
+    borderWidth: 1, borderColor: PRIMARY + '30',
   },
-  scanBtnText: { fontSize: 14, fontWeight: '600', color: PRIMARY },
+  scanBtnText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
   amountWrap: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#1A1A1A',
-    borderRadius: 16, paddingHorizontal: 20, marginBottom: 20,
-    borderWidth: 1.5,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: CARD,
+    borderRadius: RADIUS.lg, paddingHorizontal: 20, marginBottom: 20,
+    borderWidth: 1.5, ...SHADOW.card,
   },
-  amountPrefix: { fontSize: 24, color: '#888780', marginRight: 8 },
-  amountInput: { flex: 1, fontSize: 32, fontWeight: '600', color: '#fff', paddingVertical: 16 },
-  label: { fontSize: 12, fontWeight: '600', color: '#888780', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  amountPrefix: { fontSize: 24, color: TEXT_MUTED, marginRight: 8, fontWeight: '700' },
+  amountInput: { flex: 1, fontSize: 32, fontWeight: '800', color: TEXT_MAIN, paddingVertical: 16 },
+  label: { fontSize: 12, fontWeight: '700', color: TEXT_MUTED, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateBtn: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    marginBottom: 12, borderWidth: 0.5, borderColor: '#2A2A2A',
+    backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 12, borderWidth: 1, borderColor: BORDER,
   },
-  dateBtnText: { fontSize: 14, color: '#fff' },
-  dateBtnArrow: { fontSize: 12, color: '#888780' },
+  dateBtnText: { fontSize: 14, color: TEXT_MAIN, fontWeight: '600' },
+  dateBtnArrow: { fontSize: 12, color: TEXT_MUTED },
   walletRow: { flexDirection: 'row', gap: 10 },
   walletBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 12,
-    borderWidth: 0.5, borderColor: '#2A2A2A', minWidth: 140,
+    backgroundColor: CARD, borderRadius: RADIUS.md, padding: 12,
+    borderWidth: 1, borderColor: BORDER, minWidth: 150,
   },
   walletBtnActive: { borderColor: PRIMARY, borderWidth: 2 },
   walletIcon: { fontSize: 22 },
-  walletName: { fontSize: 13, fontWeight: '600', color: '#fff' },
+  walletName: { fontSize: 13, fontWeight: '700', color: TEXT_MAIN },
   walletNameActive: { color: PRIMARY },
-  walletBalance: { fontSize: 11, color: '#888780', marginTop: 2 },
+  walletBalance: { fontSize: 11, color: TEXT_MUTED, marginTop: 2 },
   walletBadge: { fontSize: 10, fontWeight: '700', marginTop: 3 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   catBtn: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.pill,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
-  catText: { fontSize: 12, color: '#888780' },
-  catTextActive: { color: '#fff', fontWeight: '600' },
+  catText: { fontSize: 12, color: TEXT_MUTED, fontWeight: '600' },
+  catTextActive: { color: '#fff', fontWeight: '700' },
   noteInput: {
-    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14,
-    fontSize: 14, color: '#fff', borderWidth: 0.5, borderColor: '#2A2A2A',
+    backgroundColor: CARD, borderRadius: RADIUS.md, padding: 14,
+    fontSize: 14, color: TEXT_MAIN, borderWidth: 1, borderColor: BORDER,
     minHeight: 80, marginBottom: 24, textAlignVertical: 'top',
   },
   saveBtn: {
-    height: 52, borderRadius: 14,
-    alignItems: 'center', justifyContent: 'center',
+    height: 54, borderRadius: RADIUS.lg,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 30,
   },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   transferWarning: {
-    backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14,
-    borderWidth: 1, borderColor: '#BA7517', marginBottom: 16,
+    backgroundColor: '#FFF7E6', borderRadius: RADIUS.md, padding: 14,
+    borderWidth: 1, borderColor: COLORS.warning + '60', marginBottom: 16,
   },
-  transferWarningText: { fontSize: 13, color: '#BA7517', lineHeight: 20 },
+  transferWarningText: { fontSize: 13, color: '#9A6700', lineHeight: 20 },
   linkTabs: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   linkTab: {
-    paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
+    paddingHorizontal: 14, paddingVertical: 9, borderRadius: RADIUS.pill,
+    backgroundColor: CARD, borderWidth: 1, borderColor: BORDER,
   },
-  linkTabActive: { backgroundColor: PRIMARY + '30', borderColor: PRIMARY },
-  linkTabText: { fontSize: 13, color: '#888780' },
-  linkTabTextActive: { color: '#fff', fontWeight: '600' },
+  linkTabActive: { backgroundColor: PRIMARY + '15', borderColor: PRIMARY },
+  linkTabText: { fontSize: 13, color: TEXT_MUTED, fontWeight: '600' },
+  linkTabTextActive: { color: PRIMARY, fontWeight: '700' },
   qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
   qtyBtn: {
-    width: 44, height: 44, borderRadius: 12, backgroundColor: '#1A1A1A',
-    alignItems: 'center', justifyContent: 'center', borderWidth: 0.5, borderColor: '#2A2A2A',
+    width: 44, height: 44, borderRadius: RADIUS.md, backgroundColor: CARD,
+    alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: BORDER,
   },
-  qtyBtnText: { fontSize: 22, color: '#fff', fontWeight: '600' },
+  qtyBtnText: { fontSize: 22, color: TEXT_MAIN, fontWeight: '700' },
   qtyInput: {
-    flex: 1, height: 44, backgroundColor: '#1A1A1A', borderRadius: 12,
-    textAlign: 'center', fontSize: 16, color: '#fff', borderWidth: 0.5, borderColor: '#2A2A2A',
+    flex: 1, height: 44, backgroundColor: CARD, borderRadius: RADIUS.md,
+    textAlign: 'center', fontSize: 16, color: TEXT_MAIN, borderWidth: 1, borderColor: BORDER,
   },
-  productInfo: { fontSize: 12, color: '#888780', marginBottom: 16, lineHeight: 18 },
+  productInfo: { fontSize: 12, color: TEXT_MUTED, marginBottom: 16, lineHeight: 18 },
   projectPicker: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
-    marginBottom: 8, borderWidth: 0.5, borderColor: '#2A2A2A',
+    backgroundColor: CARD, borderRadius: RADIUS.md, paddingHorizontal: 16, paddingVertical: 14,
+    marginBottom: 8, borderWidth: 1, borderColor: BORDER,
   },
-  projectPickerText: { fontSize: 14, color: '#fff' },
-  projectPickerArrow: { fontSize: 18, color: '#888780' },
+  projectPickerText: { fontSize: 14, color: TEXT_MAIN, fontWeight: '600' },
+  projectPickerArrow: { fontSize: 18, color: TEXT_MUTED },
   clearProjectBtn: {
     alignSelf: 'flex-start', marginBottom: 16, paddingHorizontal: 12, paddingVertical: 6,
-    borderRadius: 8, backgroundColor: '#2A1A1A', borderWidth: 0.5, borderColor: '#E24B4A30',
+    borderRadius: 8, backgroundColor: RED + '12', borderWidth: 1, borderColor: RED + '30',
   },
-  clearProjectText: { fontSize: 12, color: '#E24B4A' },
+  clearProjectText: { fontSize: 12, color: RED, fontWeight: '600' },
   modalOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.7)',
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.4)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#1A1A1A', borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    backgroundColor: CARD, borderTopLeftRadius: 20, borderTopRightRadius: 20,
     paddingBottom: 40,
   },
   modalHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+    paddingHorizontal: 20, paddingVertical: 20, borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  modalClose: { fontSize: 24, color: '#888780' },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: TEXT_MAIN },
+  modalClose: { fontSize: 24, color: TEXT_MUTED },
   projectOption: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A',
+    paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  projectOptionName: { fontSize: 15, fontWeight: '600', color: '#fff' },
-  projectOptionClient: { fontSize: 12, color: '#888780', marginTop: 2 },
+  projectOptionName: { fontSize: 15, fontWeight: '600', color: TEXT_MAIN },
+  projectOptionClient: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
   projectOptionCheck: { fontSize: 20, color: PRIMARY },
 })

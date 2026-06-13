@@ -4,11 +4,21 @@ import {
   TouchableOpacity, ActivityIndicator, Share, Alert
 } from 'react-native'
 import { useFocusEffect } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { Transaction, CATEGORIES, BudgetMethod } from '../../types'
 import { BUDGET_METHODS } from '../../constants'
+import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
+import LineChart from '../../components/LineChart'
 
-const PRIMARY = '#185FA5'
+const PRIMARY = COLORS.primary
+const INCOME = COLORS.income
+const EXPENSE = COLORS.expense
+const TEXT_MAIN = COLORS.text
+const TEXT_MUTED = COLORS.textMuted
+const CARD = COLORS.card
+const BORDER = COLORS.border
+const BG_APP = COLORS.bg
 
 const CATEGORY_EMOJI: Record<string, string> = {
   'Makan & Minum': '🍔', 'Transport': '🚗', 'Belanja': '🛍️',
@@ -40,6 +50,7 @@ export default function LaporanScreen() {
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
   const [wallets, setWallets] = useState<{ id: string; wallet_function: string }[]>([])
   const [receivables, setReceivables] = useState<{ type: string; status: string; amount: number }[]>([])
+  const [reportTab, setReportTab] = useState<'ringkasan' | 'cashflow' | 'kategori'>('ringkasan')
 
   const fetchData = async () => {
     setLoading(true)
@@ -114,6 +125,22 @@ export default function LaporanScreen() {
     .filter(r => r.type === 'hutang' && r.status === 'pending')
     .reduce((sum, r) => sum + r.amount, 0)
   const labaBersih = totalIncome - totalExpense
+
+  // Data cashflow: saldo kumulatif per hari dalam bulan terpilih (untuk line chart)
+  const cashflowData = (() => {
+    const [yy, mm] = selectedMonth.split('-').map(Number)
+    const daysInMonth = new Date(yy, mm, 0).getDate()
+    const daily = new Array(daysInMonth).fill(0)
+    realTransactions.forEach(t => {
+      const day = parseInt(t.date.slice(8, 10)) - 1
+      if (day >= 0 && day < daysInMonth) {
+        daily[day] += t.type === 'income' ? t.amount : -t.amount
+      }
+    })
+    // kumulatif
+    let run = 0
+    return daily.map(d => (run += d))
+  })()
 
   const formatRupiah = (amount: number) => 'Rp ' + Math.abs(amount).toLocaleString('id-ID')
 
@@ -236,14 +263,33 @@ Dicatat pakai Zena 🌿`
         </TouchableOpacity>
       </View>
 
+      {/* Tab pills */}
+      <View style={styles.tabPills}>
+        {(['ringkasan', 'cashflow', 'kategori'] as const).map(tab => (
+          <TouchableOpacity
+            key={tab}
+            style={[styles.tabPill, reportTab === tab && styles.tabPillActive]}
+            onPress={() => setReportTab(tab)}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.tabPillText, reportTab === tab && styles.tabPillTextActive]}>
+              {tab === 'ringkasan' ? 'Ringkasan' : tab === 'cashflow' ? 'Cashflow' : 'Kategori'}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       {/* Month selector */}
       <View style={styles.monthSelector}>
-        <TouchableOpacity onPress={() => setSelectedMonth(getPrevMonth())}>
-          <Text style={styles.monthArrow}>‹</Text>
+        <TouchableOpacity onPress={() => setSelectedMonth(getPrevMonth())} style={styles.monthArrowBtn}>
+          <Ionicons name="chevron-back" size={18} color={PRIMARY} />
         </TouchableOpacity>
-        <Text style={styles.monthLabel}>{getMonthLabel(selectedMonth)}</Text>
-        <TouchableOpacity onPress={() => setSelectedMonth(getNextMonth())}>
-          <Text style={styles.monthArrow}>›</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Ionicons name="calendar-outline" size={16} color={TEXT_MUTED} />
+          <Text style={styles.monthLabel}>{getMonthLabel(selectedMonth)}</Text>
+        </View>
+        <TouchableOpacity onPress={() => setSelectedMonth(getNextMonth())} style={styles.monthArrowBtn}>
+          <Ionicons name="chevron-forward" size={18} color={PRIMARY} />
         </TouchableOpacity>
       </View>
 
@@ -285,8 +331,29 @@ Dicatat pakai Zena 🌿`
             </Text>
           </View>
 
+          {/* CASHFLOW tab — tren saldo kumulatif */}
+          {reportTab === 'cashflow' && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Tren Cashflow</Text>
+              <View style={styles.chartCard}>
+                <LineChart
+                  data={cashflowData}
+                  width={320}
+                  height={150}
+                  color={labaBersih >= 0 ? INCOME : EXPENSE}
+                />
+                <View style={styles.chartFootRow}>
+                  <Ionicons name={labaBersih >= 0 ? 'trending-up' : 'trending-down'} size={15} color={labaBersih >= 0 ? INCOME : EXPENSE} />
+                  <Text style={[styles.chartFootText, { color: labaBersih >= 0 ? INCOME : EXPENSE }]}>
+                    {labaBersih >= 0 ? 'Surplus' : 'Defisit'} {formatRupiah(labaBersih)} bulan ini
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
           {/* BISNIS: Piutang & Hutang */}
-          {activeMode === 'business' && (
+          {reportTab === 'ringkasan' && activeMode === 'business' && (
             <View style={styles.summaryRow}>
               <View style={[styles.summaryCard, { borderTopColor: '#1D9E75' }]}>
                 <Text style={styles.summaryLabel}>Piutang (belum ditagih)</Text>
@@ -304,7 +371,7 @@ Dicatat pakai Zena 🌿`
           )}
 
           {/* Budget tracking — hanya mode Pribadi (konsep budget 50/30/20 dst) */}
-          {activeMode === 'personal' && monthlyIncome > 0 && budgetBuckets.length > 0 && (
+          {reportTab === 'ringkasan' && activeMode === 'personal' && monthlyIncome > 0 && budgetBuckets.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Budget Bulan Ini</Text>
               <Text style={styles.sectionSub}>Metode: {BUDGET_METHODS[budgetMethod]?.name}</Text>
@@ -333,7 +400,7 @@ Dicatat pakai Zena 🌿`
           )}
 
           {/* Savings rate — hanya mode Pribadi */}
-          {activeMode === 'personal' && monthlyIncome > 0 && (
+          {reportTab === 'ringkasan' && activeMode === 'personal' && monthlyIncome > 0 && (
             <View style={styles.savingsCard}>
               <Text style={styles.savingsLabel}>Saving Rate</Text>
               <Text style={styles.savingsValue}>
@@ -348,7 +415,7 @@ Dicatat pakai Zena 🌿`
           )}
 
           {/* Category breakdown */}
-          {categoriesWithData.length > 0 && (
+          {reportTab === 'kategori' && categoriesWithData.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Pengeluaran per Kategori</Text>
               {categoriesWithData.map(({ cat, total }) => (
@@ -417,23 +484,32 @@ Dicatat pakai Zena 🌿`
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0F0F0F' },
+  container: { flex: 1, backgroundColor: BG_APP },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 8,
+    paddingHorizontal: 20, paddingTop: 52, paddingBottom: 8,
   },
-  headerTitle: { fontSize: 24, fontWeight: '600', color: '#fff' },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: TEXT_MAIN },
   shareBtn: {
-    backgroundColor: '#1A1A1A', borderRadius: 20,
-    paddingHorizontal: 14, paddingVertical: 7, borderWidth: 0.5, borderColor: '#2A2A2A',
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: PRIMARY + '12', borderRadius: RADIUS.pill,
+    paddingHorizontal: 14, paddingVertical: 8,
   },
-  shareBtnText: { fontSize: 13, color: PRIMARY, fontWeight: '600' },
+  shareBtnText: { fontSize: 13, color: PRIMARY, fontWeight: '700' },
+  tabPills: {
+    flexDirection: 'row', backgroundColor: '#EAEEF4', borderRadius: RADIUS.md,
+    padding: 4, marginHorizontal: 20, marginTop: 6, gap: 4,
+  },
+  tabPill: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
+  tabPillActive: { backgroundColor: PRIMARY, ...SHADOW.card },
+  tabPillText: { fontSize: 12.5, fontWeight: '700', color: TEXT_MUTED },
+  tabPillTextActive: { color: '#fff' },
   monthSelector: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 24, paddingVertical: 12,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, paddingHorizontal: 20,
   },
-  monthArrow: { fontSize: 24, color: PRIMARY, fontWeight: '300' },
-  monthLabel: { fontSize: 16, fontWeight: '600', color: '#fff', minWidth: 160, textAlign: 'center' },
+  monthArrowBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: CARD, alignItems: 'center', justifyContent: 'center', ...SHADOW.card },
+  monthLabel: { fontSize: 15, fontWeight: '700', color: TEXT_MAIN, textAlign: 'center' },
   scroll: { flex: 1, paddingHorizontal: 20 },
   modeRow: { marginBottom: 12, alignItems: 'flex-start' },
   modeChip: {
@@ -442,57 +518,60 @@ const styles = StyleSheet.create({
   },
   summaryRow: { flexDirection: 'row', gap: 10, marginBottom: 10 },
   summaryCard: {
-    flex: 1, backgroundColor: '#1A1A1A', borderRadius: 12,
-    padding: 14, borderTopWidth: 2,
+    flex: 1, backgroundColor: CARD, borderRadius: RADIUS.lg,
+    padding: 14, borderTopWidth: 3, ...SHADOW.card,
   },
   summaryCardFull: { marginBottom: 20 },
-  summaryLabel: { fontSize: 12, color: '#888780', marginBottom: 4 },
-  summaryAmount: { fontSize: 16, fontWeight: '600' },
+  summaryLabel: { fontSize: 12, color: TEXT_MUTED, marginBottom: 4 },
+  summaryAmount: { fontSize: 16, fontWeight: '800' },
+  chartCard: { backgroundColor: CARD, borderRadius: RADIUS.lg, padding: 16, ...SHADOW.card },
+  chartFootRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  chartFootText: { fontSize: 13, fontWeight: '700' },
   section: { marginBottom: 24 },
   sectionTitle: {
-    fontSize: 13, fontWeight: '600', color: '#888780',
-    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4,
+    fontSize: 13, fontWeight: '700', color: TEXT_MUTED,
+    textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10,
   },
-  sectionSub: { fontSize: 11, color: '#555', marginBottom: 12 },
-  budgetRow: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 14, marginBottom: 8 },
+  sectionSub: { fontSize: 11, color: TEXT_MUTED, marginBottom: 12, marginTop: -6 },
+  budgetRow: { backgroundColor: CARD, borderRadius: RADIUS.md, padding: 14, marginBottom: 8, ...SHADOW.card },
   budgetHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  budgetLabel: { fontSize: 13, fontWeight: '500', color: '#fff' },
+  budgetLabel: { fontSize: 13, fontWeight: '600', color: TEXT_MAIN },
   budgetPct: { fontSize: 13, fontWeight: '700' },
-  budgetBarBg: { height: 6, backgroundColor: '#2A2A2A', borderRadius: 3, overflow: 'hidden', marginBottom: 6 },
+  budgetBarBg: { height: 6, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden', marginBottom: 6 },
   budgetBarFill: { height: '100%', borderRadius: 3 },
   budgetAmounts: { flexDirection: 'row', justifyContent: 'space-between' },
-  budgetSpent: { fontSize: 12, fontWeight: '600', color: '#fff' },
-  budgetLimit: { fontSize: 12, color: '#888780' },
-  budgetOverLabel: { fontSize: 11, color: '#E24B4A', marginTop: 4, fontWeight: '600' },
+  budgetSpent: { fontSize: 12, fontWeight: '600', color: TEXT_MAIN },
+  budgetLimit: { fontSize: 12, color: TEXT_MUTED },
+  budgetOverLabel: { fontSize: 11, color: EXPENSE, marginTop: 4, fontWeight: '600' },
   budgetWarnLabel: { fontSize: 11, color: '#BA7517', marginTop: 4, fontWeight: '600' },
   savingsCard: {
-    backgroundColor: '#1A1A2E', borderRadius: 12, padding: 16, marginBottom: 20,
-    borderWidth: 1, borderColor: '#534AB7',
+    backgroundColor: CARD, borderRadius: RADIUS.lg, padding: 16, marginBottom: 20,
+    borderLeftWidth: 4, borderLeftColor: '#7C3AED', ...SHADOW.card,
   },
-  savingsLabel: { fontSize: 11, color: '#888780', marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
-  savingsValue: { fontSize: 28, fontWeight: '700', color: '#AFA9EC', marginBottom: 2 },
-  savingsSub: { fontSize: 12, color: '#888780' },
+  savingsLabel: { fontSize: 11, color: TEXT_MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 },
+  savingsValue: { fontSize: 28, fontWeight: '800', color: '#7C3AED', marginBottom: 2 },
+  savingsSub: { fontSize: 12, color: TEXT_MUTED },
   catRow: { flexDirection: 'row', gap: 10, marginBottom: 14 },
   catEmoji: { fontSize: 20, marginTop: 2 },
   catInfo: { flex: 1 },
   catLabelRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  catName: { fontSize: 13, fontWeight: '500', color: '#fff' },
-  catAmount: { fontSize: 13, fontWeight: '600', color: '#fff' },
-  catBarBg: { height: 5, backgroundColor: '#2A2A2A', borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
+  catName: { fontSize: 13, fontWeight: '600', color: TEXT_MAIN },
+  catAmount: { fontSize: 13, fontWeight: '700', color: TEXT_MAIN },
+  catBarBg: { height: 5, backgroundColor: BORDER, borderRadius: 3, overflow: 'hidden', marginBottom: 4 },
   catBarFill: { height: '100%', borderRadius: 3 },
-  catPct: { fontSize: 11, color: '#888780' },
+  catPct: { fontSize: 11, color: TEXT_MUTED },
   emptyState: { alignItems: 'center', paddingVertical: 40 },
   emptyIcon: { fontSize: 36, marginBottom: 10 },
-  emptyText: { fontSize: 14, color: '#888780' },
+  emptyText: { fontSize: 14, color: TEXT_MUTED },
   txnItem: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, borderBottomWidth: 0.5, borderBottomColor: '#1A1A1A',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: BORDER,
   },
-  txnIcon: { width: 36, height: 36, borderRadius: 9, backgroundColor: '#1A1A1A', alignItems: 'center', justifyContent: 'center' },
+  txnIcon: { width: 38, height: 38, borderRadius: 11, backgroundColor: BG_APP, alignItems: 'center', justifyContent: 'center' },
   txnInfo: { flex: 1 },
-  txnCategory: { fontSize: 13, fontWeight: '500', color: '#fff' },
-  txnDate: { fontSize: 11, color: '#888780', marginTop: 1 },
-  txnAmount: { fontSize: 13, fontWeight: '600' },
-  income: { color: '#1D9E75' },
-  expense: { color: '#E24B4A' },
+  txnCategory: { fontSize: 13, fontWeight: '600', color: TEXT_MAIN },
+  txnDate: { fontSize: 11, color: TEXT_MUTED, marginTop: 1 },
+  txnAmount: { fontSize: 13, fontWeight: '700' },
+  income: { color: INCOME },
+  expense: { color: EXPENSE },
 })
