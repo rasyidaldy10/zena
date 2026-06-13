@@ -72,17 +72,74 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 788c3ab (Business mode always available + business name field)
+**Latest Commit:** 12b3ca4 (Wallet picker badge+smart default & home Portofolio Investasi)
 
-**Database Access:**
-- ✅ PostgreSQL 14 installed via Homebrew
-- ✅ Connection string stored in `.env.local` (file: `SUPABASE_DB_URL`)
-- ✅ Claude can run SQL directly via `psql "$SUPABASE_DB_URL" -c "..."`
-- ⚠️ Password stored locally - never commit `.env.local` to git
+**Database & Deploy Access (PENTING - update 2026-06-13):**
+- ⚠️ **psql via `SUPABASE_DB_URL` GAGAL** (password auth ditolak). JANGAN andalkan psql.
+- ✅ **DML (read/insert/update/delete data):** pakai REST API + `SUPABASE_SERVICE_ROLE_KEY` (ada di `.env`):
+  `curl "$EXPO_PUBLIC_SUPABASE_URL/rest/v1/<table>?..." -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" -H "apikey: $SUPABASE_SERVICE_ROLE_KEY"`
+- ⚠️ **DDL (CREATE TABLE/FUNCTION):** REST tidak bisa. Bikin file `.sql` → **user run manual di Supabase SQL Editor**.
+- ✅ **Edge function:** BISA deploy via CLI (sudah login):
+  `supabase functions deploy <name> --project-ref lcvenmsxauasaemjjxtc`
+- ⚠️ Web (Chrome): **Alert.alert RN TIDAK jalan** → pakai `lib/alert.ts` (`confirmAsync`/`notify`)
 
 ---
 
-## LATEST SESSION (2026-06-09 s/d 2026-06-10) - AUTH FLOW PERFECTION ✅
+## LATEST SESSION (2026-06-11 s/d 2026-06-13) - WEB FIXES + BISNIS LENGKAP ✅
+
+**🌐 FOKUS: Aplikasi dipakai via Web (Vercel/Chrome) + perbaikan menyeluruh mode bisnis**
+
+**⚠️ 3 BUG SISTEMIK BESAR YANG DITEMUKAN & DIPERBAIKI:**
+1. **`Alert.alert` RN TIDAK jalan di web** → logout/hapus/konfirmasi/modal "mati" (onPress gak ke-trigger).
+   FIX: bikin `lib/alert.ts` (`confirmAsync`/`notify`). Modal: pindah `onSuccess()/onClose()` KELUAR dari Alert onPress.
+2. **Supabase auth deadlock** di `_layout.tsx` → loader stuck selamanya.
+   FIX: jangan `await` query Supabase di dalam `onAuthStateChange`, defer pakai `setTimeout(0)`. `<Stack>` SELALU render (jangan digate loader). `app/index.tsx` = loader pasif.
+3. **Duplikat `user_preferences`** + `.single()` error → onboarding loop.
+   FIX: semua read prefs pakai `.limit(1)`; write pakai `update().eq('user_id')` bukan upsert.
+
+**🔐 AUTH DISEDERHANAKAN:**
+- Hapus Google SSO + Gmail auto-import (Gmail parsing). Login = email/password saja.
+- Signup admin-only (form daftar disembunyikan). Admin bikin akun via Admin API.
+- Akun tes: `rasyid@zena.app` / `rasyid2026` (user_id `94eef33c-...`).
+- Session persistent: AsyncStorage (native) + localStorage (web), `detectSessionInUrl: false`.
+
+**💼 BISNIS - FITUR & FIX:**
+- **Redirect**: semua simpan/hapus pakai `router.replace(...)` (bukan `router.back()` yg gak jalan di web).
+- **Back button**: screens bisnis (projects/receivables/inventory/stock-detail/project-detail) `headerShown: true` + headerLeft '‹ Kembali'.
+- **FAB '+'** di Projects/Piutang-Hutang/Inventory (headerRight gak muncul di web).
+- **Kaitkan transaksi ke Project / Jual Produk** di form Tambah Transaksi (segmented: Tidak ada/Project/Jual Produk). Jual produk auto-hitung (hrg×qty) + potong stok + catat HPP.
+- **DP project WAJIB pilih wallet** → otomatis bikin transaksi pemasukan (dulu DP ditandai lunas tapi income gak kecatat).
+- **Laporan per-mode**: Pribadi (50/30/20 budget) vs Bisnis (Omzet/Pengeluaran/Laba Bersih/Piutang/Hutang). Transaksi ber-project/business_category → dihitung bisnis walau dompet personal. Fix bug tanggal `-31` (invalid utk bulan <31 hari → laporan kosong).
+- **Edit wallet**: tambah toggle Pribadi/Bisnis (`wallet_function`).
+- **Scan struk**: tombol 📷 di form transaksi (kamera native/galeri web) → Claude Vision → auto-isi form → konfirmasi.
+- **Varian/tipe produk**: tabel `product_variants`, di ModalTambahProduk bisa tambah tipe (O2, Air), inventory tampil total + tombol Rincian breakdown per tipe.
+
+**💰 INVESTASI - DIPERBAIKI TOTAL (#schema mismatch):**
+- `tambah-investasi` dulu pakai kolom `ticker`/`buy_price` (gak ada) → rewrite pakai `symbol`/`average_buy_price`/`asset_type`. Saham simpan dlm LEMBAR (1 lot=100).
+- Picker jenis aset (Saham/Kripto/Reksadana/Obligasi).
+- **Harga saham IDX real**: edge function `stock-price` (DEPLOYED) proxy Yahoo Finance (`BBRI.JK`, IHSG=`^JKSE`). Stockbit gak ada API publik.
+- **Kelola investasi** (tap aset): Tambah Posisi (hitung ulang harga rata2), Koreksi, Riwayat (tabel `investment_transactions`).
+- Home dashboard: ganti MarketWidget (BTC/IHSG umum) → **PortfolioWidget** (cuma aset user).
+
+**🤖 AI (Zena chat) - FIXED:**
+- Bug: `lib/claude.ts` kirim `anthropic_version` di BODY → Anthropic tolak 400. Hapus dari body (itu header, sudah di-set edge function). Model `claude-sonnet-4-6`.
+
+**🎨 UI:**
+- Header dashboard HIJAU (#1D9E75) di mode Bisnis, biru di Pribadi.
+- Wallet picker (+ Catat): badge 👤 Pribadi/💼 Bisnis + smart default sesuai mode (tetap nampilin semua wallet).
+
+**🗄️ 3 SQL DIJALANKAN USER (di Supabase SQL Editor) - SUDAH DONE:**
+- `FIX_PROJECT_STATS_MARGIN.sql` — fix margin project (fan-out join project_terms×transactions).
+- `CREATE_PRODUCT_VARIANTS.sql` — tabel varian produk.
+- `CREATE_INVESTMENT_TRANSACTIONS.sql` — tabel riwayat pembelian investasi.
+
+**FILE BARU PENTING:**
+- `lib/alert.ts` (confirmAsync/notify), `components/PortfolioWidget.tsx`, `components/ModalKelolaInvestasi.tsx`
+- `supabase/functions/stock-price/index.ts` (Yahoo Finance proxy, deployed)
+
+---
+
+## SESSION SEBELUMNYA (2026-06-09 s/d 2026-06-10) - AUTH FLOW PERFECTION ✅
 
 **🔐 LOGIN INSTAGRAM-LEVEL: ACHIEVED!** - Clean, Smooth, Bug-Free Authentication  
 **15 Commits, 3 Files Fixed, 5 Critical Bugs Resolved, Code Review Complete ✅**
@@ -309,11 +366,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 8. ⏳ APK testing Build #8 (increment versionCode 7 → 8) - test business mode
 9. Production build: `eas build --platform android --profile production`
 
-**🟡 INTEGRATIONS (Code Ready, Needs API Keys/OAuth):**
+**🟡 INTEGRATIONS:**
 1. ⏳ Brick.co OAuth callback handler (zena://brick-callback) - save tokens to DB
-2. ⏳ Stock API integration (Yahoo Finance / IDX API) - replace mock data
-3. ⏳ Gmail parsing aktif - butuh scope `gmail.readonly` + refresh tokens
+2. ✅ **Stock API (Yahoo Finance) - DONE** (edge function `stock-price`, saham IDX `.JK`)
+3. ❌ Gmail parsing - **DIHAPUS** (Google login dihapus, fitur Gmail dibuang)
 4. ⏳ Higgsfield backend service - Node.js server untuk run CLI commands
+
+**🟣 SISA / IDE LANJUTAN (2026-06-13):**
+- ⏳ Varian produk: integrasi ke penjualan (pilih tipe saat jual + potong stok per tipe). Sekarang baru: bikin varian + tampil Rincian di inventory.
+- ⏳ Stock-detail: tampilkan & kelola varian (edit stok per tipe).
+- ⏳ Optional: ubah `estimated_profit` project jadi (contract_value - expense) kalau user mau estimasi profit total (sekarang = income masuk - expense).
+- ⏳ Cleanup: hapus komponen tak terpakai `MarketWidget.tsx`, `StockWidget.tsx` (sudah diganti PortfolioWidget).
 
 **🟠 BUSINESS MODE ENHANCEMENTS (Optional - Core sudah lengkap):**
 1. ⏳ LaporanScreen Laba Kotor tab - `get_monthly_gross_profit()`, `get_product_sales_report()` sudah ready
