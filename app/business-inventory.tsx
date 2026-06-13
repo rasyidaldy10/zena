@@ -19,6 +19,8 @@ import ModalTambahProduk from '../components/ModalTambahProduk'
 
 export default function BusinessInventoryScreen() {
   const [products, setProducts] = useState<Product[]>([])
+  const [variantsByProduct, setVariantsByProduct] = useState<Record<string, { id: string; name: string; stock_qty: number }[]>>({})
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
@@ -41,6 +43,17 @@ export default function BusinessInventoryScreen() {
 
       if (error) throw error
       setProducts(data || [])
+
+      // Ambil varian/tipe, grup per produk
+      const { data: variantData } = await supabase
+        .from('product_variants')
+        .select('id, product_id, name, stock_qty')
+        .eq('user_id', session.user.id)
+      const grouped: Record<string, { id: string; name: string; stock_qty: number }[]> = {}
+      for (const v of variantData || []) {
+        ;(grouped[v.product_id] ||= []).push({ id: v.id, name: v.name, stock_qty: v.stock_qty })
+      }
+      setVariantsByProduct(grouped)
     } catch (error) {
       console.error('Error fetching products:', error)
     } finally {
@@ -87,6 +100,9 @@ export default function BusinessInventoryScreen() {
 
   function renderProductCard({ item }: { item: Product }) {
     const isLowStock = item.stock_qty <= item.stock_min_alert
+    const variants = variantsByProduct[item.id] || []
+    const hasVariants = variants.length > 0
+    const isExpanded = expandedId === item.id
 
     return (
       <TouchableOpacity
@@ -112,16 +128,38 @@ export default function BusinessInventoryScreen() {
         <View style={styles.cardBody}>
           <View style={styles.row}>
             <Text style={styles.label}>Stok Saat Ini</Text>
-            <Text
-              style={[
-                styles.value,
-                styles.stockValue,
-                isLowStock && { color: COLORS.DANGER },
-              ]}
-            >
-              {item.stock_qty.toLocaleString('id-ID')} {item.unit}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text
+                style={[
+                  styles.value,
+                  styles.stockValue,
+                  isLowStock && { color: COLORS.DANGER },
+                ]}
+              >
+                {item.stock_qty.toLocaleString('id-ID')} {item.unit}
+              </Text>
+              {hasVariants && (
+                <TouchableOpacity
+                  onPress={() => setExpandedId(isExpanded ? null : item.id)}
+                  style={styles.rincianBtn}
+                >
+                  <Text style={styles.rincianText}>Rincian {isExpanded ? '▲' : '▾'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
+
+          {/* Breakdown per tipe/varian */}
+          {hasVariants && isExpanded && (
+            <View style={styles.variantBox}>
+              {variants.map((v) => (
+                <View key={v.id} style={styles.variantLine}>
+                  <Text style={styles.variantName}>• {v.name}</Text>
+                  <Text style={styles.variantStock}>{v.stock_qty.toLocaleString('id-ID')} {item.unit}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
           {item.stock_min_alert > 0 && (
             <View style={styles.row}>
@@ -400,6 +438,17 @@ const styles = StyleSheet.create({
   stockValue: {
     fontSize: 16,
   },
+  rincianBtn: {
+    paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
+    backgroundColor: COLORS.PRIMARY + '15', borderWidth: 1, borderColor: COLORS.PRIMARY + '40',
+  },
+  rincianText: { fontSize: 11, fontWeight: '600', color: COLORS.PRIMARY },
+  variantBox: {
+    backgroundColor: COLORS.BACKGROUND, borderRadius: 8, padding: 10, marginTop: 6, gap: 6,
+  },
+  variantLine: { flexDirection: 'row', justifyContent: 'space-between' },
+  variantName: { fontSize: 13, color: COLORS.TEXT },
+  variantStock: { fontSize: 13, fontWeight: '600', color: COLORS.TEXT },
   valueSmall: {
     fontSize: 13,
     fontWeight: '500',

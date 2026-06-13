@@ -33,6 +33,13 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
   const [initialStock, setInitialStock] = useState('')
   const [minAlert, setMinAlert] = useState('')
   const [loading, setLoading] = useState(false)
+  // Varian/tipe (opsional, hanya mode tambah). Tiap tipe punya nama + stok + harga jual.
+  const [variants, setVariants] = useState<{ name: string; stock: string; price: string }[]>([])
+
+  const addVariant = () => setVariants(v => [...v, { name: '', stock: '', price: '' }])
+  const removeVariant = (i: number) => setVariants(v => v.filter((_, idx) => idx !== i))
+  const updateVariant = (i: number, field: 'name' | 'stock' | 'price', val: string) =>
+    setVariants(v => v.map((item, idx) => idx === i ? { ...item, [field]: val } : item))
 
   // Prefill saat mode edit / modal dibuka
   useEffect(() => {
@@ -90,6 +97,15 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
         notify('Berhasil', 'Produk berhasil diperbarui')
       } else {
         // MODE TAMBAH — insert produk baru
+        // Kalau pakai varian: total stok = jumlah stok semua varian
+        const validVariants = variants
+          .map(v => ({ name: v.name.trim(), stock: parseFloat(v.stock.replace(/[^0-9]/g, '')) || 0, price: parseFloat(v.price.replace(/[^0-9]/g, '')) || sellPriceNum }))
+          .filter(v => v.name)
+        const useVariants = validVariants.length > 0
+        const productStock = useVariants
+          ? validVariants.reduce((s, v) => s + v.stock, 0)
+          : initialStockNum
+
         const { data: newProduct, error: productError } = await supabase
           .from('products')
           .insert({
@@ -99,7 +115,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
             unit,
             buy_price: buyPriceNum,
             sell_price: sellPriceNum,
-            stock_qty: initialStockNum,
+            stock_qty: productStock,
             stock_min_alert: minAlertNum,
             is_active: true,
           })
@@ -108,17 +124,31 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
 
         if (productError) throw productError
 
-        // If initial stock > 0, create stock movement
-        if (initialStockNum > 0) {
+        // Insert varian (kalau ada)
+        if (useVariants) {
+          const { error: varError } = await supabase.from('product_variants').insert(
+            validVariants.map(v => ({
+              product_id: newProduct.id,
+              user_id: session.user.id,
+              name: v.name,
+              stock_qty: v.stock,
+              sell_price: v.price,
+              buy_price: buyPriceNum,
+            }))
+          )
+          if (varError) throw varError
+        }
+
+        // Stock movement untuk stok awal (kalau ada)
+        if (productStock > 0) {
           const { error: movementError } = await supabase.from('stock_movements').insert({
             user_id: session.user.id,
             product_id: newProduct.id,
             type: 'in',
-            qty: initialStockNum,
+            qty: productStock,
             price_per_unit: buyPriceNum,
-            note: 'Stok awal saat produk dibuat',
+            note: useVariants ? 'Stok awal (dari varian)' : 'Stok awal saat produk dibuat',
           })
-
           if (movementError) console.error('Error creating initial stock movement:', movementError)
         }
 
@@ -143,6 +173,7 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
     setSellPrice('')
     setInitialStock('')
     setMinAlert('')
+    setVariants([])
   }
 
   function formatCurrency(value: string) {
@@ -252,8 +283,9 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
               </View>
             </View>
 
-            {/* Initial Stock — hanya saat tambah (edit: stok via Stok Masuk/Adjustment) */}
-            {!isEdit && (
+            {/* Initial Stock — hanya saat tambah & TIDAK pakai varian
+                (kalau pakai varian, total stok = jumlah stok tiap tipe) */}
+            {!isEdit && variants.length === 0 && (
               <View style={styles.field}>
                 <Text style={styles.label}>Stok Awal</Text>
                 <TextInput
@@ -265,6 +297,52 @@ export default function ModalTambahProduk({ visible, onClose, onSuccess, product
                   keyboardType="numeric"
                   editable={!loading}
                 />
+              </View>
+            )}
+
+            {/* Varian / Tipe (opsional, hanya mode tambah) */}
+            {!isEdit && (
+              <View style={styles.field}>
+                <Text style={styles.label}>Tipe / Varian (opsional)</Text>
+                <Text style={styles.hint}>
+                  Mis. produk punya beberapa tipe (O2, Air, dll). Total stok = jumlah semua tipe.
+                </Text>
+                {variants.map((v, i) => (
+                  <View key={i} style={styles.variantRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1.4 }]}
+                      value={v.name}
+                      onChangeText={(t) => updateVariant(i, 'name', t)}
+                      placeholder="Nama tipe"
+                      placeholderTextColor={COLORS.TEXT_LIGHT}
+                      editable={!loading}
+                    />
+                    <TextInput
+                      style={[styles.input, { flex: 0.8 }]}
+                      value={v.stock}
+                      onChangeText={(t) => updateVariant(i, 'stock', t.replace(/[^0-9]/g, ''))}
+                      placeholder="Stok"
+                      placeholderTextColor={COLORS.TEXT_LIGHT}
+                      keyboardType="numeric"
+                      editable={!loading}
+                    />
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      value={v.price}
+                      onChangeText={(t) => updateVariant(i, 'price', formatCurrency(t))}
+                      placeholder="Harga"
+                      placeholderTextColor={COLORS.TEXT_LIGHT}
+                      keyboardType="numeric"
+                      editable={!loading}
+                    />
+                    <TouchableOpacity onPress={() => removeVariant(i)} style={styles.variantDel}>
+                      <Text style={{ color: COLORS.DANGER, fontSize: 18 }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))}
+                <TouchableOpacity style={styles.addVariantBtn} onPress={addVariant} disabled={loading}>
+                  <Text style={styles.addVariantText}>+ Tambah Tipe</Text>
+                </TouchableOpacity>
               </View>
             )}
 
@@ -420,6 +498,13 @@ const styles = StyleSheet.create({
     color: COLORS.TEXT_LIGHT,
     marginTop: 4,
   },
+  variantRow: { flexDirection: 'row', gap: 6, alignItems: 'center', marginTop: 8 },
+  variantDel: { paddingHorizontal: 6, paddingVertical: 8 },
+  addVariantBtn: {
+    marginTop: 10, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed',
+    borderColor: COLORS.PRIMARY, paddingVertical: 10, alignItems: 'center',
+  },
+  addVariantText: { fontSize: 13, fontWeight: '600', color: COLORS.PRIMARY },
   footer: {
     flexDirection: 'row',
     gap: 12,
