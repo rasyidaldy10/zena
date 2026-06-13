@@ -15,6 +15,7 @@ import {
 } from 'react-native'
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
+import ModalKelolaInvestasi from '../components/ModalKelolaInvestasi'
 import type { InvestmentHolding, InvestmentAssetType } from '../types'
 
 const PRIMARY = '#185FA5'
@@ -48,6 +49,8 @@ export default function InvestmentPortfolioScreen() {
   const [loading, setLoading] = useState(true)
   const [refreshingPrice, setRefreshingPrice] = useState(false)
   const [filter, setFilter] = useState<FilterType>('all')
+  const [showManage, setShowManage] = useState(false)
+  const [manageHolding, setManageHolding] = useState<InvestmentHolding | null>(null)
 
   useEffect(() => {
     fetchHoldings()
@@ -225,16 +228,14 @@ export default function InvestmentPortfolioScreen() {
             </View>
           ) : (
             <View style={styles.holdingsList}>
+              <Text style={styles.manageHint}>✏️ Tap aset untuk koreksi harga, tambah posisi, atau lihat riwayat</Text>
               {filteredHoldings.map(holding => {
                 const isGain = holding.unrealized_gain_loss >= 0
                 return (
                   <TouchableOpacity
                     key={holding.id}
                     style={styles.holdingCard}
-                    onPress={() => Alert.alert(
-                      holding.asset_name,
-                      `Symbol: ${holding.symbol}\nQuantity: ${holding.quantity}\nAvg Buy: Rp ${holding.average_buy_price.toLocaleString('id-ID')}\nCurrent: Rp ${holding.current_price.toLocaleString('id-ID')}`
-                    )}
+                    onPress={() => { setManageHolding(holding); setShowManage(true) }}
                   >
                     {/* Icon + Name */}
                     <View style={styles.holdingLeft}>
@@ -288,6 +289,13 @@ export default function InvestmentPortfolioScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       )}
+
+      <ModalKelolaInvestasi
+        visible={showManage}
+        holding={manageHolding}
+        onClose={() => setShowManage(false)}
+        onSuccess={fetchHoldings}
+      />
     </View>
   )
 }
@@ -423,6 +431,9 @@ const styles = StyleSheet.create({
 
   holdingsList: {
     paddingHorizontal: 20,
+  },
+  manageHint: {
+    fontSize: 11, color: TEXT_SECONDARY, marginBottom: 10, fontStyle: 'italic',
   },
   holdingCard: {
     flexDirection: 'row',

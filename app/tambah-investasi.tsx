@@ -61,7 +61,7 @@ export default function TambahInvestasiScreen() {
     // (dihitung trigger DB = quantity × current_price per lembar) benar.
     const qtyToStore = assetType === 'stock' ? qty * 100 : qty
 
-    const { error } = await supabase.from('investment_holdings').insert({
+    const { data: holdingRow, error } = await supabase.from('investment_holdings').insert({
       user_id: session.user.id,
       asset_type: assetType,
       symbol: symbol.toUpperCase().trim(),
@@ -69,7 +69,16 @@ export default function TambahInvestasiScreen() {
       quantity: qtyToStore,
       average_buy_price: avgBuy,
       current_price: curPrice,
-    })
+    }).select().single()
+
+    // Catat pembelian awal ke riwayat (best-effort; tabel mungkin belum dibuat)
+    if (holdingRow) {
+      await supabase.from('investment_transactions').insert({
+        holding_id: holdingRow.id, user_id: session.user.id, type: 'buy',
+        quantity: qtyToStore, price_per_unit: avgBuy, total: qtyToStore * avgBuy,
+        note: 'Pembelian awal',
+      })
+    }
 
     setSaving(false)
 

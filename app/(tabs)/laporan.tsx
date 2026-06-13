@@ -91,11 +91,16 @@ export default function LaporanScreen() {
 
   useFocusEffect(useCallback(() => { fetchData() }, [selectedMonth]))
 
-  // Klasifikasi wallet → personal/business, lalu filter transaksi sesuai mode aktif.
-  // Laporan Pribadi hanya hitung transaksi dompet pribadi, Bisnis hanya dompet bisnis.
+  // Klasifikasi transaksi → personal/business.
+  // Aturan: kalau transaksi terkait PROJECT atau punya kategori bisnis → BISNIS
+  // (walau dompetnya personal). Selain itu ikut fungsi dompetnya.
   const walletFn = new Map(wallets.map(w => [w.id, w.wallet_function]))
+  const txMode = (t: any): 'personal' | 'business' => {
+    if (t.project_id || t.business_category) return 'business'
+    return walletFn.get(t.wallet_id || '') === 'business' ? 'business' : 'personal'
+  }
   const realTransactions = transactions.filter(
-    t => !t.is_wallet_transfer && walletFn.get(t.wallet_id || '') === activeMode
+    t => !t.is_wallet_transfer && txMode(t) === activeMode
   )
 
   const totalIncome = realTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
