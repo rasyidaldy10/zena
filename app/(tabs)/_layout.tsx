@@ -1,14 +1,16 @@
 import { Tabs } from 'expo-router'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { COLORS } from '../../constants/theme'
 
 const PRIMARY = COLORS.primary
+const MUTED = COLORS.textMuted
 
-function TabIcon({ focused, icon, label }: { focused: boolean; icon: string; label: string }) {
+function TabIcon({ focused, icon, label }: { focused: boolean; icon: keyof typeof Ionicons.glyphMap; label: string }) {
   return (
     <View style={styles.tabItem}>
-      <Text style={[styles.tabIcon, focused && styles.tabIconActive]}>{icon}</Text>
+      <Ionicons name={icon} size={22} color={focused ? PRIMARY : MUTED} />
       <Text style={[styles.tabLabel, focused && styles.tabLabelActive]}>{label}</Text>
     </View>
   )
@@ -27,7 +29,7 @@ export default function TabsLayout() {
         name="index"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="🏠" label="Home" />
+            <TabIcon focused={focused} icon={focused ? 'home' : 'home-outline'} label="Home" />
           ),
         }}
       />
@@ -35,7 +37,7 @@ export default function TabsLayout() {
         name="laporan"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="📊" label="Laporan" />
+            <TabIcon focused={focused} icon={focused ? 'stats-chart' : 'stats-chart-outline'} label="Laporan" />
           ),
         }}
       />
@@ -49,7 +51,7 @@ export default function TabsLayout() {
               onPress={() => router.push('/tambah-transaksi')}
             >
               <View style={styles.addBtn}>
-                <Text style={styles.addBtnPlus}>+</Text>
+                <Ionicons name="add" size={32} color="#fff" />
               </View>
               <Text style={styles.zenaBtnLabel}>Catat</Text>
             </TouchableOpacity>
@@ -60,7 +62,7 @@ export default function TabsLayout() {
         name="reminder"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="🔔" label="Reminder" />
+            <TabIcon focused={focused} icon={focused ? 'notifications' : 'notifications-outline'} label="Reminder" />
           ),
         }}
       />
@@ -68,7 +70,7 @@ export default function TabsLayout() {
         name="profil"
         options={{
           tabBarIcon: ({ focused }) => (
-            <TabIcon focused={focused} icon="👤" label="Profil" />
+            <TabIcon focused={focused} icon={focused ? 'person' : 'person-outline'} label="Profil" />
           ),
         }}
       />

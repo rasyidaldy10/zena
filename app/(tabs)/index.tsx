@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
@@ -268,7 +269,7 @@ export default function HomeScreen() {
         </View>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/notifications')}>
-            <Text style={styles.headerBtnIcon}>🔔</Text>
+            <Ionicons name="notifications-outline" size={22} color="#fff" />
             {notifCount > 0 && (
               <View style={styles.headerBadge}>
                 <Text style={styles.headerBadgeText}>{notifCount > 9 ? '9+' : notifCount}</Text>
@@ -276,7 +277,7 @@ export default function HomeScreen() {
             )}
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerBtn} onPress={() => router.push('/(tabs)/profil')}>
-            <Text style={styles.headerBtnIcon}>⚙️</Text>
+            <Ionicons name="settings-outline" size={22} color="#fff" />
           </TouchableOpacity>
         </View>
       </LinearGradient>
@@ -290,8 +291,9 @@ export default function HomeScreen() {
               onPress={() => selectMode('personal')}
               activeOpacity={0.8}
             >
+              <Ionicons name="person" size={15} color={activeMode === 'personal' ? '#fff' : TEXT_SECONDARY} />
               <Text style={[styles.modePillText, activeMode === 'personal' && styles.modePillTextActive]}>
-                👤 Mode Pribadi
+                Mode Pribadi
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -299,8 +301,9 @@ export default function HomeScreen() {
               onPress={() => selectMode('business')}
               activeOpacity={0.8}
             >
+              <Ionicons name="briefcase" size={15} color={activeMode === 'business' ? '#fff' : TEXT_SECONDARY} />
               <Text style={[styles.modePillText, activeMode === 'business' && styles.modePillTextActive]}>
-                💼 Mode Bisnis
+                Mode Bisnis
               </Text>
             </TouchableOpacity>
           </View>
@@ -314,7 +317,7 @@ export default function HomeScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <Text style={styles.balanceLabel}>Total Saldo</Text>
                 <TouchableOpacity onPress={() => setBalanceVisible(!balanceVisible)}>
-                  <Text style={{ fontSize: 16 }}>{balanceVisible ? '👁️' : '👁️‍🗨️'}</Text>
+                  <Ionicons name={balanceVisible ? 'eye-outline' : 'eye-off-outline'} size={18} color={TEXT_SECONDARY} />
                 </TouchableOpacity>
               </View>
               <Text style={styles.balanceAmount}>
@@ -382,7 +385,7 @@ export default function HomeScreen() {
         {activeMode === 'business' && (
           <View style={styles.businessStatsSection}>
             <View style={styles.businessStatsHeader}>
-              <Text style={styles.businessStatsTitle}>💼 Ringkasan Bisnis</Text>
+              <Text style={styles.businessStatsTitle}>Ringkasan Bisnis</Text>
               <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
                 <Text style={styles.businessStatsLink}>Kelola →</Text>
               </TouchableOpacity>
@@ -395,7 +398,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-receivables')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>📥</Text>
+                <Ionicons name="arrow-down-circle-outline" size={24} color="#16A06A" style={{ marginBottom: 6 }} />
                 <Text style={styles.businessStatLabel}>Piutang</Text>
                 <Text style={[styles.businessStatValue, { color: '#16A34A' }]}>
                   Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
@@ -408,7 +411,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-receivables')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>📤</Text>
+                <Ionicons name="arrow-up-circle-outline" size={24} color="#E5484D" style={{ marginBottom: 6 }} />
                 <Text style={styles.businessStatLabel}>Hutang</Text>
                 <Text style={[styles.businessStatValue, { color: '#E24B4A' }]}>
                   Rp {businessStats.totalHutang.toLocaleString('id-ID')}
@@ -421,7 +424,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-projects')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>📋</Text>
+                <Ionicons name="briefcase-outline" size={24} color="#1763D6" style={{ marginBottom: 6 }} />
                 <Text style={styles.businessStatLabel}>Project Aktif</Text>
                 <Text style={[styles.businessStatValue, { color: '#185FA5' }]}>
                   {businessStats.activeProjectsCount} Project
@@ -434,7 +437,7 @@ export default function HomeScreen() {
                 onPress={() => router.push('/business-inventory')}
                 activeOpacity={0.7}
               >
-                <Text style={styles.businessStatIcon}>📦</Text>
+                <Ionicons name="cube-outline" size={24} color="#F5A623" style={{ marginBottom: 6 }} />
                 <Text style={styles.businessStatLabel}>Stok Rendah</Text>
                 <Text style={[styles.businessStatValue, { color: '#F59E0B' }]}>
                   {businessStats.lowStockCount} Produk
@@ -448,7 +451,7 @@ export default function HomeScreen() {
                 style={styles.businessQuickLinkBtn}
                 onPress={() => router.push('/business-projects')}
               >
-                <Text style={styles.businessQuickLinkIcon}>📋</Text>
+                <Ionicons name="briefcase-outline" size={20} color={PRIMARY} />
                 <Text style={styles.businessQuickLinkText}>Projects</Text>
               </TouchableOpacity>
 
@@ -456,7 +459,7 @@ export default function HomeScreen() {
                 style={styles.businessQuickLinkBtn}
                 onPress={() => router.push('/business-inventory')}
               >
-                <Text style={styles.businessQuickLinkIcon}>📦</Text>
+                <Ionicons name="cube-outline" size={20} color={PRIMARY} />
                 <Text style={styles.businessQuickLinkText}>Inventory</Text>
               </TouchableOpacity>
 
@@ -464,7 +467,7 @@ export default function HomeScreen() {
                 style={styles.businessQuickLinkBtn}
                 onPress={() => router.push('/business-receivables')}
               >
-                <Text style={styles.businessQuickLinkIcon}>💸</Text>
+                <Ionicons name="swap-horizontal-outline" size={20} color={PRIMARY} />
                 <Text style={styles.businessQuickLinkText}>Receivables</Text>
               </TouchableOpacity>
             </View>
@@ -478,26 +481,26 @@ export default function HomeScreen() {
             <View style={styles.quickRow}>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
-                  <Text style={{ fontSize: 24 }}>💬</Text>
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color="#7C3AED" />
                 </View>
                 <Text style={styles.quickLabel}>Zena AI</Text>
                 <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={{ fontSize: 24 }}>📸</Text>
+                  <Ionicons name="scan-outline" size={24} color="#1763D6" />
                 </View>
                 <Text style={styles.quickLabel}>Scan Struk</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={{ fontSize: 24 }}>📊</Text>
+                  <Ionicons name="stats-chart-outline" size={24} color="#B45309" />
                 </View>
                 <Text style={styles.quickLabel}>Laporan</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Text style={{ fontSize: 24 }}>🎯</Text>
+                  <Ionicons name="pie-chart-outline" size={24} color="#E5484D" />
                 </View>
                 <Text style={styles.quickLabel}>Budget</Text>
               </TouchableOpacity>
@@ -507,14 +510,14 @@ export default function HomeScreen() {
             <View style={styles.quickRow}>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
-                  <Text style={{ fontSize: 24 }}>🧠</Text>
+                  <Ionicons name="sparkles-outline" size={24} color="#0E8A58" />
                 </View>
                 <Text style={styles.quickLabel}>ZENA Intel</Text>
                 <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                  <Text style={{ fontSize: 24 }}>💎</Text>
+                  <Ionicons name="trending-up-outline" size={24} color="#16A06A" />
                 </View>
                 <Text style={styles.quickLabel}>Investasi</Text>
                 <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
@@ -524,13 +527,13 @@ export default function HomeScreen() {
                 onPress={() => Alert.alert('Leaderboard 🏆', 'Fitur leaderboard akan datang segera! Bandingkan skor keuangan dengan pengguna lain.')}
               >
                 <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={{ fontSize: 24 }}>🏆</Text>
+                  <Ionicons name="trophy-outline" size={24} color="#B45309" />
                 </View>
                 <Text style={styles.quickLabel}>Leaderboard</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={{ fontSize: 24 }}>🔔</Text>
+                  <Ionicons name="notifications-outline" size={24} color="#1763D6" />
                 </View>
               <Text style={styles.quickLabel}>Reminder</Text>
             </TouchableOpacity>
@@ -545,25 +548,25 @@ export default function HomeScreen() {
             <View style={styles.quickRow}>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-projects')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={{ fontSize: 24 }}>📊</Text>
+                  <Ionicons name="briefcase-outline" size={24} color="#1763D6" />
                 </View>
                 <Text style={styles.quickLabel}>Projects</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-inventory')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                  <Text style={{ fontSize: 24 }}>📦</Text>
+                  <Ionicons name="cube-outline" size={24} color="#16A06A" />
                 </View>
                 <Text style={styles.quickLabel}>Inventory</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-receivables')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Text style={{ fontSize: 24 }}>💸</Text>
+                  <Ionicons name="swap-horizontal-outline" size={24} color="#E5484D" />
                 </View>
                 <Text style={styles.quickLabel}>Receivables</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={{ fontSize: 24 }}>💰</Text>
+                  <Ionicons name="cash-outline" size={24} color="#B45309" />
                 </View>
                 <Text style={styles.quickLabel}>Transaksi</Text>
                 <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
@@ -574,26 +577,26 @@ export default function HomeScreen() {
             <View style={styles.quickRow}>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
-                  <Text style={{ fontSize: 24 }}>💬</Text>
+                  <Ionicons name="chatbubble-ellipses-outline" size={24} color="#7C3AED" />
                 </View>
                 <Text style={styles.quickLabel}>Zena AI</Text>
                 <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Text style={{ fontSize: 24 }}>📋</Text>
+                  <Ionicons name="document-text-outline" size={24} color="#B45309" />
                 </View>
                 <Text style={styles.quickLabel}>Laporan</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Text style={{ fontSize: 24 }}>🔔</Text>
+                  <Ionicons name="notifications-outline" size={24} color="#1763D6" />
                 </View>
                 <Text style={styles.quickLabel}>Reminder</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
                 <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
-                  <Text style={{ fontSize: 24 }}>🧠</Text>
+                  <Ionicons name="sparkles-outline" size={24} color="#0E8A58" />
                 </View>
                 <Text style={styles.quickLabel}>ZENA Intel</Text>
               </TouchableOpacity>
@@ -640,7 +643,7 @@ export default function HomeScreen() {
 
         {transactions.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={{ fontSize: 36 }}>📝</Text>
+            <Ionicons name="document-text-outline" size={40} color={TEXT_SECONDARY} />
             <Text style={styles.emptyText}>Belum ada transaksi</Text>
           </View>
         ) : (
@@ -653,9 +656,11 @@ export default function HomeScreen() {
                 activeOpacity={0.7}
               >
                 <View style={[styles.txnIcon, { backgroundColor: txn.type === 'income' ? '#F0FDF4' : '#FEF2F2' }]}>
-                  <Text style={{ fontSize: 20 }}>
-                    {txn.type === 'income' ? '💰' : '💸'}
-                  </Text>
+                  <Ionicons
+                    name={txn.type === 'income' ? 'arrow-down' : 'arrow-up'}
+                    size={18}
+                    color={txn.type === 'income' ? INCOME_COLOR : EXPENSE_COLOR}
+                  />
                 </View>
                 <View style={styles.txnInfo}>
                   <Text style={styles.txnCategory}>{txn.category}</Text>
@@ -705,7 +710,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg, padding: 5, ...SHADOW.card,
   },
   modePill: { flexDirection: 'row', backgroundColor: '#F1F4F9', borderRadius: RADIUS.md, padding: 4 },
-  modePillTab: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
+  modePillTab: { flex: 1, flexDirection: 'row', gap: 6, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center', justifyContent: 'center' },
   modePillTabActivePersonal: { backgroundColor: PRIMARY },
   modePillTabActiveBusiness: { backgroundColor: BUSINESS },
   modePillText: { fontSize: 12.5, fontWeight: '700', color: TEXT_SECONDARY },
