@@ -47,6 +47,8 @@ export default function HomeScreen() {
   const [businessStats, setBusinessStats] = useState({
     totalPiutang: 0,
     totalHutang: 0,
+    piutangCount: 0,
+    hutangCount: 0,
     lowStockCount: 0,
     activeProjectsCount: 0,
   })
@@ -97,6 +99,8 @@ export default function HomeScreen() {
       setBusinessStats({
         totalPiutang: piutang?.reduce((sum, r: any) => sum + r.amount, 0) || 0,
         totalHutang: hutang?.reduce((sum, r: any) => sum + r.amount, 0) || 0,
+        piutangCount: piutang?.length || 0,
+        hutangCount: hutang?.length || 0,
         lowStockCount: lowStock || 0,
         activeProjectsCount: activeProjects?.length || 0,
       })
@@ -409,8 +413,8 @@ export default function HomeScreen() {
             </View>
 
             <View style={styles.businessStatsGrid}>
-              {/* Piutang */}
-              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
+              {/* Piutang — garis kiri hijau */}
+              <TouchableOpacity style={[styles.bsCard, { borderLeftColor: '#16A06A' }]} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
                 <View style={[styles.bsIcon, { backgroundColor: '#16A06A' }]}>
                   <Ionicons name="cash" size={20} color="#fff" />
                 </View>
@@ -419,12 +423,12 @@ export default function HomeScreen() {
                   <Text style={[styles.bsValue, { color: '#16A06A' }]} numberOfLines={1}>
                     Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
                   </Text>
-                  <Text style={styles.bsSub}>Total piutang</Text>
+                  <Text style={styles.bsSub}>{businessStats.piutangCount} Invoice</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Hutang */}
-              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
+              {/* Hutang — garis kiri merah */}
+              <TouchableOpacity style={[styles.bsCard, { borderLeftColor: '#E5484D' }]} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
                 <View style={[styles.bsIcon, { backgroundColor: '#E5484D' }]}>
                   <Ionicons name="receipt" size={20} color="#fff" />
                 </View>
@@ -433,12 +437,12 @@ export default function HomeScreen() {
                   <Text style={[styles.bsValue, { color: '#E5484D' }]} numberOfLines={1}>
                     Rp {businessStats.totalHutang.toLocaleString('id-ID')}
                   </Text>
-                  <Text style={styles.bsSub}>Total tagihan</Text>
+                  <Text style={styles.bsSub}>{businessStats.hutangCount} Tagihan</Text>
                 </View>
               </TouchableOpacity>
 
-              {/* Projects */}
-              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-projects')} activeOpacity={0.8}>
+              {/* Project Aktif — garis kiri biru */}
+              <TouchableOpacity style={[styles.bsCard, { borderLeftColor: '#1763D6' }]} onPress={() => router.push('/business-projects')} activeOpacity={0.8}>
                 <View style={[styles.bsIcon, { backgroundColor: '#1763D6' }]}>
                   <Ionicons name="briefcase" size={20} color="#fff" />
                 </View>
@@ -449,8 +453,8 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
 
-              {/* Low Stock */}
-              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-inventory')} activeOpacity={0.8}>
+              {/* Stok Rendah — garis kiri kuning */}
+              <TouchableOpacity style={[styles.bsCard, { borderLeftColor: '#F5A623' }]} onPress={() => router.push('/business-inventory')} activeOpacity={0.8}>
                 <View style={[styles.bsIcon, { backgroundColor: '#F5A623' }]}>
                   <Ionicons name="cube" size={20} color="#fff" />
                 </View>
@@ -459,33 +463,6 @@ export default function HomeScreen() {
                   <Text style={[styles.bsValue, { color: '#F5A623' }]}>{businessStats.lowStockCount} Produk</Text>
                   <Text style={styles.bsSub}>Perlu restock</Text>
                 </View>
-              </TouchableOpacity>
-            </View>
-
-            {/* Quick Links */}
-            <View style={styles.businessQuickLinks}>
-              <TouchableOpacity
-                style={styles.businessQuickLinkBtn}
-                onPress={() => router.push('/business-projects')}
-              >
-                <Ionicons name="briefcase-outline" size={20} color={PRIMARY} />
-                <Text style={styles.businessQuickLinkText}>Projects</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.businessQuickLinkBtn}
-                onPress={() => router.push('/business-inventory')}
-              >
-                <Ionicons name="cube-outline" size={20} color={PRIMARY} />
-                <Text style={styles.businessQuickLinkText}>Inventory</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.businessQuickLinkBtn}
-                onPress={() => router.push('/business-receivables')}
-              >
-                <Ionicons name="swap-horizontal-outline" size={20} color={PRIMARY} />
-                <Text style={styles.businessQuickLinkText}>Receivables</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -541,12 +518,11 @@ export default function HomeScreen() {
           </>
         )}
 
-        {/* AKSES CEPAT - BUSINESS MODE */}
+        {/* AKSES CEPAT - BUSINESS MODE (4 icon) */}
         {activeMode === 'business' && (
           <>
             <Text style={styles.sectionTitle}>Akses Cepat</Text>
             <View style={styles.quickActions}>
-              {/* Row 1 */}
               <View style={styles.quickRow}>
                 <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-projects')}>
                   <View style={styles.aksesCard}><Ionicons name="briefcase" size={26} color="#1763D6" /></View>
@@ -563,28 +539,6 @@ export default function HomeScreen() {
                 <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
                   <View style={styles.aksesCard}><Ionicons name="bar-chart" size={26} color="#B45309" /></View>
                   <Text style={styles.quickLabel}>Laporan</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Row 2 */}
-              <View style={styles.quickRow}>
-                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi?mode=business')}>
-                  <View style={[styles.aksesCircle, { backgroundColor: BUSINESS }]}>
-                    <Ionicons name="add" size={28} color="#fff" />
-                  </View>
-                  <Text style={styles.quickLabel}>Catat</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-                  <View style={styles.aksesCard}><Ionicons name="chatbubble-ellipses" size={26} color="#7C3AED" /></View>
-                  <Text style={styles.quickLabel}>Zena AI</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
-                  <View style={styles.aksesCard}><Ionicons name="sparkles" size={26} color="#0E8A58" /></View>
-                  <Text style={styles.quickLabel}>ZENA Intel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
-                  <View style={styles.aksesCard}><Ionicons name="notifications" size={26} color="#1763D6" /></View>
-                  <Text style={styles.quickLabel}>Reminder</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -823,6 +777,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 12,
     minWidth: '47%', flexGrow: 1, flexBasis: '47%',
     backgroundColor: CARD_BG, borderRadius: RADIUS.lg, padding: 12, ...SHADOW.card,
+    borderLeftWidth: 4, borderLeftColor: '#16A06A',
   },
   bsIcon: {
     width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',

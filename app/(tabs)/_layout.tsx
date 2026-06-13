@@ -64,8 +64,23 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="reminder"
         options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon accent={accent} focused={focused} icon={focused ? 'notifications' : 'notifications-outline'} label="Reminder" />
+          // Tab ke-4 mode-aware: Bisnis → Projects (ke /business-projects), Pribadi → Reminder
+          tabBarButton: (props: any) => (
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={0.7}
+              onPress={(e) => {
+                if (mode === 'business') router.push('/business-projects')
+                else props.onPress?.(e)
+              }}
+            >
+              <TabIcon
+                accent={accent}
+                focused={mode !== 'business' && !!props.accessibilityState?.selected}
+                icon={mode === 'business' ? 'briefcase-outline' : (props.accessibilityState?.selected ? 'notifications' : 'notifications-outline')}
+                label={mode === 'business' ? 'Projects' : 'Reminder'}
+              />
+            </TouchableOpacity>
           ),
         }}
       />
