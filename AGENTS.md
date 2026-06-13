@@ -72,7 +72,11 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **EAS Project:** `@rasyidaldy/zena`
 
 **Current Build:** versionCode 7, Build #7  
-**Latest Commit:** 12b3ca4 (Wallet picker badge+smart default & home Portofolio Investasi)
+**Latest Commit:** 3878b1f (complete UI redesign + tier system + financial health)
+
+**⚠️ SQL yang HARUS dijalankan user di Supabase (selain yang sudah):**
+- `GAMIFICATION_SETUP.sql` — kolom xp/tier/streak + tabel user_badges (opsional: gamification jalan dari data computed, SQL untuk persistensi)
+- Sudah dijalankan: FIX_PROJECT_STATS_MARGIN, CREATE_PRODUCT_VARIANTS, CREATE_INVESTMENT_TRANSACTIONS
 
 **Database & Deploy Access (PENTING - update 2026-06-13):**
 - ⚠️ **psql via `SUPABASE_DB_URL` GAGAL** (password auth ditolak). JANGAN andalkan psql.
@@ -85,7 +89,31 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## LATEST SESSION (2026-06-11 s/d 2026-06-13) - WEB FIXES + BISNIS LENGKAP ✅
+## LATEST SESSION (2026-06-13 s/d 2026-06-14) - UI REDESIGN 6 FASE ✅
+
+**🎨 REDESIGN TOTAL UI (light theme, design system) + fitur gamification & health**
+
+**Design system (`constants/theme.ts` v2):** `COLORS` (lowercase + legacy uppercase, palet biru #1763D6 / hijau #16A06A), `RADIUS`, `SHADOW`, `SPACING`. Semua screen utama light theme + Ionicons (bukan emoji).
+
+**FASE 1 — Home Pribadi:** gradient header + avatar, mode pill toggle, balance card + ilustrasi icon, Financial Health card, Akses Cepat (card putih + icon filled, Catat = lingkaran). Bottom nav FAB '+' . Install `expo-linear-gradient`, `@expo/vector-icons`.
+
+**FASE 2 — Home Bisnis:** Ringkasan Bisnis 2x2 garis kiri berwarna + subtitle count, Akses Cepat 4 icon, bottom nav tab ke-4 = Projects, FAB/tab warna per-mode (`lib/modeStore.ts` + `useAppMode`).
+
+**FASE 3 — Catat & Laporan:** konversi light. Catat: header X+title, type pill (Pemasukan/Pengeluaran/Transfer). Laporan: tab pills (Ringkasan/Cashflow/Kategori), Tren Cashflow line chart. `components/LineChart.tsx` (SVG), install `react-native-svg`.
+
+**FASE 4 — Profile + Gamification (FITUR BARU):** `lib/gamification.ts` (XP +10 txn/+50 hari/+100 budget, tier starter→platinum, badge first_saver/consistent/investor/budget_pro). `GAMIFICATION_SETUP.sql` (kolom xp/tier/streak + tabel user_badges). Profile: header tier badge, 3 stat box, tier XP card, badge grid, statistik. XP/badge/rank DITURUNKAN dari data existing (txn count, streak, holdings, score) — jalan TANPA SQL.
+
+**FASE 5 — Financial Health + Portfolio (FITUR BARU):** `components/Gauge.tsx` (gauge SVG setengah lingkaran). `app/financial-health.tsx` (gauge + komponen Budget/Konsistensi/Tabungan/Investasi/Utang + tips). Home health card → tap ke detail. Portfolio: line chart + range pills (1D..All).
+
+**FASE 6 — Pengaturan + polish:** `app/pengaturan.tsx` (menu Profil/Keamanan/Notifikasi/Mode/Backup/Bantuan/Keluar). Gear icon Home → Pengaturan.
+
+**File baru:** `constants/theme.ts` (v2), `lib/gamification.ts`, `lib/modeStore.ts`, `components/{LineChart,Gauge}.tsx`, `app/{financial-health,pengaturan}.tsx`, `GAMIFICATION_SETUP.sql`.
+
+**Catatan:** logic/perhitungan TIDAK diubah (styling + fitur tambah). Semua tsc 0 errors.
+
+---
+
+## SESSION SEBELUMNYA (2026-06-11 s/d 2026-06-13) - WEB FIXES + BISNIS LENGKAP ✅
 
 **🌐 FOKUS: Aplikasi dipakai via Web (Vercel/Chrome) + perbaikan menyeluruh mode bisnis**
 
