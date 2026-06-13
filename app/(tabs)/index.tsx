@@ -259,7 +259,7 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>{initials}</Text>
           </View>
           <View>
-            <Text style={styles.headerGreeting}>{greeting}</Text>
+            <Text style={styles.headerGreeting}>{greeting} 👋</Text>
             <Text style={styles.headerName}>
               {activeMode === 'business' && prefs?.business_name
                 ? prefs.business_name
@@ -393,55 +393,55 @@ export default function HomeScreen() {
 
             <View style={styles.businessStatsGrid}>
               {/* Piutang */}
-              <TouchableOpacity
-                style={[styles.businessStatCard, { borderLeftColor: '#16A34A' }]}
-                onPress={() => router.push('/business-receivables')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-down-circle-outline" size={24} color="#16A06A" style={{ marginBottom: 6 }} />
-                <Text style={styles.businessStatLabel}>Piutang</Text>
-                <Text style={[styles.businessStatValue, { color: '#16A34A' }]}>
-                  Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
-                </Text>
+              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
+                <View style={[styles.bsIcon, { backgroundColor: '#16A06A' }]}>
+                  <Ionicons name="cash" size={20} color="#fff" />
+                </View>
+                <View style={styles.bsTextCol}>
+                  <Text style={styles.bsLabel}>Piutang</Text>
+                  <Text style={[styles.bsValue, { color: '#16A06A' }]} numberOfLines={1}>
+                    Rp {businessStats.totalPiutang.toLocaleString('id-ID')}
+                  </Text>
+                  <Text style={styles.bsSub}>Total piutang</Text>
+                </View>
               </TouchableOpacity>
 
               {/* Hutang */}
-              <TouchableOpacity
-                style={[styles.businessStatCard, { borderLeftColor: '#E24B4A' }]}
-                onPress={() => router.push('/business-receivables')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="arrow-up-circle-outline" size={24} color="#E5484D" style={{ marginBottom: 6 }} />
-                <Text style={styles.businessStatLabel}>Hutang</Text>
-                <Text style={[styles.businessStatValue, { color: '#E24B4A' }]}>
-                  Rp {businessStats.totalHutang.toLocaleString('id-ID')}
-                </Text>
+              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-receivables')} activeOpacity={0.8}>
+                <View style={[styles.bsIcon, { backgroundColor: '#E5484D' }]}>
+                  <Ionicons name="receipt" size={20} color="#fff" />
+                </View>
+                <View style={styles.bsTextCol}>
+                  <Text style={styles.bsLabel}>Hutang</Text>
+                  <Text style={[styles.bsValue, { color: '#E5484D' }]} numberOfLines={1}>
+                    Rp {businessStats.totalHutang.toLocaleString('id-ID')}
+                  </Text>
+                  <Text style={styles.bsSub}>Total tagihan</Text>
+                </View>
               </TouchableOpacity>
 
               {/* Projects */}
-              <TouchableOpacity
-                style={[styles.businessStatCard, { borderLeftColor: '#185FA5' }]}
-                onPress={() => router.push('/business-projects')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="briefcase-outline" size={24} color="#1763D6" style={{ marginBottom: 6 }} />
-                <Text style={styles.businessStatLabel}>Project Aktif</Text>
-                <Text style={[styles.businessStatValue, { color: '#185FA5' }]}>
-                  {businessStats.activeProjectsCount} Project
-                </Text>
+              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-projects')} activeOpacity={0.8}>
+                <View style={[styles.bsIcon, { backgroundColor: '#1763D6' }]}>
+                  <Ionicons name="briefcase" size={20} color="#fff" />
+                </View>
+                <View style={styles.bsTextCol}>
+                  <Text style={styles.bsLabel}>Project Aktif</Text>
+                  <Text style={[styles.bsValue, { color: '#1763D6' }]}>{businessStats.activeProjectsCount} Project</Text>
+                  <Text style={styles.bsSub}>Sedang berjalan</Text>
+                </View>
               </TouchableOpacity>
 
               {/* Low Stock */}
-              <TouchableOpacity
-                style={[styles.businessStatCard, { borderLeftColor: '#F59E0B' }]}
-                onPress={() => router.push('/business-inventory')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="cube-outline" size={24} color="#F5A623" style={{ marginBottom: 6 }} />
-                <Text style={styles.businessStatLabel}>Stok Rendah</Text>
-                <Text style={[styles.businessStatValue, { color: '#F59E0B' }]}>
-                  {businessStats.lowStockCount} Produk
-                </Text>
+              <TouchableOpacity style={styles.bsCard} onPress={() => router.push('/business-inventory')} activeOpacity={0.8}>
+                <View style={[styles.bsIcon, { backgroundColor: '#F5A623' }]}>
+                  <Ionicons name="cube" size={20} color="#fff" />
+                </View>
+                <View style={styles.bsTextCol}>
+                  <Text style={styles.bsLabel}>Stok Rendah</Text>
+                  <Text style={[styles.bsValue, { color: '#F5A623' }]}>{businessStats.lowStockCount} Produk</Text>
+                  <Text style={styles.bsSub}>Perlu restock</Text>
+                </View>
               </TouchableOpacity>
             </View>
 
@@ -474,134 +474,104 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* QUICK ACTIONS - PERSONAL MODE */}
+        {/* AKSES CEPAT - PERSONAL MODE */}
         {activeMode === 'personal' && (
-          <View style={styles.quickActions}>
-            {/* Row 1 */}
-            <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={24} color="#7C3AED" />
-                </View>
-                <Text style={styles.quickLabel}>Zena AI</Text>
-                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="scan-outline" size={24} color="#1763D6" />
-                </View>
-                <Text style={styles.quickLabel}>Scan Struk</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Ionicons name="stats-chart-outline" size={24} color="#B45309" />
-                </View>
-                <Text style={styles.quickLabel}>Laporan</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Ionicons name="pie-chart-outline" size={24} color="#E5484D" />
-                </View>
-                <Text style={styles.quickLabel}>Budget</Text>
-              </TouchableOpacity>
-            </View>
+          <>
+            <Text style={styles.sectionTitle}>Akses Cepat</Text>
+            <View style={styles.quickActions}>
+              {/* Row 1 */}
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
+                  <View style={[styles.aksesCircle, { backgroundColor: PRIMARY }]}>
+                    <Ionicons name="add" size={28} color="#fff" />
+                  </View>
+                  <Text style={styles.quickLabel}>Catat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
+                  <View style={styles.aksesCard}><Ionicons name="camera" size={26} color="#1763D6" /></View>
+                  <Text style={styles.quickLabel}>Scan Struk</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                  <View style={styles.aksesCard}><Ionicons name="bar-chart" size={26} color="#16A06A" /></View>
+                  <Text style={styles.quickLabel}>Laporan</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                  <View style={styles.aksesCard}><Ionicons name="pie-chart" size={26} color="#E5484D" /></View>
+                  <Text style={styles.quickLabel}>Budget</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Row 2 */}
-            <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
-                  <Ionicons name="sparkles-outline" size={24} color="#0E8A58" />
-                </View>
-                <Text style={styles.quickLabel}>ZENA Intel</Text>
-                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                  <Ionicons name="trending-up-outline" size={24} color="#16A06A" />
-                </View>
-                <Text style={styles.quickLabel}>Investasi</Text>
-                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.quickBtn}
-                onPress={() => Alert.alert('Leaderboard 🏆', 'Fitur leaderboard akan datang segera! Bandingkan skor keuangan dengan pengguna lain.')}
-              >
-                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Ionicons name="trophy-outline" size={24} color="#B45309" />
-                </View>
-                <Text style={styles.quickLabel}>Leaderboard</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="notifications-outline" size={24} color="#1763D6" />
-                </View>
-              <Text style={styles.quickLabel}>Reminder</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {/* Row 2 */}
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+                  <View style={styles.aksesCard}><Ionicons name="chatbubble-ellipses" size={26} color="#7C3AED" /></View>
+                  <Text style={styles.quickLabel}>Zena AI</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/investment-portfolio')}>
+                  <View style={styles.aksesCard}><Ionicons name="trending-up" size={26} color="#16A06A" /></View>
+                  <Text style={styles.quickLabel}>Investasi</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
+                  <View style={styles.aksesCard}><Ionicons name="sparkles" size={26} color="#0E8A58" /></View>
+                  <Text style={styles.quickLabel}>ZENA Intel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
+                  <View style={styles.aksesCard}><Ionicons name="notifications" size={26} color="#1763D6" /></View>
+                  <Text style={styles.quickLabel}>Reminder</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </>
         )}
 
-        {/* QUICK ACTIONS - BUSINESS MODE */}
+        {/* AKSES CEPAT - BUSINESS MODE */}
         {activeMode === 'business' && (
-          <View style={styles.quickActions}>
-            {/* Row 1 - Business Core */}
-            <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-projects')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="briefcase-outline" size={24} color="#1763D6" />
-                </View>
-                <Text style={styles.quickLabel}>Projects</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-inventory')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F0FDF4' }]}>
-                  <Ionicons name="cube-outline" size={24} color="#16A06A" />
-                </View>
-                <Text style={styles.quickLabel}>Inventory</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-receivables')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#FEF2F2' }]}>
-                  <Ionicons name="swap-horizontal-outline" size={24} color="#E5484D" />
-                </View>
-                <Text style={styles.quickLabel}>Receivables</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Ionicons name="cash-outline" size={24} color="#B45309" />
-                </View>
-                <Text style={styles.quickLabel}>Transaksi</Text>
-                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>NEW</Text></View>
-              </TouchableOpacity>
-            </View>
+          <>
+            <Text style={styles.sectionTitle}>Akses Cepat</Text>
+            <View style={styles.quickActions}>
+              {/* Row 1 */}
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-projects')}>
+                  <View style={styles.aksesCard}><Ionicons name="briefcase" size={26} color="#1763D6" /></View>
+                  <Text style={styles.quickLabel}>Projects</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-inventory')}>
+                  <View style={styles.aksesCard}><Ionicons name="cube" size={26} color="#16A06A" /></View>
+                  <Text style={styles.quickLabel}>Inventory</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/business-receivables')}>
+                  <View style={styles.aksesCard}><Ionicons name="swap-horizontal" size={26} color="#E5484D" /></View>
+                  <Text style={styles.quickLabel}>Receivables</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
+                  <View style={styles.aksesCard}><Ionicons name="bar-chart" size={26} color="#B45309" /></View>
+                  <Text style={styles.quickLabel}>Laporan</Text>
+                </TouchableOpacity>
+              </View>
 
-            {/* Row 2 - Business Support */}
-            <View style={styles.quickRow}>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F3EFFE' }]}>
-                  <Ionicons name="chatbubble-ellipses-outline" size={24} color="#7C3AED" />
-                </View>
-                <Text style={styles.quickLabel}>Zena AI</Text>
-                <View style={styles.quickBadge}><Text style={styles.quickBadgeText}>AI</Text></View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/laporan')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#FFFBEB' }]}>
-                  <Ionicons name="document-text-outline" size={24} color="#B45309" />
-                </View>
-                <Text style={styles.quickLabel}>Laporan</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#EFF6FF' }]}>
-                  <Ionicons name="notifications-outline" size={24} color="#1763D6" />
-                </View>
-                <Text style={styles.quickLabel}>Reminder</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
-                <View style={[styles.quickIcon, { backgroundColor: '#F0FDFA' }]}>
-                  <Ionicons name="sparkles-outline" size={24} color="#0E8A58" />
-                </View>
-                <Text style={styles.quickLabel}>ZENA Intel</Text>
-              </TouchableOpacity>
+              {/* Row 2 */}
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/tambah-transaksi?mode=business')}>
+                  <View style={[styles.aksesCircle, { backgroundColor: BUSINESS }]}>
+                    <Ionicons name="add" size={28} color="#fff" />
+                  </View>
+                  <Text style={styles.quickLabel}>Catat</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/chat')}>
+                  <View style={styles.aksesCard}><Ionicons name="chatbubble-ellipses" size={26} color="#7C3AED" /></View>
+                  <Text style={styles.quickLabel}>Zena AI</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/zena-intelligence')}>
+                  <View style={styles.aksesCard}><Ionicons name="sparkles" size={26} color="#0E8A58" /></View>
+                  <Text style={styles.quickLabel}>ZENA Intel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/(tabs)/reminder')}>
+                  <View style={styles.aksesCard}><Ionicons name="notifications" size={26} color="#1763D6" /></View>
+                  <Text style={styles.quickLabel}>Reminder</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          </>
         )}
 
         {/* FINANCIAL SCORE (Personal mode only) */}
@@ -688,10 +658,11 @@ const styles = StyleSheet.create({
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerLogo: { width: 40, height: 40, borderRadius: 20 },
   avatar: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 48, height: 48, borderRadius: 24, backgroundColor: '#15233A',
     alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)',
   },
-  avatarText: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  avatarText: { fontSize: 16, fontWeight: '800', color: '#fff' },
   headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 2 },
   headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   headerTier: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
@@ -752,13 +723,23 @@ const styles = StyleSheet.create({
   healthBarFill: { height: '100%', borderRadius: 4 },
   healthDelta: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 8 },
 
-  quickActions: { marginHorizontal: 20, marginTop: 24, gap: 16 },
+  quickActions: { marginHorizontal: 16, marginTop: 4, gap: 16 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  quickBtn: { alignItems: 'center', width: (SCREEN_WIDTH - 60) / 4, position: 'relative' },
+  quickBtn: { alignItems: 'center', width: (SCREEN_WIDTH - 64) / 4, position: 'relative' },
+  // Card putih kotak-rounded + shadow (icon filled berwarna) — ala reference
+  aksesCard: {
+    width: 60, height: 60, borderRadius: 18, backgroundColor: CARD_BG,
+    alignItems: 'center', justifyContent: 'center', ...SHADOW.card,
+  },
+  // Catat = lingkaran solid warna mode
+  aksesCircle: {
+    width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center',
+    shadowColor: PRIMARY, shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  },
   quickIcon: {
     width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
   },
-  quickLabel: { fontSize: 11, color: TEXT_MAIN, marginTop: 6, textAlign: 'center' },
+  quickLabel: { fontSize: 11, color: TEXT_MAIN, marginTop: 8, textAlign: 'center', fontWeight: '500' },
   quickBadge: {
     position: 'absolute', top: -4, right: 4, backgroundColor: '#E24B4A',
     borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2,
@@ -817,13 +798,19 @@ const styles = StyleSheet.create({
   businessStatsGrid: {
     flexDirection: 'row', flexWrap: 'wrap', gap: 10,
   },
-  businessStatCard: {
-    flex: 1, minWidth: '47%', backgroundColor: '#F9FAFB',
-    borderRadius: 12, padding: 14, borderLeftWidth: 4,
+  // Card stat baru: icon kotak berwarna + value + subtitle (ala reference)
+  bsCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    minWidth: '47%', flexGrow: 1, flexBasis: '47%',
+    backgroundColor: CARD_BG, borderRadius: RADIUS.lg, padding: 12, ...SHADOW.card,
   },
-  businessStatIcon: { fontSize: 24, marginBottom: 8 },
-  businessStatLabel: { fontSize: 11, color: TEXT_SECONDARY, marginBottom: 4 },
-  businessStatValue: { fontSize: 15, fontWeight: '700' },
+  bsIcon: {
+    width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+  },
+  bsTextCol: { flex: 1 },
+  bsLabel: { fontSize: 11, color: TEXT_SECONDARY },
+  bsValue: { fontSize: 15, fontWeight: '800', marginTop: 1 },
+  bsSub: { fontSize: 10, color: TEXT_SECONDARY, marginTop: 1 },
   businessQuickLinks: {
     flexDirection: 'row', gap: 8, marginTop: 12,
   },
