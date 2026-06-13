@@ -1,24 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Image, Dimensions
+  ActivityIndicator, Alert, Dimensions
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
+import { LinearGradient } from 'expo-linear-gradient'
 import { supabase } from '../../lib/supabase'
 import { UserWallet, Transaction, UserPreferences, TierName } from '../../types'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { TIER_CONFIG } from '../../types'
+import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 import PortfolioWidget from '../../components/PortfolioWidget'
 
-const PRIMARY = '#185FA5'
-const BUSINESS = '#1D9E75' // hijau — aksen mode bisnis
-const BG_APP = '#F4F7FA'
-const CARD_BG = '#FFFFFF'
-const TEXT_MAIN = '#0D1B3E'
-const TEXT_SECONDARY = '#888888'
-const INCOME_COLOR = '#16A34A'
-const EXPENSE_COLOR = '#E24B4A'
+// Design system v2
+const PRIMARY = COLORS.primary       // #1763D6
+const BUSINESS = COLORS.business     // #16A06A
+const BG_APP = COLORS.bg
+const CARD_BG = COLORS.card
+const TEXT_MAIN = COLORS.text
+const TEXT_SECONDARY = COLORS.textMuted
+const INCOME_COLOR = COLORS.income
+const EXPENSE_COLOR = COLORS.expense
+const BORDER = COLORS.border
+// Gradient header per mode
+const GRAD_PERSONAL = ['#1763D6', '#0F4FB5'] as const
+const GRAD_BUSINESS = ['#16A06A', '#0E8A58'] as const
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window')
 
@@ -166,9 +173,13 @@ export default function HomeScreen() {
 
   const handleToggleMode = async () => {
     const newMode = activeMode === 'personal' ? 'business' : 'personal'
-    setActiveMode(newMode)
+    selectMode(newMode)
+  }
 
-    // Save to preferences
+  // Pilih mode spesifik (dipakai pill toggle) + simpan ke preferences
+  const selectMode = async (newMode: TabMode) => {
+    if (newMode === activeMode) return
+    setActiveMode(newMode)
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
       await supabase
@@ -236,14 +247,16 @@ export default function HomeScreen() {
         userName={prefs?.nickname || 'Friend'}
       />
 
-      {/* HEADER */}
-      <View style={[styles.header, activeMode === 'business' && { backgroundColor: BUSINESS }]}>
+      {/* HEADER (gradient, rounded bottom) */}
+      <LinearGradient
+        colors={activeMode === 'business' ? GRAD_BUSINESS : GRAD_PERSONAL}
+        start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+        style={styles.header}
+      >
         <View style={styles.headerLeft}>
-          <Image
-            source={require('../../assets/icon.png')}
-            style={styles.headerLogo}
-            resizeMode="contain"
-          />
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
           <View>
             <Text style={styles.headerGreeting}>{greeting}</Text>
             <Text style={styles.headerName}>
@@ -266,32 +279,35 @@ export default function HomeScreen() {
             <Text style={styles.headerBtnIcon}>⚙️</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* BALANCE CARD */}
-        <View style={styles.balanceCard}>
-          {/* Mode Label + Toggle */}
-          <View style={styles.modeHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={styles.modeLabel}>
-                {activeMode === 'personal' ? '👤 Mode Pribadi' : '💼 Mode Bisnis'}
-              </Text>
-            </View>
-
-            {/* Toggle Switch (always available) */}
+        {/* MODE TOGGLE — pill di dalam card putih */}
+        <View style={styles.modeCard}>
+          <View style={styles.modePill}>
             <TouchableOpacity
-              style={styles.modeToggle}
-              onPress={handleToggleMode}
-              activeOpacity={0.7}
+              style={[styles.modePillTab, activeMode === 'personal' && styles.modePillTabActivePersonal]}
+              onPress={() => selectMode('personal')}
+              activeOpacity={0.8}
             >
-              <Text style={styles.modeToggleIcon}>⇄</Text>
-              <Text style={styles.modeToggleText}>
-                {activeMode === 'personal' ? 'Bisnis' : 'Pribadi'}
+              <Text style={[styles.modePillText, activeMode === 'personal' && styles.modePillTextActive]}>
+                👤 Mode Pribadi
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modePillTab, activeMode === 'business' && styles.modePillTabActiveBusiness]}
+              onPress={() => selectMode('business')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.modePillText, activeMode === 'business' && styles.modePillTextActive]}>
+                💼 Mode Bisnis
               </Text>
             </TouchableOpacity>
           </View>
+        </View>
 
+        {/* BALANCE CARD */}
+        <View style={styles.balanceCard}>
           {/* Balance */}
           <View style={styles.balanceContent}>
             <View style={styles.balanceLeft}>
@@ -338,13 +354,28 @@ export default function HomeScreen() {
             </View>
           )}
 
-          {/* XP Progress */}
-          <View style={styles.xpSection}>
-            <View style={styles.xpBar}>
-              <View style={[styles.xpFill, { width: `${(score?.total ?? 0)}%`, backgroundColor: tierConfig.color }]} />
+        </View>
+
+        {/* FINANCIAL HEALTH CARD (terpisah) */}
+        <View style={styles.healthCard}>
+          <View style={styles.healthTop}>
+            <View>
+              <Text style={styles.healthLabel}>Financial Health</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 6, marginTop: 2 }}>
+                <Text style={styles.healthScore}>{score?.total ?? 0}</Text>
+                <Text style={styles.healthScoreMax}>/100</Text>
+              </View>
             </View>
-            <Text style={styles.xpText}>{score?.total ?? 0}% XP</Text>
+            <View style={[styles.healthBadge, { backgroundColor: tierConfig.color + '18' }]}>
+              <Text style={[styles.healthBadgeText, { color: tierConfig.color }]}>
+                {(score?.total ?? 0) >= 80 ? 'Sangat Baik' : (score?.total ?? 0) >= 60 ? 'Baik' : (score?.total ?? 0) >= 40 ? 'Cukup' : 'Perlu Perbaikan'}
+              </Text>
+            </View>
           </View>
+          <View style={styles.healthBar}>
+            <View style={[styles.healthBarFill, { width: `${score?.total ?? 0}%`, backgroundColor: tierConfig.color }]} />
+          </View>
+          <Text style={styles.healthDelta}>Tier: {tierName} · streak {streak} hari</Text>
         </View>
 
         {/* BUSINESS STATS (show only in business tab) */}
@@ -646,7 +677,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: BG_APP },
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    backgroundColor: PRIMARY, paddingHorizontal: 20, paddingTop: 56, paddingBottom: 32,
+    paddingHorizontal: 20, paddingTop: 56, paddingBottom: 40,
+    borderBottomLeftRadius: 28, borderBottomRightRadius: 28,
   },
   headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   headerLogo: { width: 40, height: 40, borderRadius: 20 },
@@ -667,24 +699,22 @@ const styles = StyleSheet.create({
   },
   headerBadgeText: { fontSize: 10, fontWeight: '700', color: '#fff' },
 
+  // Mode toggle pill (card putih)
+  modeCard: {
+    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: -22,
+    borderRadius: RADIUS.lg, padding: 5, ...SHADOW.card,
+  },
+  modePill: { flexDirection: 'row', backgroundColor: '#F1F4F9', borderRadius: RADIUS.md, padding: 4 },
+  modePillTab: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
+  modePillTabActivePersonal: { backgroundColor: PRIMARY },
+  modePillTabActiveBusiness: { backgroundColor: BUSINESS },
+  modePillText: { fontSize: 12.5, fontWeight: '700', color: TEXT_SECONDARY },
+  modePillTextActive: { color: '#fff' },
+
   balanceCard: {
-    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: -18,
-    borderRadius: 24, padding: 20,
-    shadowColor: PRIMARY, shadowOpacity: 0.12, shadowRadius: 32, shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: 12,
+    borderRadius: RADIUS.xl, padding: 20, ...SHADOW.card,
   },
-  modeHeader: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginBottom: 12, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#F0F0F0',
-  },
-  modeLabel: { fontSize: 13, fontWeight: '700', color: TEXT_MAIN },
-  modeToggle: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: PRIMARY + '10', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12,
-    borderWidth: 1, borderColor: PRIMARY + '30',
-  },
-  modeToggleIcon: { fontSize: 14, color: PRIMARY },
-  modeToggleText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
   balanceContent: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   balanceLeft: { flex: 1 },
   balanceLabel: { fontSize: 13, color: TEXT_SECONDARY },
@@ -702,16 +732,26 @@ const styles = StyleSheet.create({
   walletName: { fontSize: 14, fontWeight: '600', color: TEXT_MAIN },
   walletType: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 },
   walletBalance: { fontSize: 13, fontWeight: '600', color: TEXT_MAIN },
-  xpSection: { marginTop: 16 },
-  xpBar: { height: 6, backgroundColor: '#F0F4F8', borderRadius: 3, overflow: 'hidden' },
-  xpFill: { height: '100%' },
-  xpText: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 6, textAlign: 'center' },
+  // Financial Health card
+  healthCard: {
+    backgroundColor: CARD_BG, marginHorizontal: 16, marginTop: 12,
+    borderRadius: RADIUS.xl, padding: 18, ...SHADOW.card,
+  },
+  healthTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  healthLabel: { fontSize: 12, color: TEXT_SECONDARY, fontWeight: '600' },
+  healthScore: { fontSize: 32, fontWeight: '800', color: TEXT_MAIN, lineHeight: 34 },
+  healthScoreMax: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 4 },
+  healthBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: RADIUS.pill },
+  healthBadgeText: { fontSize: 12, fontWeight: '700' },
+  healthBar: { height: 8, backgroundColor: '#EDF0F5', borderRadius: 4, overflow: 'hidden', marginTop: 14 },
+  healthBarFill: { height: '100%', borderRadius: 4 },
+  healthDelta: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 8 },
 
   quickActions: { marginHorizontal: 20, marginTop: 24, gap: 16 },
   quickRow: { flexDirection: 'row', justifyContent: 'space-between' },
   quickBtn: { alignItems: 'center', width: (SCREEN_WIDTH - 60) / 4, position: 'relative' },
   quickIcon: {
-    width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center',
   },
   quickLabel: { fontSize: 11, color: TEXT_MAIN, marginTop: 6, textAlign: 'center' },
   quickBadge: {

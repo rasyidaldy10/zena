@@ -1,8 +1,9 @@
 import { Tabs } from 'expo-router'
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { router } from 'expo-router'
+import { COLORS } from '../../constants/theme'
 
-const PRIMARY = '#185FA5'
+const PRIMARY = COLORS.primary
 
 function TabIcon({ focused, icon, label }: { focused: boolean; icon: string; label: string }) {
   return (
@@ -48,11 +49,7 @@ export default function TabsLayout() {
               onPress={() => router.push('/tambah-transaksi')}
             >
               <View style={styles.addBtn}>
-                <Image
-                  source={require('../../assets/icon.png')}
-                  style={styles.zenaBtnIcon}
-                  resizeMode="contain"
-                />
+                <Text style={styles.addBtnPlus}>+</Text>
               </View>
               <Text style={styles.zenaBtnLabel}>Catat</Text>
             </TouchableOpacity>
@@ -82,13 +79,15 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: '#FFFFFF',
-    borderTopColor: '#F0F4F8',
+    borderTopColor: COLORS.border,
     borderTopWidth: 1,
     height: 80,
     paddingBottom: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#1A1D26',
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
     shadowOffset: { width: 0, height: -4 },
     elevation: 8,
   },
@@ -116,7 +115,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 12,
   },
-  zenaBtnIcon: { width: 36, height: 36 },
+  addBtnPlus: { fontSize: 34, color: '#fff', fontWeight: '300', marginTop: -2 },
   zenaBtnLabel: {
     fontSize: 11,
     fontWeight: '600',
