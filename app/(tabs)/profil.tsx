@@ -34,8 +34,6 @@ export default function ProfilScreen() {
   const [income, setIncome] = useState('')
   const [score, setScore] = useState<ScoreData | null>(null)
   const [wallets, setWallets] = useState<UserWallet[]>([])
-  const [tapCount, setTapCount] = useState(0)
-  const [lastTapTime, setLastTapTime] = useState(0)
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
   const [businessName, setBusinessName] = useState('')
   const [ppnEnabled, setPpnEnabled] = useState(false)
@@ -162,21 +160,6 @@ export default function ProfilScreen() {
     } catch { notify('Error', 'Gagal logout. Coba lagi.') }
   }
 
-  const handleHeaderTap = () => {
-    const now = Date.now()
-    if (now - lastTapTime > 2000) setTapCount(1)
-    else {
-      const newCount = tapCount + 1
-      setTapCount(newCount)
-      if (newCount >= 5) {
-        setTapCount(0)
-        confirmAsync('🎨 Marketing Manager', 'Akses admin - Generate content dengan Higgsfield AI', 'Buka')
-          .then((ok) => { if (ok) router.push('/marketing-dashboard') })
-      }
-    }
-    setLastTapTime(now)
-  }
-
   if (loading) return (
     <View style={styles.loadingWrap}><ActivityIndicator color={PRIMARY} /></View>
   )
@@ -196,7 +179,7 @@ export default function ProfilScreen() {
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
       {/* HEADER biru */}
       <View style={styles.header}>
-        <TouchableOpacity activeOpacity={1} onPress={handleHeaderTap} style={styles.headerTop}>
+        <View style={styles.headerTop}>
           <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName}>{prefs?.nickname || 'User'}</Text>
@@ -205,10 +188,10 @@ export default function ProfilScreen() {
               <Text style={styles.memberBadgeText}>{tier.label} Member</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.editProfileBtn} onPress={() => setEditing(true)}>
+          <TouchableOpacity style={styles.editProfileBtn} onPress={() => router.push('/edit-profil')}>
             <Text style={styles.editProfileText}>Ubah Profil</Text>
           </TouchableOpacity>
-        </TouchableOpacity>
+        </View>
 
         {/* 3 stat box */}
         <View style={styles.statRow}>
@@ -353,7 +336,8 @@ export default function ProfilScreen() {
           ))}
         </View>
 
-        {/* PPN */}
+        {/* PPN — hanya tampil di mode Bisnis (fitur bisnis) */}
+        {activeMode === 'business' && (
         <View style={styles.cardSection}>
           <Text style={styles.sectionTitle}>Pengaturan PPN</Text>
           <TouchableOpacity style={styles.toggleRow} onPress={handlePpnToggle} activeOpacity={0.7}>
@@ -375,6 +359,7 @@ export default function ProfilScreen() {
             </View>
           )}
         </View>
+        )}
 
         {/* DOMPET */}
         {(['personal', 'business'] as const).map(fn => {

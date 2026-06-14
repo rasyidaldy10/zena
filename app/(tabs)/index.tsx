@@ -407,7 +407,7 @@ export default function HomeScreen() {
           <View style={styles.businessStatsSection}>
             <View style={styles.businessStatsHeader}>
               <Text style={styles.businessStatsTitle}>Ringkasan Bisnis</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/profil')}>
+              <TouchableOpacity onPress={() => router.push('/business-projects')}>
                 <Text style={styles.businessStatsLink}>Kelola →</Text>
               </TouchableOpacity>
             </View>
