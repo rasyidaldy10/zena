@@ -1,12 +1,14 @@
 import { useState, useCallback } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, TextInput, ActivityIndicator, Platform
+  TouchableOpacity, TextInput, ActivityIndicator, Platform, Image
 } from 'react-native'
 import { useFocusEffect, router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../lib/supabase'
 import { confirmAsync, notify } from '../../lib/alert'
+import { uploadImage } from '../../lib/upload'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { WALLET_TYPE_CONFIG, UserWallet } from '../../types'
@@ -43,6 +45,8 @@ export default function ProfilScreen() {
   const [streak, setStreak] = useState(0)
   const [hasInvestment, setHasInvestment] = useState(false)
   const [totalSavings, setTotalSavings] = useState(0)
+  const [avatarUrl, setAvatarUrl] = useState('')
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const fetchData = async () => {
     setLoading(true)
@@ -61,6 +65,7 @@ export default function ProfilScreen() {
       setBusinessName(prefsData.business_name || '')
       setPpnEnabled(prefsData.ppn_enabled || false)
       setPpnRate(prefsData.ppn_rate?.toString() || '11')
+      setAvatarUrl((prefsData as any).avatar_url || '')
     }
 
     const { data: txns } = await supabase.from('transactions').select('*').eq('user_id', user?.id)
@@ -150,6 +155,21 @@ export default function ProfilScreen() {
     }
   }
 
+  const pickAvatar = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.6, base64: false })
+    if (result.canceled || !result.assets?.[0]) return
+    setUploadingAvatar(true)
+    const url = await uploadImage(result.assets[0].uri, 'avatars')
+    if (url) {
+      const { data: { user } } = await supabase.auth.getUser()
+      await supabase.from('user_preferences').update({ avatar_url: url }).eq('user_id', user?.id)
+      setAvatarUrl(url)
+    } else {
+      notify('Gagal', 'Upload foto gagal. Pastikan bucket "logos" sudah dibuat (run SQL).')
+    }
+    setUploadingAvatar(false)
+  }
+
   const handleLogout = async () => {
     const ok = await confirmAsync('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', 'Keluar')
     if (!ok) return
@@ -180,7 +200,12 @@ export default function ProfilScreen() {
       {/* HEADER biru */}
       <View style={styles.header}>
         <View style={styles.headerTop}>
-          <View style={styles.avatar}><Text style={styles.avatarText}>{initials}</Text></View>
+          <TouchableOpacity style={styles.avatar} onPress={pickAvatar} activeOpacity={0.8}>
+            {uploadingAvatar ? <ActivityIndicator color="#fff" />
+              : avatarUrl ? <Image source={{ uri: avatarUrl }} style={styles.avatarImg} resizeMode="cover" />
+              : <Text style={styles.avatarText}>{initials}</Text>}
+            <View style={styles.avatarCam}><Ionicons name="camera" size={11} color="#fff" /></View>
+          </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerName}>{prefs?.nickname || 'User'}</Text>
             <View style={[styles.memberBadge, { backgroundColor: tier.color + '33' }]}>
@@ -269,6 +294,18 @@ export default function ProfilScreen() {
             <Text style={styles.statsLabel}>Total Saldo</Text>
           </View>
         </View>
+
+        {/* PROFIL BISNIS — hanya relevan saat mode/akses bisnis */}
+        {(activeMode === 'business' || prefs?.business_mode) && (
+          <TouchableOpacity style={styles.bizLink} onPress={() => router.push('/profil-bisnis')} activeOpacity={0.8}>
+            <View style={styles.bizLinkIcon}><Ionicons name="business" size={20} color={COLORS.business} /></View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.rowName}>Profil Usaha</Text>
+              <Text style={styles.rowDesc}>Nama, logo, alamat, rekening (untuk invoice)</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={TEXT_MUTED} />
+          </TouchableOpacity>
+        )}
 
         {/* INFORMASI / EDIT */}
         <View style={styles.cardSection}>
@@ -410,7 +447,11 @@ const styles = StyleSheet.create({
   },
   headerTop: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   avatar: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#15233A', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'rgba(255,255,255,0.4)' },
+  avatarImg: { width: 56, height: 56, borderRadius: 28 },
   avatarText: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  avatarCam: { position: 'absolute', right: -2, bottom: -2, width: 22, height: 22, borderRadius: 11, backgroundColor: PRIMARY, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#fff' },
+  bizLink: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: RADIUS.lg, padding: 14, ...SHADOW.card, marginBottom: 14 },
+  bizLinkIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: COLORS.business + '15', alignItems: 'center', justifyContent: 'center' },
   headerName: { fontSize: 19, fontWeight: '800', color: '#fff' },
   memberBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: RADIUS.pill, marginTop: 5 },
   memberBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
