@@ -428,6 +428,24 @@ export default function BusinessProjectDetailScreen() {
           )}
         </View>
 
+        {/* Buat Invoice dari project */}
+        <TouchableOpacity
+          style={styles.invoiceBtn}
+          onPress={() => {
+            const amount = sisaPiutang > 0 ? sisaPiutang : project.contract_value
+            const q = new URLSearchParams({
+              type: 'invoice',
+              client: project.client_name || project.name,
+              amount: String(Math.round(amount)),
+              pname: project.name,
+              project: id!,
+            }).toString()
+            router.push(`/document-form?${q}`)
+          }}
+        >
+          <Text style={styles.invoiceBtnText}>🧾 Buat Invoice dari Project</Text>
+        </TouchableOpacity>
+
         {/* Footer Actions */}
         {project.status === 'aktif' && (
           <View style={styles.footer}>
@@ -699,5 +717,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: COLORS.SUCCESS,
+  },
+  invoiceBtn: {
+    backgroundColor: COLORS.PRIMARY + '12',
+    borderColor: COLORS.PRIMARY,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+  },
+  invoiceBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.PRIMARY,
   },
 })

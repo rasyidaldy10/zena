@@ -99,9 +99,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 **FASE 3 (Invoice & Penawaran — Level 1+2):** `DOCUMENTS_SETUP.sql` — tabel `documents` + RLS + RPC `next_doc_counter` (increment counter ATOMIK, anti-duplikat). `lib/docNumber.ts` (bulan romawi, format `003/GMC/VI/2026` & `PNW-...`, nomor di-generate saat CREATE & terkunci saat edit). `app/documents.tsx` (tab Invoice/Penawaran + summary unpaid + list + FAB). `app/document-form.tsx` (create/edit, item dinamis qty×harga, nomor readonly, PPN cuma kalau `ppn_enabled`, pilih rekening + template). `app/document-preview.tsx` (preview 3 template + logo + rekening, tombol WhatsApp/PDF/Edit + ubah status). Edge function `generate-document-pdf` (DEPLOYED) → generate HTML cetak (3 template, fallback `professional`, anti-error) upload ke Storage, auto Print→Save PDF. Home Bisnis: tombol Invoice & Penawaran.
 
+**FASE 4 (Penawaran → Project + Piutang):** Di `app/document-preview.tsx`, penawaran (`doc_type='quotation'`) pakai label lifecycle Menunggu→Disetujui/Ditolak. Saat status `approved` muncul CTA **"Jadikan Project"** → `confirmAsync` → insert `projects` (type 'lainnya', contract_value=total, status 'aktif') + `receivables` (piutang, amount=total) + set `documents.project_id` → `router.replace('/business-project-detail?id=...')`. Anti-dobel: kalau `project_id` sudah ada → tombol jadi **"Lihat Project"**. Bonus: di `app/business-project-detail.tsx` tombol **"Buat Invoice dari Project"** → `document-form` prefill (client+nilai sisa piutang+project_id), invoice nyimpen `project_id`.
+
 **SQL yang HARUS dijalankan user (SUDAH dijalankan 2026-06-14):** `BUSINESS_PROFILE_SETUP.sql`, `DOCUMENTS_SETUP.sql`.
 
-**Catatan:** "Download PDF" = generate HTML rapi + auto browser print (zero-dependency, anti-crash di Deno). Upgrade ke PDF server-side asli = future. Semua tsc 0 errors. Commit `c634c7c`.
+**SCHEMA BARU:**
+- `business_profile` (user_id UNIQUE, business_name, business_abbr, logo_url, address, phone, default_note, invoice_counter, quote_counter) — RPC `next_doc_counter(p_doc_type)` increment atomik.
+- `business_bank_accounts` (user_id, bank_name, account_number, account_holder, is_default).
+- `documents` (user_id, doc_type invoice|quotation, doc_number terkunci, client_name/address, issue_date/due_date, status draft|sent|paid|approved|rejected, items jsonb, subtotal/ppn_amount/total, note, bank_account_id, template_key, project_id, pdf_url) — RLS per-user.
+- `user_preferences.avatar_url`, bucket Storage `logos` (public, juga simpan HTML dokumen di `documents/`).
+
+**Catatan:** "Download PDF" = generate HTML rapi + auto browser print (zero-dependency, anti-crash di Deno). Upgrade ke PDF server-side asli = future. Fitur Invoice & Penawaran SELESAI (buat→kirim→PDF→penawaran jadi project). Semua tsc 0 errors. Commit `c634c7c` (FASE 1-3) + FASE 4.
 
 ---
 

@@ -5,7 +5,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
-import { notify } from '../lib/alert'
+import { notify, confirmAsync } from '../lib/alert'
 import { COLORS, RADIUS, SHADOW } from '../constants/theme'
 
 const TEXT_MAIN = COLORS.text
@@ -22,6 +22,13 @@ const STATUS: Record<string, { label: string; color: string }> = {
   paid: { label: 'Lunas', color: '#16A06A' },
   approved: { label: 'Disetujui', color: '#16A06A' },
   rejected: { label: 'Ditolak', color: '#E5484D' },
+}
+
+// Penawaran (quotation) pakai istilah lifecycle berbeda
+const QUOTE_LABEL: Record<string, string> = { draft: 'Draft', sent: 'Menunggu', approved: 'Disetujui', rejected: 'Ditolak' }
+function statusLabel(docType: string, status: string) {
+  if (docType === 'quotation') return QUOTE_LABEL[status] || status
+  return STATUS[status]?.label || status
 }
 
 type Item = { name: string; qty: number; price: number; subtotal: number }
@@ -56,6 +63,51 @@ export default function DocumentPreviewScreen() {
   async function setStatus(status: string) {
     await supabase.from('documents').update({ status, updated_at: new Date().toISOString() }).eq('id', id)
     setDoc({ ...doc, status })
+  }
+
+  // Penawaran disetujui → buat Project + Piutang otomatis (anti-dobel via project_id)
+  async function handleMakeProject() {
+    if (doc.project_id) return
+    const ok = await confirmAsync(
+      'Jadikan Project?',
+      `Penawaran ${doc.doc_number} akan dibuat jadi project aktif + piutang ${fmt(doc.total)} atas nama ${doc.client_name || 'klien'}.`,
+      'Buat Project'
+    )
+    if (!ok) return
+    setDownloading(true)
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const firstItem = (doc.items || [])[0]
+      const projName = `${doc.client_name || 'Klien'}${firstItem?.name ? ' - ' + firstItem.name : ' - ' + doc.doc_number}`
+
+      const { data: project, error: pErr } = await supabase.from('projects').insert({
+        user_id: user?.id,
+        name: projName,
+        client_name: doc.client_name || null,
+        type: 'lainnya',
+        contract_value: doc.total,
+        status: 'aktif',
+      }).select().single()
+      if (pErr || !project) throw pErr || new Error('Gagal buat project')
+
+      const { error: rErr } = await supabase.from('receivables').insert({
+        user_id: user?.id,
+        project_id: project.id,
+        type: 'piutang',
+        party_name: doc.client_name || projName,
+        amount: doc.total,
+        description: `Dari penawaran ${doc.doc_number}`,
+        status: 'pending',
+      })
+      if (rErr) throw rErr
+
+      await supabase.from('documents').update({ project_id: project.id, updated_at: new Date().toISOString() }).eq('id', id)
+
+      router.replace(`/business-project-detail?id=${project.id}`)
+    } catch (e: any) {
+      setDownloading(false)
+      notify('Gagal', e?.message || 'Gagal membuat project')
+    }
   }
 
   async function handlePdf() {
@@ -135,7 +187,7 @@ export default function DocumentPreviewScreen() {
               <Text style={[styles.docTitle, { color: accent }]}>{title}</Text>
               <Text style={styles.docNumber}>{doc.doc_number}</Text>
               <View style={[styles.statusBadge, { backgroundColor: st.color + '20', marginTop: 6 }]}>
-                <Text style={[styles.statusText, { color: st.color }]}>{st.label}</Text>
+                <Text style={[styles.statusText, { color: st.color }]}>{statusLabel(doc.doc_type, doc.status)}</Text>
               </View>
             </View>
           </View>
@@ -203,12 +255,39 @@ export default function DocumentPreviewScreen() {
           ) : null}
         </View>
 
+        {/* Penawaran → Project */}
+        {doc.doc_type === 'quotation' && (
+          doc.project_id ? (
+            <TouchableOpacity style={styles.projectCta} onPress={() => router.push(`/business-project-detail?id=${doc.project_id}`)} activeOpacity={0.85}>
+              <Ionicons name="briefcase" size={20} color="#16A06A" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ctaTitle}>Lihat Project</Text>
+                <Text style={styles.ctaSub}>Penawaran ini sudah jadi project</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={TEXT_MUTED} />
+            </TouchableOpacity>
+          ) : doc.status === 'approved' ? (
+            <TouchableOpacity style={[styles.projectCta, { borderColor: '#16A06A', backgroundColor: '#16A06A0C' }]} onPress={handleMakeProject} activeOpacity={0.85}>
+              <Ionicons name="add-circle" size={22} color="#16A06A" />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.ctaTitle, { color: '#16A06A' }]}>Jadikan Project</Text>
+                <Text style={styles.ctaSub}>Buat project aktif + piutang otomatis</Text>
+              </View>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.ctaHint}>
+              <Ionicons name="information-circle-outline" size={16} color={TEXT_MUTED} />
+              <Text style={styles.ctaHintText}>Ubah status ke "Disetujui" untuk jadikan project</Text>
+            </View>
+          )
+        )}
+
         {/* Status quick actions */}
         <Text style={styles.quickLabel}>Ubah Status</Text>
         <View style={styles.statusPills}>
           {(doc.doc_type === 'invoice' ? ['draft', 'sent', 'paid'] : ['draft', 'sent', 'approved', 'rejected']).map(s => (
             <TouchableOpacity key={s} style={[styles.pill, doc.status === s && { backgroundColor: (STATUS[s]?.color || '#888') + '20', borderColor: STATUS[s]?.color }]} onPress={() => setStatus(s)}>
-              <Text style={[styles.pillText, doc.status === s && { color: STATUS[s]?.color }]}>{STATUS[s]?.label || s}</Text>
+              <Text style={[styles.pillText, doc.status === s && { color: STATUS[s]?.color }]}>{statusLabel(doc.doc_type, s)}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -276,6 +355,11 @@ const styles = StyleSheet.create({
   noteBox: { paddingHorizontal: 18, paddingBottom: 20 },
   noteLabel: { fontSize: 11, fontWeight: '800', color: TEXT_MUTED, textTransform: 'uppercase', letterSpacing: 0.5 },
   noteText: { fontSize: 13, color: TEXT_MAIN, marginTop: 4, lineHeight: 19 },
+  projectCta: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: CARD, borderRadius: RADIUS.lg, padding: 16, marginTop: 16, borderWidth: 1, borderColor: COLORS.border, ...SHADOW.card },
+  ctaTitle: { fontSize: 15, fontWeight: '800', color: TEXT_MAIN },
+  ctaSub: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
+  ctaHint: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 16, paddingHorizontal: 4 },
+  ctaHintText: { fontSize: 12, color: TEXT_MUTED, flex: 1 },
   quickLabel: { fontSize: 12, fontWeight: '700', color: TEXT_MUTED, marginTop: 20, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
   statusPills: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   pill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: RADIUS.pill, borderWidth: 1, borderColor: COLORS.border, backgroundColor: CARD },

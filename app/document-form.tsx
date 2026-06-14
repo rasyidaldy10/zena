@@ -41,6 +41,7 @@ export default function DocumentFormScreen() {
   const [bankId, setBankId] = useState('')
   const [note, setNote] = useState('')
   const [templateKey, setTemplateKey] = useState('professional')
+  const [projectId] = useState<string>((params.project as string) || '')
   // context
   const [abbr, setAbbr] = useState('INV')
   const [ppnEnabled, setPpnEnabled] = useState(false)
@@ -80,6 +81,11 @@ export default function DocumentFormScreen() {
       const def = (bba || []).find((b: any) => b.is_default) || (bba || [])[0]
       if (def) setBankId(def.id)
       if (bp?.[0]?.default_note) setNote(bp[0].default_note)
+      // prefill dari Project (tombol "Buat Invoice")
+      if (params.client) setClientName(String(params.client))
+      if (params.amount) {
+        setItems([{ name: String(params.pname || 'Pekerjaan project'), qty: '1', price: String(params.amount) }])
+      }
     }
     setLoading(false)
   }
@@ -127,6 +133,7 @@ export default function DocumentFormScreen() {
       items: itemsJson, subtotal, ppn_amount: ppnAmount, total,
       issue_date: issueDate, due_date: dueDate || null, bank_account_id: bankId || null,
       note: note.trim() || null, template_key: templateKey, status: 'draft',
+      project_id: projectId || null,
     }).select().single()
     setSaving(false)
     if (error) { notify('Gagal', error.message); return }
