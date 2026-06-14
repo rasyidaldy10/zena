@@ -541,6 +541,18 @@ export default function HomeScreen() {
                   <Text style={styles.quickLabel}>Laporan</Text>
                 </TouchableOpacity>
               </View>
+              <View style={styles.quickRow}>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/documents?tab=invoice')}>
+                  <View style={styles.aksesCard}><Ionicons name="receipt" size={26} color="#1763D6" /></View>
+                  <Text style={styles.quickLabel}>Invoice</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.quickBtn} onPress={() => router.push('/documents?tab=quotation')}>
+                  <View style={styles.aksesCard}><Ionicons name="document-text" size={26} color="#16A06A" /></View>
+                  <Text style={styles.quickLabel}>Penawaran</Text>
+                </TouchableOpacity>
+                <View style={styles.quickBtn} />
+                <View style={styles.quickBtn} />
+              </View>
             </View>
           </>
         )}
