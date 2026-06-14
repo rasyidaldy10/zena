@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   View, Text, ScrollView, TouchableOpacity, StyleSheet,
-  ActivityIndicator, Alert, Dimensions
+  ActivityIndicator, Alert, Dimensions, Image
 } from 'react-native'
 import { router, useFocusEffect } from 'expo-router'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -263,7 +263,11 @@ export default function HomeScreen() {
       >
         <View style={styles.headerLeft}>
           <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
+            {prefs?.avatar_url ? (
+              <Image source={{ uri: prefs.avatar_url }} style={styles.avatarImg} />
+            ) : (
+              <Text style={styles.avatarText}>{initials}</Text>
+            )}
           </View>
           <View>
             <Text style={styles.headerGreeting}>{greeting} 👋</Text>
@@ -646,6 +650,7 @@ const styles = StyleSheet.create({
     borderWidth: 2, borderColor: 'rgba(255,255,255,0.35)',
   },
   avatarText: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  avatarImg: { width: 44, height: 44, borderRadius: 22 },
   headerGreeting: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 2 },
   headerName: { fontSize: 16, fontWeight: '700', color: '#fff' },
   headerTier: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginTop: 2 },

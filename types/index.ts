@@ -35,9 +35,9 @@ export interface UserPreferences {
   business_name?: string
   ppn_rate?: number
   ppn_enabled?: boolean
+  avatar_url?: string
   created_at: string
   updated_at: string
-  // Note: avatar_url comes from session.user.user_metadata.picture (Google OAuth)
 }
 
 export interface UserWallet {

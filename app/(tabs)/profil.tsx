@@ -373,8 +373,8 @@ export default function ProfilScreen() {
           ))}
         </View>
 
-        {/* PPN — hanya tampil di mode Bisnis (fitur bisnis) */}
-        {activeMode === 'business' && (
+        {/* PPN — disembunyikan atas permintaan (set true utk tampilkan lagi) */}
+        {false && (
         <View style={styles.cardSection}>
           <Text style={styles.sectionTitle}>Pengaturan PPN</Text>
           <TouchableOpacity style={styles.toggleRow} onPress={handlePpnToggle} activeOpacity={0.7}>
