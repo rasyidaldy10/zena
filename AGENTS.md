@@ -89,7 +89,23 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## LATEST SESSION (2026-06-13 s/d 2026-06-14) - UI REDESIGN 6 FASE ✅
+## LATEST SESSION (2026-06-14) - PROFIL USAHA + INVOICE & PENAWARAN ✅
+
+**🧾 Sistem dokumen bisnis: Profil Usaha → Invoice & Penawaran dengan nomor terkunci + PDF.**
+
+**FASE 1 (bug fix):** Home "Kelola →" ke `/business-projects` (dulu salah ke profil), aktifkan "Ubah Profil" (`app/edit-profil.tsx`), PPN cuma muncul di mode bisnis, hapus Marketing Manager (`app/marketing-dashboard.tsx` + `lib/marketing-manager.ts` dihapus, trigger tap-5x dibuang).
+
+**FASE 2 (Profil Usaha):** `BUSINESS_PROFILE_SETUP.sql` — tabel `business_profile` (business_name, business_abbr utk nomor invoice, logo_url, address, phone, default_note, invoice_counter, quote_counter) + `business_bank_accounts` (bank_name/account_number/account_holder/is_default) + `user_preferences.avatar_url` + bucket `logos` (public). `app/profil-bisnis.tsx` (form profil + upload logo + kelola rekening). `lib/upload.ts` (`uploadImage` cross-platform). Avatar di Profile tappable → upload. Menu "Profil Usaha" gated mode bisnis.
+
+**FASE 3 (Invoice & Penawaran — Level 1+2):** `DOCUMENTS_SETUP.sql` — tabel `documents` + RLS + RPC `next_doc_counter` (increment counter ATOMIK, anti-duplikat). `lib/docNumber.ts` (bulan romawi, format `003/GMC/VI/2026` & `PNW-...`, nomor di-generate saat CREATE & terkunci saat edit). `app/documents.tsx` (tab Invoice/Penawaran + summary unpaid + list + FAB). `app/document-form.tsx` (create/edit, item dinamis qty×harga, nomor readonly, PPN cuma kalau `ppn_enabled`, pilih rekening + template). `app/document-preview.tsx` (preview 3 template + logo + rekening, tombol WhatsApp/PDF/Edit + ubah status). Edge function `generate-document-pdf` (DEPLOYED) → generate HTML cetak (3 template, fallback `professional`, anti-error) upload ke Storage, auto Print→Save PDF. Home Bisnis: tombol Invoice & Penawaran.
+
+**SQL yang HARUS dijalankan user (SUDAH dijalankan 2026-06-14):** `BUSINESS_PROFILE_SETUP.sql`, `DOCUMENTS_SETUP.sql`.
+
+**Catatan:** "Download PDF" = generate HTML rapi + auto browser print (zero-dependency, anti-crash di Deno). Upgrade ke PDF server-side asli = future. Semua tsc 0 errors. Commit `c634c7c`.
+
+---
+
+## SESSION (2026-06-13 s/d 2026-06-14) - UI REDESIGN 6 FASE ✅
 
 **🎨 REDESIGN TOTAL UI (light theme, design system) + fitur gamification & health**
 
@@ -373,6 +389,8 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Market Data:** CoinGecko crypto widget (BTC, ETH, BNB, SOL, ADA), Stock watchlist (IHSG + 16 Indonesian stocks), Investment Portfolio screen (stocks, crypto, reksadana, obligasi)  
 **✅ ZENA Intelligence System:** 6 autonomous agents (Budget Monitor, Anomaly Detector, Weekly Insight, Gmail Parser placeholder, Daily Summary, Smart Categorization), Realtime alerts, AI Insights visualization  
 **✅ Business Mode:** Projects (termin tracking, stats), Receivables (piutang/hutang, WhatsApp reminder), Inventory (products, stock movements, low stock alerts, stock opname), HPP tracking, PPN system (tax summary)  
+**✅ Profil Usaha:** Nama bisnis, singkatan (utk nomor invoice), upload logo, alamat, telepon, catatan default, kelola rekening bank (multi + default)  
+**✅ Invoice & Penawaran:** Buat/edit dokumen, nomor otomatis terkunci (`003/GMC/VI/2026` / `PNW-...`), item dinamis, PPN, pilih rekening + 3 template, preview, kirim WhatsApp, Download PDF (HTML cetak via edge function), ubah status (draft/sent/paid/approved/rejected)  
 **✅ Reminder:** Add tagihan, Toggle paid/unpaid  
 **✅ Bottom Nav:** Home, Laporan, + (tambah transaksi), Reminder, Profil  
 **✅ Security:** Elite-level (9.2/10) - Defense-in-depth encryption (7 layers), Rate limiting, Input validation (12 validators), Token theft detection, RLS policies  
