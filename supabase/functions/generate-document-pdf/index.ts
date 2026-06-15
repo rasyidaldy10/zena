@@ -171,7 +171,8 @@ serve(async (req) => {
 
     await admin.from('documents').update({ pdf_url: url }).eq('id', document_id)
 
-    return new Response(JSON.stringify({ url }), {
+    // Kirim html mentah juga — biar app web bisa render via blob (anti masalah content-type storage)
+    return new Response(JSON.stringify({ url, html }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {

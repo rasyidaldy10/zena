@@ -116,9 +116,18 @@ export default function DocumentPreviewScreen() {
       const { data, error } = await supabase.functions.invoke('generate-document-pdf', { body: { document_id: id } })
       if (error) throw error
       const url = data?.url
-      if (!url) throw new Error('URL PDF kosong')
-      if (Platform.OS === 'web') window.open(url, '_blank')
-      else Linking.openURL(url)
+      if (Platform.OS === 'web') {
+        // render HTML via blob (pasti text/html) → buka tab → auto print
+        if (data?.html) {
+          const blob = new Blob([data.html], { type: 'text/html' })
+          window.open(URL.createObjectURL(blob), '_blank')
+        } else if (url) {
+          window.open(url, '_blank')
+        } else throw new Error('Dokumen kosong')
+      } else {
+        if (!url) throw new Error('URL PDF kosong')
+        Linking.openURL(url)
+      }
       if (doc?.status === 'draft') setStatus('sent')
     } catch (e: any) {
       notify('Gagal', 'Gagal membuat PDF: ' + (e?.message || 'error'))
