@@ -19,39 +19,68 @@ const fmt = (n: number) => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id
 const esc = (s: unknown) =>
   String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+const BULAN = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember']
+function formatTanggal(d: string): string {
+  if (!d) return '-'
+  const dt = new Date(d)
+  if (isNaN(dt.getTime())) return d
+  return `${dt.getDate()} ${BULAN[dt.getMonth()]} ${dt.getFullYear()}`
+}
+
+// Angka -> terbilang (Bahasa Indonesia)
+function terbilang(num: number): string {
+  const n = Math.floor(Math.abs(Number(num) || 0))
+  const sat = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan', 'sepuluh', 'sebelas']
+  const f = (x: number): string => {
+    if (x < 12) return sat[x]
+    if (x < 20) return f(x - 10) + ' belas'
+    if (x < 100) return f(Math.floor(x / 10)) + ' puluh' + (x % 10 ? ' ' + sat[x % 10] : '')
+    if (x < 200) return 'seratus' + (x - 100 ? ' ' + f(x - 100) : '')
+    if (x < 1000) return sat[Math.floor(x / 100)] + ' ratus' + (x % 100 ? ' ' + f(x % 100) : '')
+    if (x < 2000) return 'seribu' + (x - 1000 ? ' ' + f(x - 1000) : '')
+    if (x < 1e6) return f(Math.floor(x / 1000)) + ' ribu' + (x % 1000 ? ' ' + f(x % 1000) : '')
+    if (x < 1e9) return f(Math.floor(x / 1e6)) + ' juta' + (x % 1e6 ? ' ' + f(x % 1e6) : '')
+    if (x < 1e12) return f(Math.floor(x / 1e9)) + ' miliar' + (x % 1e9 ? ' ' + f(x % 1e9) : '')
+    return f(Math.floor(x / 1e12)) + ' triliun' + (x % 1e12 ? ' ' + f(x % 1e12) : '')
+  }
+  if (n === 0) return 'Nol rupiah'
+  const w = f(n).replace(/\s+/g, ' ').trim()
+  return w.charAt(0).toUpperCase() + w.slice(1) + ' rupiah'
+}
+
 function buildHtml(doc: any, biz: any, bank: any): string {
   const accent = TPL_COLOR[doc.template_key] || TPL_COLOR.professional
   const title = doc.doc_type === 'invoice' ? 'INVOICE' : 'PENAWARAN'
   const items: any[] = Array.isArray(doc.items) ? doc.items : []
+  const bizName = esc(biz?.business_name || 'Bisnis Anda')
 
-  const rows = items.map((it) => `
+  const rows = items.map((it, i) => `
     <tr>
-      <td>
-        <div class="iname">${esc(it.name)}</div>
-        <div class="iunit">${fmt(it.price)} &times; ${esc(it.qty)}</div>
-      </td>
+      <td class="c muted">${i + 1}</td>
+      <td><div class="iname">${esc(it.name)}</div></td>
       <td class="c">${esc(it.qty)}</td>
-      <td class="r">${fmt(it.subtotal)}</td>
+      <td class="r">${fmt(it.price)}</td>
+      <td class="r b">${fmt(it.subtotal)}</td>
     </tr>`).join('')
 
   const ppnRow = Number(doc.ppn_amount) > 0
     ? `<div class="trow"><span>PPN</span><span>${fmt(doc.ppn_amount)}</span></div>` : ''
 
-  const logo = biz?.logo_url
-    ? `<img src="${esc(biz.logo_url)}" class="logo" />` : ''
+  const logo = biz?.logo_url ? `<img src="${esc(biz.logo_url)}" class="logo" />` : ''
 
   const bankBox = bank ? `
-    <div class="bank">
-      <div class="blabel">PEMBAYARAN</div>
-      <div class="bline">${esc(bank.bank_name)} — ${esc(bank.account_number)}</div>
+    <div class="box">
+      <div class="blabel">INFORMASI PEMBAYARAN</div>
+      <div class="bline">${esc(bank.bank_name)}</div>
+      <div class="bnum">${esc(bank.account_number)}</div>
       ${bank.account_holder ? `<div class="bmeta">a.n. ${esc(bank.account_holder)}</div>` : ''}
-    </div>` : ''
+    </div>` : `<div class="box" style="visibility:hidden"></div>`
 
   const noteBox = doc.note ? `
-    <div class="note"><div class="blabel">CATATAN</div><div>${esc(doc.note)}</div></div>` : ''
+    <div class="note"><div class="blabel">CATATAN</div><div class="ntext">${esc(doc.note)}</div></div>` : ''
 
   const dueBox = doc.due_date
-    ? `<div class="mlabel" style="margin-top:8px">JATUH TEMPO</div><div class="mval">${esc(doc.due_date)}</div>` : ''
+    ? `<div class="mlabel" style="margin-top:10px">JATUH TEMPO</div><div class="mval">${formatTanggal(doc.due_date)}</div>` : ''
 
   return `<!DOCTYPE html>
 <html lang="id"><head><meta charset="utf-8"/>
@@ -59,47 +88,59 @@ function buildHtml(doc: any, biz: any, bank: any): string {
 <title>${esc(doc.doc_number)}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #1A1D26; background: #F5F7FA; padding: 24px; }
-  .paper { max-width: 720px; margin: 0 auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,.08); }
-  .accent { height: 8px; background: ${accent}; }
-  .head { display: flex; justify-content: space-between; padding: 28px 28px 16px; }
-  .logo { max-height: 48px; max-width: 160px; margin-bottom: 10px; display: block; }
-  .bname { font-size: 20px; font-weight: 800; }
-  .bmeta2 { font-size: 12px; color: #8A93A6; margin-top: 3px; }
+  body { font-family: 'Helvetica Neue', -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; color: #20242E; background: #EEF1F6; padding: 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .paper { max-width: 760px; margin: 0 auto; background: #fff; box-shadow: 0 6px 30px rgba(0,0,0,.08); }
+  .accent { height: 6px; background: ${accent}; }
+  .head { display: flex; justify-content: space-between; align-items: flex-start; padding: 34px 36px 22px; }
+  .logo { max-height: 54px; max-width: 180px; margin-bottom: 12px; display: block; }
+  .bname { font-size: 21px; font-weight: 800; letter-spacing: -.3px; }
+  .bmeta2 { font-size: 12px; color: #707A8C; margin-top: 4px; line-height: 1.5; max-width: 260px; }
   .right { text-align: right; }
-  .dtitle { font-size: 24px; font-weight: 900; letter-spacing: 1px; color: ${accent}; }
-  .dnum { font-size: 13px; color: #8A93A6; margin-top: 4px; font-weight: 600; }
-  .badge { display: inline-block; margin-top: 8px; padding: 4px 12px; border-radius: 999px; font-size: 11px; font-weight: 700; background: ${accent}1f; color: ${accent}; text-transform: uppercase; }
-  .divider { height: 1px; background: #EDF0F5; margin: 0 28px; }
-  .meta { display: flex; justify-content: space-between; padding: 18px 28px; }
-  .mlabel { font-size: 10px; color: #8A93A6; text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
-  .mval { font-size: 13px; margin-top: 2px; }
-  .mname { font-size: 15px; font-weight: 700; margin-top: 2px; }
+  .dtitle { font-size: 30px; font-weight: 800; letter-spacing: 3px; color: ${accent}; }
+  .dnum { font-size: 13px; color: #707A8C; margin-top: 6px; font-weight: 600; letter-spacing: .3px; }
+  .badge { display: inline-block; margin-top: 10px; padding: 5px 14px; border-radius: 999px; font-size: 10px; font-weight: 800; letter-spacing: .5px; background: ${accent}1f; color: ${accent}; text-transform: uppercase; }
+  .meta { display: flex; justify-content: space-between; padding: 8px 36px 22px; gap: 30px; }
+  .mlabel { font-size: 10px; color: #98A1B2; text-transform: uppercase; letter-spacing: .8px; font-weight: 700; }
+  .mval { font-size: 13px; margin-top: 3px; color: #20242E; }
+  .mname { font-size: 15px; font-weight: 700; margin-top: 3px; }
+  .maddr { font-size: 12px; color: #707A8C; margin-top: 2px; line-height: 1.5; max-width: 260px; }
   table { width: 100%; border-collapse: collapse; }
-  thead th { background: ${accent}12; font-size: 11px; text-transform: uppercase; padding: 10px 28px; text-align: left; }
+  thead th { background: ${accent}; color: #fff; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; padding: 11px 14px; text-align: left; font-weight: 700; }
+  thead th:first-child { padding-left: 36px; } thead th:last-child { padding-right: 36px; }
   thead th.c { text-align: center; } thead th.r { text-align: right; }
-  tbody td { padding: 12px 28px; border-bottom: 1px solid #EDF0F5; font-size: 13px; vertical-align: top; }
-  td.c { text-align: center; } td.r { text-align: right; font-weight: 600; }
-  .iname { font-weight: 600; } .iunit { font-size: 11px; color: #8A93A6; margin-top: 2px; }
-  .totals { padding: 14px 28px; }
-  .trow { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; color: #555; }
-  .grand { display: flex; justify-content: space-between; border-top: 1px solid #EDF0F5; margin-top: 8px; padding-top: 12px; }
-  .grand .l { font-size: 15px; font-weight: 900; letter-spacing: .5px; }
-  .grand .v { font-size: 20px; font-weight: 900; color: ${accent}; }
-  .bank, .note { margin: 16px 28px; padding: 14px; background: #F5F7FA; border-radius: 8px; }
-  .blabel { font-size: 11px; font-weight: 800; color: #8A93A6; text-transform: uppercase; letter-spacing: .5px; }
-  .bline { font-size: 14px; font-weight: 700; margin-top: 4px; } .bmeta { font-size: 12px; color: #8A93A6; margin-top: 2px; }
-  .note div:last-child { font-size: 13px; margin-top: 4px; line-height: 1.5; }
-  .foot { text-align: center; font-size: 11px; color: #8A93A6; padding: 16px; }
-  .printbar { max-width: 720px; margin: 16px auto 0; text-align: center; }
-  .printbtn { background: ${accent}; color: #fff; border: 0; padding: 12px 28px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
-  @media print { body { background: #fff; padding: 0; } .paper { box-shadow: none; border-radius: 0; } .printbar { display: none; } }
+  tbody td { padding: 13px 14px; border-bottom: 1px solid #EDF0F5; font-size: 13px; vertical-align: top; }
+  tbody td:first-child { padding-left: 36px; } tbody td:last-child { padding-right: 36px; }
+  tbody tr:nth-child(even) { background: #FAFBFC; }
+  td.c { text-align: center; } td.r { text-align: right; } td.b { font-weight: 700; } .muted { color: #98A1B2; }
+  .iname { font-weight: 600; color: #20242E; }
+  .lower { display: flex; justify-content: space-between; padding: 22px 36px 0; gap: 30px; }
+  .terbilang { font-size: 12px; color: #4A5263; font-style: italic; }
+  .terbilang b { font-style: normal; font-weight: 700; color: #20242E; }
+  .totals { width: 280px; }
+  .trow { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; color: #4A5263; }
+  .grand { display: flex; justify-content: space-between; border-top: 2px solid #20242E; margin-top: 8px; padding-top: 12px; align-items: baseline; }
+  .grand .l { font-size: 14px; font-weight: 800; letter-spacing: .5px; }
+  .grand .v { font-size: 22px; font-weight: 800; color: ${accent}; }
+  .foot2 { display: flex; justify-content: space-between; padding: 26px 36px 10px; gap: 30px; align-items: flex-end; }
+  .box { flex: 1; padding: 14px 16px; background: #F6F8FB; border-radius: 8px; border: 1px solid #EDF0F5; }
+  .blabel { font-size: 10px; font-weight: 800; color: #98A1B2; text-transform: uppercase; letter-spacing: .7px; }
+  .bline { font-size: 15px; font-weight: 700; margin-top: 6px; } .bnum { font-size: 14px; font-weight: 600; margin-top: 2px; letter-spacing: .5px; } .bmeta { font-size: 12px; color: #707A8C; margin-top: 3px; }
+  .sign { width: 220px; text-align: center; }
+  .sign-date { font-size: 12px; color: #4A5263; margin-bottom: 2px; }
+  .sign-label { font-size: 13px; color: #20242E; margin-bottom: 56px; }
+  .sign-name { font-size: 14px; font-weight: 800; border-top: 1px solid #20242E; padding-top: 6px; }
+  .note { margin: 18px 36px 0; padding: 14px 16px; background: #FFF9ED; border-left: 3px solid ${accent}; border-radius: 6px; }
+  .ntext { font-size: 12px; color: #4A5263; margin-top: 5px; line-height: 1.5; }
+  .foot { text-align: center; font-size: 10px; color: #B0B7C3; padding: 22px 16px 26px; margin-top: 18px; border-top: 1px solid #F0F2F6; }
+  .printbar { max-width: 760px; margin: 16px auto 0; text-align: center; }
+  .printbtn { background: ${accent}; color: #fff; border: 0; padding: 12px 30px; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  @media print { body { background: #fff; padding: 0; } .paper { box-shadow: none; } .printbar { display: none; } }
 </style></head>
 <body>
   <div class="paper">
     <div class="accent"></div>
     <div class="head">
-      <div>${logo}<div class="bname">${esc(biz?.business_name || 'Bisnis Anda')}</div>
+      <div>${logo}<div class="bname">${bizName}</div>
         ${biz?.address ? `<div class="bmeta2">${esc(biz.address)}</div>` : ''}
         ${biz?.phone ? `<div class="bmeta2">${esc(biz.phone)}</div>` : ''}
       </div>
@@ -109,24 +150,33 @@ function buildHtml(doc: any, biz: any, bank: any): string {
         <div class="badge">${esc(doc.status)}</div>
       </div>
     </div>
-    <div class="divider"></div>
     <div class="meta">
-      <div><div class="mlabel">KEPADA</div><div class="mname">${esc(doc.client_name || '-')}</div>
-        ${doc.client_address ? `<div class="mval">${esc(doc.client_address)}</div>` : ''}</div>
-      <div class="right"><div class="mlabel">TGL TERBIT</div><div class="mval">${esc(doc.issue_date || '-')}</div>${dueBox}</div>
+      <div><div class="mlabel">KEPADA YTH.</div><div class="mname">${esc(doc.client_name || '-')}</div>
+        ${doc.client_address ? `<div class="maddr">${esc(doc.client_address)}</div>` : ''}</div>
+      <div class="right"><div class="mlabel">TANGGAL TERBIT</div><div class="mval">${formatTanggal(doc.issue_date)}</div>${dueBox}</div>
     </div>
     <table>
-      <thead><tr><th>Item</th><th class="c">Qty</th><th class="r">Jumlah</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="3" style="text-align:center;color:#8A93A6">Tidak ada item</td></tr>'}</tbody>
+      <thead><tr><th class="c">No</th><th>Deskripsi</th><th class="c">Qty</th><th class="r">Harga</th><th class="r">Jumlah</th></tr></thead>
+      <tbody>${rows || '<tr><td colspan="5" style="text-align:center;color:#98A1B2;padding:24px">Tidak ada item</td></tr>'}</tbody>
     </table>
-    <div class="totals">
-      <div class="trow"><span>Subtotal</span><span>${fmt(doc.subtotal)}</span></div>
-      ${ppnRow}
-      <div class="grand"><span class="l">TOTAL</span><span class="v">${fmt(doc.total)}</span></div>
+    <div class="lower">
+      <div class="terbilang">Terbilang:<br/><b>${terbilang(doc.total)}</b></div>
+      <div class="totals">
+        <div class="trow"><span>Subtotal</span><span>${fmt(doc.subtotal)}</span></div>
+        ${ppnRow}
+        <div class="grand"><span class="l">TOTAL</span><span class="v">${fmt(doc.total)}</span></div>
+      </div>
     </div>
-    ${bankBox}
+    <div class="foot2">
+      ${bankBox}
+      <div class="sign">
+        <div class="sign-date">${formatTanggal(doc.issue_date)}</div>
+        <div class="sign-label">Hormat kami,</div>
+        <div class="sign-name">${bizName}</div>
+      </div>
+    </div>
     ${noteBox}
-    <div class="foot">Dibuat dengan Zena</div>
+    <div class="foot">Dokumen ini sah dan dibuat secara elektronik &middot; Dibuat dengan Zena</div>
   </div>
   <div class="printbar"><button class="printbtn" onclick="window.print()">Simpan / Cetak PDF</button></div>
   <script>window.addEventListener('load',function(){setTimeout(function(){try{window.print()}catch(e){}},400)})</script>
