@@ -19,7 +19,7 @@ const BRICK_CLIENT_ID = Deno.env.get('BRICK_CLIENT_ID')!
 const BRICK_CLIENT_SECRET = Deno.env.get('BRICK_CLIENT_SECRET')!
 const BRICK_ENVIRONMENT = Deno.env.get('BRICK_ENVIRONMENT') || 'sandbox'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const SUPABASE_SERVICE_ROLE_KEY = (Deno.env.get('secretkeynew') ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'))!
 
 const BRICK_BASE_URL = BRICK_ENVIRONMENT === 'production'
   ? 'https://api.onebrick.io/v2'
