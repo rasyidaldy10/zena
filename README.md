@@ -1,276 +1,219 @@
-# 🏦 ZENA - Personal Finance Management
+<div align="center">
 
-**Tagline:** Keuanganmu, selaras.
+# 🏦 Zena
 
-AI-powered personal finance app with multi-wallet management, intelligent insights, and beautiful UX inspired by Livin'.
+### Keuanganmu, selaras.
 
----
+**A production-grade personal & business finance super-app for Indonesia — AI-powered, mobile-first, and built end-to-end by a solo developer.**
 
-## ✨ **Features**
+[![Expo](https://img.shields.io/badge/Expo-SDK%2056-000020?logo=expo&logoColor=white)](https://expo.dev/)
+[![React Native](https://img.shields.io/badge/React%20Native-0.79-61DAFB?logo=react&logoColor=black)](https://reactnative.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Postgres%20%2B%20Edge-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
+[![Claude](https://img.shields.io/badge/AI-Claude%20%2B%20Groq-D97757)](https://www.anthropic.com/)
+[![Platform](https://img.shields.io/badge/Platform-iOS%20%7C%20Android%20%7C%20Web-555)]()
 
-### **Core**
-- 💰 Multi-wallet management (unlimited wallets)
-- 📊 Transaction tracking (income/expense/transfer)
-- 📈 Monthly reports with budget tracking
-- 🤖 AI chat assistant (6 personas, 4 languages)
-- 🧠 ZENA Intelligence (6 autonomous agents)
-- 🔔 Smart notifications & alerts
-- 📱 Beautiful, intuitive UI
+[Live Web Demo](https://zena-mu.vercel.app) · [Features](#-features) · [Architecture](#%EF%B8%8F-architecture) · [Tech Stack](#-tech-stack) · [Security](#-security)
 
-### **AI-Powered**
-- Context-aware financial advice
-- Receipt OCR (scan struk)
-- Budget monitoring
-- Anomaly detection
-- Weekly insights
-- Daily summaries
+</div>
 
 ---
 
-## 🚀 **Quick Start**
+## 📖 Overview
 
-### **Prerequisites**
-- Node.js 18 or 20 (NOT 24!)
-- npm or yarn
-- Expo account (free)
+**Zena** is a finance management app that unifies two worlds most apps keep separate: **personal money management** and **small-business operations** — in a single mode-switchable interface inspired by banking super-apps (Livin', Binance).
 
-### **Installation**
+A user tracks daily spending and budgets in **Personal mode**, then flips a toggle into **Business mode** to manage projects, receivables, inventory, taxes, and generate **invoices & quotations** — all backed by an AI assistant that understands their actual transaction history.
 
-```bash
-# Clone
-git clone [repo-url]
-cd zena
+Built solo as a full-stack project: mobile + web frontend, database design, row-level security, serverless edge functions, and AI integration.
 
-# Install dependencies
-npm install
+> **Status:** Actively developed · Web build live on Vercel · Android build via EAS · 33 screens · 14 edge functions
 
-# Setup environment
-cp .env.example .env
-# Edit .env dengan Supabase keys
+---
 
-# Run development server
-npm start
+## ✨ Features
+
+### 👤 Personal Finance
+- **Multi-wallet management** — cash, bank, e-wallet, with inter-wallet transfers
+- **Transaction tracking** — income / expense / transfer, custom categories & dates
+- **Smart budgeting** — 50/30/20 method with live budget alerts (75% / 90% / 100%)
+- **Monthly reports** — category breakdown, cashflow trend chart, saving-rate indicator
+- **Financial Health score** — gauge-based 0–100 rating across budget, consistency, savings, investment & debt
+- **Gamification** — XP, tiers (Starter → Sovereign), badges & rank — all derived from real behavior
+- **Investment portfolio** — stocks (IDX, live prices via Yahoo Finance), crypto, mutual funds, bonds
+
+### 💼 Business Mode
+- **Projects** — contract value, payment terms (termin), profit/margin stats
+- **Receivables & payables** — piutang/hutang tracking with WhatsApp reminders
+- **Inventory** — products, stock movements, low-stock alerts, stock opname, product variants
+- **HPP (COGS) & PPN (VAT)** — auto-recorded cost of goods, inclusive/exclusive tax, monthly tax summary
+- **Invoice & Quotation generator** — locked sequential numbering (`003/ABBR/VI/2026`), 3 templates, logo & bank details, share via WhatsApp, export to PDF
+- **Quote → Project automation** — an approved quotation becomes an active project **and** a receivable in one tap
+
+### 🤖 AI & Automation
+- **Conversational AI assistant** — Claude-powered, context-aware over 3 months of transactions, 6 personas, end-of-month forecasting
+- **Receipt OCR** — snap a receipt, Claude Vision auto-fills the transaction form
+- **Voice input** — speak a transaction, Groq Whisper transcribes + parses it
+- **Zena Intelligence** — autonomous agents for budget monitoring, anomaly detection, weekly insights & daily summaries
+
+---
+
+## 🖼️ Screenshots
+
+> Add your images to `docs/screenshots/` and they'll render here.
+
+| Home (Personal) | Home (Business) | Invoice Preview | AI Assistant |
+|:---:|:---:|:---:|:---:|
+| ![Home Personal](docs/screenshots/home-personal.png) | ![Home Business](docs/screenshots/home-business.png) | ![Invoice](docs/screenshots/invoice.png) | ![AI](docs/screenshots/ai-chat.png) |
+
+---
+
+## 🏗️ Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client["Client - Expo Router (iOS / Android / Web)"]
+        UI["React Native + TypeScript<br/>Design system - SVG charts - LinearGradient"]
+    end
+
+    subgraph Supabase["Supabase Backend"]
+        Auth["Auth<br/>(email/password)"]
+        DB["PostgreSQL<br/>+ Row-Level Security"]
+        Storage["Storage<br/>(logos, documents)"]
+        Edge["Edge Functions<br/>(Deno runtime)"]
+    end
+
+    subgraph External["External Services"]
+        Claude["Claude API<br/>(chat - vision - PDF docs)"]
+        Groq["Groq API<br/>(voice transcribe + parse)"]
+        Yahoo["Yahoo Finance<br/>(IDX stock prices)"]
+    end
+
+    UI -->|"supabase-js (RLS-scoped)"| Auth
+    UI --> DB
+    UI --> Storage
+    UI -->|"invoke()"| Edge
+    Edge -->|"server-side keys only"| Claude
+    Edge --> Groq
+    Edge --> Yahoo
 ```
 
-### **First Time Setup**
-
-1. **Create Supabase Project** (https://supabase.com)
-2. **Get credentials:**
-   - EXPO_PUBLIC_SUPABASE_URL
-   - EXPO_PUBLIC_SUPABASE_ANON_KEY
-3. **Apply RLS migration:** Run `supabase/migrations/000_initial_schema_rls.sql` in Supabase SQL Editor
-4. **Deploy Edge Functions:**
-   ```bash
-   supabase functions deploy chat
-   supabase functions deploy budget-monitor
-   # etc...
-   ```
+**Design principles**
+- **Security-first** — API keys never touch the client; all sensitive calls proxied through edge functions. Every table guarded by Row-Level Security.
+- **Edge for sensitive ops** — AI proxying, PDF/document generation, and price fetching run server-side in Deno.
+- **Atomic where it matters** — invoice numbering uses a Postgres RPC to guarantee no duplicate document numbers under concurrency.
+- **Cross-platform from one codebase** — the same Expo Router code ships to iOS, Android, and web.
 
 ---
 
-## 📱 **Development**
+## 🛠️ Tech Stack
 
-### **Commands**
+| Layer | Technology |
+|---|---|
+| **Frontend** | React Native (Expo SDK 56), TypeScript, Expo Router (file-based) |
+| **UI** | Custom design system, `react-native-svg` (charts/gauges), `expo-linear-gradient`, Ionicons |
+| **Backend** | Supabase — PostgreSQL, Auth, Storage, Row-Level Security |
+| **Serverless** | Supabase Edge Functions (Deno) |
+| **AI** | Anthropic Claude (chat, vision, document generation), Groq (Whisper + LLM parsing) |
+| **Data** | Yahoo Finance (IDX stock prices), CoinGecko (crypto) |
+| **Deploy** | Vercel (web), EAS Build (Android/iOS) |
+| **Tooling** | TypeScript strict mode (`tsc --noEmit` gate), psql/REST migrations |
 
-```bash
-npm start              # Start Expo dev server
-npm run web            # Start web mode
-npm run ios            # iOS simulator
-npm run android        # Android emulator
-npm run type-check     # TypeScript check
-npm run clear          # Clear cache & restart
-npm run reset          # Complete reset (reinstall)
-```
+---
 
-### **Project Structure**
+## 🔐 Security
+
+- **Row-Level Security (RLS)** on every user-owned table — users can only ever read/write their own rows (`auth.uid() = user_id`).
+- **No secrets on the client** — Claude/Groq API keys live only in edge-function environment variables.
+- **Input validation** across financial inputs (amounts, tax rates, dates).
+- **Auth hardening** — persistent sessions (AsyncStorage on native, localStorage on web), deferred auth-state handling to avoid deadlocks.
+
+---
+
+## 📂 Project Structure
 
 ```
 zena/
-├── app/                 # Screens (Expo Router)
-│   ├── (auth)/         # Login, register
-│   ├── (tabs)/         # Main navigation
-│   └── _layout.tsx     # Root layout
-├── lib/                # Utilities
-├── types/              # TypeScript types
-├── assets/             # Images, icons
-├── supabase/
-│   ├── migrations/     # SQL migrations
-│   └── functions/      # Edge Functions
-└── docs/               # Documentation
+├── app/                     # Expo Router screens (file-based routing)
+│   ├── (tabs)/              # Home, Reports, Add, Reminder, Profile
+│   ├── documents.tsx        # Invoice & quotation list
+│   ├── document-form.tsx    # Create / edit document
+│   ├── document-preview.tsx # Preview + WhatsApp + PDF + quote→project
+│   ├── business-*.tsx       # Projects, inventory, receivables, detail
+│   ├── financial-health.tsx
+│   └── profil-bisnis.tsx    # Business profile + bank accounts
+├── components/              # Reusable UI (charts, modals, widgets)
+├── lib/                     # Domain logic (scoring, gamification, docNumber, alert, upload)
+├── constants/              # Design system (theme), business constants
+├── types/                   # Shared TypeScript types
+├── supabase/functions/      # 14 Deno edge functions
+│   ├── claude-proxy/        # AI chat proxy
+│   ├── generate-document-pdf/
+│   ├── groq-transcribe/     # Voice → text
+│   ├── stock-price/         # IDX prices
+│   └── ...
+└── *.sql                    # Schema & migration scripts
 ```
 
 ---
 
-## 🏗️ **Production Build**
+## 🚀 Getting Started
 
-### **Build APK/IPA**
+> Requires Node.js 18 or 20, an Expo account, and a Supabase project.
 
 ```bash
-# Install EAS CLI
-npm install -g eas-cli
+# 1. Clone
+git clone https://github.com/rasyidaldy10/zena.git
+cd zena
 
-# Login
-eas login
+# 2. Install
+npm install
 
-# Build preview (testing)
-eas build --platform android --profile preview
+# 3. Configure environment
+cp .env.example .env        # then fill in your own keys (see below)
 
-# Build production (store)
-eas build --platform android --profile production
+# 4. Run
+npx expo start              # native (Expo Go / dev build)
+npx expo start --web        # web
 ```
 
-### **OTA Updates (Instant!)**
+**Environment variables** (`.env`):
 
 ```bash
-# Deploy update (users get it in 1-5 minutes!)
-eas update --branch production --message "Fix bug X"
+EXPO_PUBLIC_SUPABASE_URL=https://<your-project>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=<your-anon-key>
+# Server-side only (edge function secrets — never bundled into the client):
+# SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY
+```
+
+Database schema lives in the root `*.sql` files (run them in the Supabase SQL Editor). Deploy edge functions with:
+
+```bash
+supabase functions deploy <name> --project-ref <your-ref>
 ```
 
 ---
 
-## 📚 **Documentation**
+## 🗺️ Roadmap
 
-| File | Description |
-|------|-------------|
-| `AGENTS.md` | Development log & feature status |
-| `DEPLOYMENT_CHECKLIST.md` | Pre-deploy checklist |
-| `PRODUCTION_BUILD_GUIDE.md` | Build & OTA guide |
-| `MAINTENANCE_GUIDE.md` | Long-term maintenance |
-| `SECURITY_AUDIT.md` | Security analysis |
-| `APP_COMPLETENESS_REVIEW.md` | Feature gaps & roadmap |
-| `ERROR_ANALYSIS.md` | Debugging guide |
-| `DEV_SETUP.md` | Development setup |
+- [ ] Couple mode — shared wallets & joint transactions
+- [ ] Server-side native PDF rendering for documents
+- [ ] Push notifications (FCM) for budget alerts & daily summaries
+- [ ] PDF export for monthly/yearly reports
+- [ ] Play Store & App Store release
 
 ---
 
-## 🔒 **Security**
+## 👤 Author
 
-### **CRITICAL: Apply RLS Migration**
+**Abdur Rasyid** — full-stack & mobile developer
 
-Before deployment, **MUST** run:
+Designed, architected, and built end-to-end: UX, database design, RLS policies, edge functions, and AI integration.
 
-```sql
--- In Supabase SQL Editor
--- File: supabase/migrations/000_initial_schema_rls.sql
-```
-
-Without RLS, **any user can access any other user's data!**
-
-See `SECURITY_AUDIT.md` for complete security analysis.
+[![GitHub](https://img.shields.io/badge/GitHub-rasyidaldy10-181717?logo=github)](https://github.com/rasyidaldy10)
 
 ---
 
-## 🎨 **Tech Stack**
-
-- **Frontend:** React Native (Expo SDK 56)
-- **Backend:** Supabase (PostgreSQL, Auth, Functions)
-- **AI:** Claude API (Anthropic)
-- **Deployment:** EAS Build + OTA Updates
-- **Hosting:** Vercel (web), Expo (mobile)
-- **Language:** TypeScript
-
----
-
-## 🤝 **Contributing**
-
-### **Development Workflow**
-
-1. Fork & clone
-2. Create feature branch
-3. Make changes
-4. Test locally
-5. Submit PR
-
-### **Code Standards**
-
-- TypeScript strict mode
-- No `console.log` in production
-- Comment only when WHY is non-obvious
-- Follow existing patterns
-
----
-
-## 📊 **Status**
-
-**Current Version:** 1.0.0 (Pre-Production)
-
-**Completeness:** 92%
-- ✅ Core features: 100%
-- ✅ UI/UX: 95%
-- ✅ AI features: 95%
-- ⚠️ Security: 85% (needs RLS applied)
-
-**Production Ready:** ✅ YES (after RLS migration)
-
----
-
-## 🗺️ **Roadmap**
-
-### **V1.0 (Now)**
-- All core features
-- Multi-wallet
-- AI chat
-- ZENA Intelligence
-- Production ready
-
-### **V1.1 (1 month)**
-- Gmail auto-import
-- Full reminder system
-- PDF export
-
-### **V1.5 (3 months)**
-- In-app purchase
-- Pro/Business tiers
-- Premium features
-
-### **V2.0 (6 months)**
-- Savings goals
-- Leaderboard
-- Voice features
-- Couple mode
-- Multi-currency
-
----
-
-## 📄 **License**
-
-[Your License]
-
----
-
-## 🆘 **Support**
-
-- **Issues:** [GitHub Issues]
-- **Email:** [Support Email]
-- **Docs:** Check `/docs` folder
-
----
-
-## 🙏 **Acknowledgments**
-
-Built with:
-- [Expo](https://expo.dev)
-- [Supabase](https://supabase.com)
-- [Claude AI](https://anthropic.com)
-- [React Native](https://reactnative.dev)
-
----
-
-## 📝 **Changelog**
-
-### **V1.0.0** (2026-06-XX)
-- Initial release
-- Multi-wallet management
-- Transaction tracking
-- Monthly reports
-- AI chat (6 personas, 4 languages)
-- ZENA Intelligence (6 agents)
-- Smart notifications
-- Budget tracking
-- Financial score & tier system
-
----
-
-**Made with ❤️ for better financial wellness**
-
-🌟 **Star this repo if you find it useful!**
+<div align="center">
+<sub>Built with React Native, Supabase &amp; Claude. · <strong>Zena — Keuanganmu, selaras.</strong></sub>
+</div>

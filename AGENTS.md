@@ -89,7 +89,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
-## LATEST SESSION (2026-06-14) - PROFIL USAHA + INVOICE & PENAWARAN ✅
+## LATEST SESSION (2026-06-15) - POLISH + PORTFOLIO README ✅
+
+**🛠️ Fix kecil + README portfolio.**
+- Home header: tampilkan foto avatar dari `prefs.avatar_url` (komponen `Image`, fallback inisial). `avatar_url` ditambah ke type `UserPreferences`.
+- Profil: section "Pengaturan PPN" disembunyikan (`{false && ...}`, gampang dibalikin).
+- Penyebab tombol Penawaran "hilang" di Vercel: 4 commit belum di-push → sekarang sudah di-push ke `main` (auto-deploy). Tombol Invoice & Penawaran ADA di Home **mode Bisnis** (Akses Cepat baris ke-2).
+- **README.md ditulis ulang** jadi showcase portfolio (English): hero, badges, fitur lengkap, tech stack, arsitektur (mermaid), security, struktur project, getting started. Sanitized — TIDAK ada credential asli (pakai placeholder). Screenshot taruh di `docs/screenshots/` (user tambah manual). Commit `2d33caa` (fix) + README.
+
+---
+
+## SESSION (2026-06-14) - PROFIL USAHA + INVOICE & PENAWARAN ✅
 
 **🧾 Sistem dokumen bisnis: Profil Usaha → Invoice & Penawaran dengan nomor terkunci + PDF.**
 

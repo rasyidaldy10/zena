@@ -26,8 +26,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# Local env files
-.env*.local
+# Local env files (NEVER commit real secrets — only .env.example is tracked)
+.env
+.env.*
+!.env.example
 
 # Typescript
 *.tsbuildinfo
