@@ -91,7 +91,10 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ## LATEST SESSION (2026-06-15) - POLISH + PORTFOLIO README ✅
 
-**🛠️ Fix kecil + README portfolio.**
+**🛠️ Fix kecil + README portfolio + keamanan + jenis project custom.**
+- **Jenis project custom:** ModalTambahProject ada opsi "✏️ Tulis sendiri" → teks bebas, diingat dari riwayat (distinct type project lama, non-default). `ProjectType` di-relax jadi string. ⚠️ **Butuh SQL `ALLOW_CUSTOM_PROJECT_TYPE.sql`** (lepas CHECK constraint `projects.type`) — user run di Supabase SQL Editor.
+- **Keamanan:** secret bocor (.env service_role/groq/brick) ke-commit → scrub tree + purge git history (filter-repo) + migrasi ke API key Supabase baru (publishable `sb_publishable_` di app/.env/Vercel, secret `secretkeynew` di edge function secrets, semua 9 edge function pakai `Deno.env.get('secretkeynew') ?? legacy`) → legacy anon/service_role DI-DISABLE (verified key bocor HTTP 401). SISA: rotate GROQ & BRICK key (set di Edge Function Secrets via dashboard). Lihat [[zena-env-secret-leak]].
+- **PDF dokumen:** fix render (storage text/plain → app render via blob text/html); template di-upgrade profesional (kolom No/Deskripsi, Terbilang, blok tanda tangan, tanggal Indonesia).
 - Home header: tampilkan foto avatar dari `prefs.avatar_url` (komponen `Image`, fallback inisial). `avatar_url` ditambah ke type `UserPreferences`.
 - Profil: section "Pengaturan PPN" disembunyikan (`{false && ...}`, gampang dibalikin).
 - Penyebab tombol Penawaran "hilang" di Vercel: 4 commit belum di-push → sekarang sudah di-push ke `main` (auto-deploy). Tombol Invoice & Penawaran ADA di Home **mode Bisnis** (Akses Cepat baris ke-2).
