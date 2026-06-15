@@ -33,8 +33,14 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
   const [wallets, setWallets] = useState<BizWallet[]>([])
   const [dpWalletId, setDpWalletId] = useState('')
   const [loading, setLoading] = useState(false)
+  // Jenis custom: yang sudah pernah dipakai (diingat dari riwayat) + input baru
+  const [customTypes, setCustomTypes] = useState<string[]>([])
+  const [writingCustom, setWritingCustom] = useState(false)
+  const [customInput, setCustomInput] = useState('')
 
-  // Ambil dompet bisnis untuk tujuan DP (income masuk ke sini)
+  const DEFAULT_TYPE_VALUES = PROJECT_TYPES.map((t) => t.value)
+
+  // Ambil dompet bisnis + jenis project custom dari riwayat
   useEffect(() => {
     if (!visible) return
     ;(async () => {
@@ -47,12 +53,26 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
         .eq('is_active', true)
         .eq('wallet_function', 'business')
       if (data) setWallets(data)
+
+      // jenis custom = type project lama yang bukan bawaan
+      const { data: projs } = await supabase
+        .from('projects')
+        .select('type')
+        .eq('user_id', session.user.id)
+      const customs = Array.from(
+        new Set((projs || []).map((p: any) => p.type).filter((t: string) => t && !DEFAULT_TYPE_VALUES.includes(t)))
+      ) as string[]
+      setCustomTypes(customs)
     })()
   }, [visible])
 
   async function handleSave() {
     if (!name.trim()) {
       notify('Error', 'Nama project wajib diisi')
+      return
+    }
+    if (writingCustom && !customInput.trim()) {
+      notify('Error', 'Tulis jenis project-nya dulu')
       return
     }
 
@@ -168,6 +188,8 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
     setContractValue('')
     setDpAmount('')
     setDpWalletId('')
+    setWritingCustom(false)
+    setCustomInput('')
   }
 
   function formatCurrency(value: string) {
@@ -228,23 +250,55 @@ export default function ModalTambahProject({ visible, onClose, onSuccess }: Prop
                     key={projectType.value}
                     style={[
                       styles.typeButton,
-                      type === projectType.value && styles.typeButtonActive,
+                      type === projectType.value && !writingCustom && styles.typeButtonActive,
                     ]}
-                    onPress={() => setType(projectType.value)}
+                    onPress={() => { setWritingCustom(false); setType(projectType.value) }}
                     disabled={loading}
                   >
                     <Text style={styles.typeIcon}>{projectType.icon}</Text>
                     <Text
                       style={[
                         styles.typeLabel,
-                        type === projectType.value && styles.typeLabelActive,
+                        type === projectType.value && !writingCustom && styles.typeLabelActive,
                       ]}
                     >
                       {projectType.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
+                {/* Jenis custom yang diingat dari riwayat */}
+                {customTypes.map((ct) => (
+                  <TouchableOpacity
+                    key={ct}
+                    style={[styles.typeButton, type === ct && !writingCustom && styles.typeButtonActive]}
+                    onPress={() => { setWritingCustom(false); setType(ct) }}
+                    disabled={loading}
+                  >
+                    <Text style={styles.typeIcon}>📌</Text>
+                    <Text style={[styles.typeLabel, type === ct && !writingCustom && styles.typeLabelActive]}>{ct}</Text>
+                  </TouchableOpacity>
+                ))}
+                {/* Tulis sendiri */}
+                <TouchableOpacity
+                  style={[styles.typeButton, writingCustom && styles.typeButtonActive]}
+                  onPress={() => { setWritingCustom(true); setType(customInput.trim()) }}
+                  disabled={loading}
+                >
+                  <Text style={styles.typeIcon}>✏️</Text>
+                  <Text style={[styles.typeLabel, writingCustom && styles.typeLabelActive]}>Tulis sendiri</Text>
+                </TouchableOpacity>
               </View>
+              {writingCustom && (
+                <TextInput
+                  style={styles.customTypeInput}
+                  value={customInput}
+                  onChangeText={(t) => { setCustomInput(t); setType(t.trim()) }}
+                  placeholder="Ketik jenis project sendiri (mis. Renovasi)"
+                  placeholderTextColor={COLORS.TEXT_LIGHT}
+                  editable={!loading}
+                  autoFocus
+                />
+              )}
             </View>
 
             {/* Contract Value */}
@@ -400,6 +454,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
+  },
+  customTypeInput: {
+    backgroundColor: COLORS.BACKGROUND,
+    borderWidth: 1,
+    borderColor: COLORS.PRIMARY,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    fontSize: 14,
+    color: COLORS.TEXT,
+    marginTop: 8,
   },
   typeButton: {
     flex: 1,

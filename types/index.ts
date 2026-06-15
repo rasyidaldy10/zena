@@ -289,7 +289,8 @@ export interface InvestmentHolding {
 // BUSINESS MODE TYPES
 // ============================================
 
-export type ProjectType = 'alkes' | 'servis' | 'konsultasi' | 'lainnya'
+// Jenis bawaan + jenis custom (teks bebas, disimpan & diingat dari riwayat)
+export type ProjectType = 'alkes' | 'servis' | 'konsultasi' | 'lainnya' | (string & {})
 export type ProjectStatus = 'aktif' | 'selesai' | 'pending'
 export type ReceivableType = 'piutang' | 'hutang'
 export type ReceivableStatus = 'pending' | 'lunas'
