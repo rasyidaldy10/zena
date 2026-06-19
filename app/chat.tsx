@@ -204,6 +204,13 @@ export default function ChatScreen() {
   const handleSaveTransaction = async () => {
     if (!pendingTransaction) return
 
+    // Guard: nominal harus valid (cegah insert amount kosong/0 → error/membingungkan)
+    if (!pendingTransaction.amount || pendingTransaction.amount <= 0) {
+      notify('Nominal tidak terbaca', 'Nominal transaksi gak kebaca. Coba ketik manual atau foto ulang ya!')
+      setPendingTransaction(null)
+      return
+    }
+
     setSavingTransaction(true)
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
@@ -232,7 +239,8 @@ export default function ChatScreen() {
       const txnType: 'income' | 'expense' =
         pendingTransaction.type === 'personal'
           ? (pendingTransaction.transaction_type === 'income' ? 'income' : 'expense')
-          : 'expense' // mayoritas transaksi bisnis = pengeluaran
+          // Bisnis: penjualan = uang masuk (income), sisanya pengeluaran
+          : (pendingTransaction.business_category === 'penjualan' ? 'income' : 'expense')
 
       // NOTE: tabel transactions pakai kolom `note` (BUKAN description) — samain dgn tambah-transaksi
       const { error } = await supabase.from('transactions').insert({
