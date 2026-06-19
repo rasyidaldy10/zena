@@ -8,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import { supabase } from '../../lib/supabase'
 import { confirmAsync, notify } from '../../lib/alert'
+import { clearChatHistory } from '../../lib/chatHistory'
 import { uploadImage } from '../../lib/upload'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
@@ -174,6 +175,8 @@ export default function ProfilScreen() {
     const ok = await confirmAsync('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', 'Keluar')
     if (!ok) return
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await clearChatHistory(user.id)
       await supabase.auth.signOut()
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.href = '/'
       else router.replace('/(auth)/login')

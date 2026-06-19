@@ -3,6 +3,7 @@ import { router } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { confirmAsync, notify } from '../lib/alert'
+import { clearChatHistory } from '../lib/chatHistory'
 import { COLORS, RADIUS, SHADOW } from '../constants/theme'
 
 const PRIMARY = COLORS.primary
@@ -20,6 +21,8 @@ export default function PengaturanScreen() {
     const ok = await confirmAsync('Keluar dari Zena?', 'Kamu perlu login lagi untuk mengakses akunmu.', 'Keluar')
     if (!ok) return
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) await clearChatHistory(user.id)
       await supabase.auth.signOut()
       if (Platform.OS === 'web' && typeof window !== 'undefined') window.location.href = '/'
       else router.replace('/(auth)/login')
