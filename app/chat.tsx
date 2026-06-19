@@ -15,6 +15,8 @@ import { processVoiceNote } from '../lib/groq'
 import { parseTransactionText, ParsedTransaction } from '../lib/transaction-parser'
 import TransactionConfirmCard from '../components/TransactionConfirmCard'
 import { Persona, Language, BudgetMethod, Transaction } from '../types'
+import { notify, confirmAsync } from '../lib/alert'
+import { loadChatHistory, saveChatHistory, clearChatHistory } from '../lib/chatHistory'
 
 const PRIMARY = '#185FA5'
 
@@ -48,15 +50,35 @@ export default function ChatScreen() {
   const [pendingTransaction, setPendingTransaction] = useState<ParsedTransaction | null>(null)
   const [savingTransaction, setSavingTransaction] = useState(false)
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
+  const userIdRef = useRef<string | null>(null)
+  const historyReadyRef = useRef(false)
   const scrollRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     initChat()
   }, [])
 
+  // Simpan history tiap kali pesan berubah (setelah init selesai) — reset 1 hari (lib/chatHistory)
+  useEffect(() => {
+    if (!historyReadyRef.current || !userIdRef.current) return
+    if (messages.length === 0) return
+    saveChatHistory(userIdRef.current, messages)
+  }, [messages])
+
   const initChat = async () => {
     const prefs = await loadPrefs()
     const txns = await loadTransactions()
+
+    // Lanjutkan percakapan sebelumnya kalau masih < 24 jam
+    if (userIdRef.current) {
+      const saved = await loadChatHistory(userIdRef.current)
+      if (saved && saved.length > 0) {
+        setMessages(saved)
+        historyReadyRef.current = true
+        setInitLoading(false)
+        return
+      }
+    }
 
     const welcomes: Record<Persona, string> = {
       bestie: 'Hei! Gue Zena — asisten keuangan lo yang paling ngerti lo 😎 Mau ngomongin apa?',
@@ -85,6 +107,7 @@ export default function ChatScreen() {
     }
 
     setMessages([{ role: 'assistant', content: welcome }])
+    historyReadyRef.current = true
     setInitLoading(false)
   }
 
@@ -94,6 +117,7 @@ export default function ChatScreen() {
       router.replace('/(auth)/login')
       return null
     }
+    userIdRef.current = user.id
 
     const { data: prefsRows } = await supabase
       .from('user_preferences')
@@ -182,68 +206,69 @@ export default function ChatScreen() {
 
     setSavingTransaction(true)
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) {
+      setSavingTransaction(false)
+      return
+    }
 
     try {
-      // Get first wallet of matching function
+      // Ambil dompet pertama sesuai mode (sekalian saldo buat update current_balance)
       const { data: wallets } = await supabase
         .from('user_wallets')
-        .select('id')
+        .select('id, current_balance')
         .eq('user_id', user.id)
         .eq('wallet_function', activeMode)
         .eq('is_active', true)
         .limit(1)
 
       if (!wallets || wallets.length === 0) {
-        Alert.alert('Oops', `Kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dulu ya!`)
+        notify('Oops', `Kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dulu ya!`)
         setPendingTransaction(null)
         setSavingTransaction(false)
         return
       }
 
-      if (pendingTransaction.type === 'personal') {
-        // Save personal transaction
-        const { error } = await supabase.from('transactions').insert({
-          user_id: user.id,
-          wallet_id: wallets[0].id,
-          type: pendingTransaction.transaction_type,
-          amount: pendingTransaction.amount,
-          category: pendingTransaction.category || 'lainnya',
-          description: pendingTransaction.description,
-          source: 'manual',
-          date: new Date().toISOString().split('T')[0],
-        })
+      const wallet = wallets[0]
+      const txnType: 'income' | 'expense' =
+        pendingTransaction.type === 'personal'
+          ? (pendingTransaction.transaction_type === 'income' ? 'income' : 'expense')
+          : 'expense' // mayoritas transaksi bisnis = pengeluaran
 
-        if (error) throw error
+      // NOTE: tabel transactions pakai kolom `note` (BUKAN description) — samain dgn tambah-transaksi
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        wallet_id: wallet.id,
+        wallet_source: wallet.id,
+        type: txnType,
+        amount: pendingTransaction.amount,
+        category: pendingTransaction.type === 'personal' ? (pendingTransaction.category || 'lainnya') : 'lainnya',
+        business_category: pendingTransaction.type === 'business' ? pendingTransaction.business_category : null,
+        note: pendingTransaction.description || '',
+        source: 'manual',
+        is_categorized: true,
+        is_wallet_transfer: false,
+        date: new Date().toISOString().split('T')[0],
+      })
 
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ Oke! Transaksi ${pendingTransaction.transaction_type === 'income' ? 'pemasukan' : 'pengeluaran'} Rp ${pendingTransaction.amount.toLocaleString('id-ID')} udah tersimpan!`
-        }])
-      } else {
-        // Save business transaction
-        const { error } = await supabase.from('transactions').insert({
-          user_id: user.id,
-          wallet_id: wallets[0].id,
-          type: 'expense', // Most business transactions are expenses
-          amount: pendingTransaction.amount,
-          business_category: pendingTransaction.business_category,
-          description: pendingTransaction.description,
-          source: 'manual',
-          date: new Date().toISOString().split('T')[0],
-        })
+      if (error) throw error
 
-        if (error) throw error
+      // Update saldo dompet (kalau gak diupdate, saldo gak nambah/kurang)
+      const newBalance = txnType === 'income'
+        ? (wallet.current_balance || 0) + pendingTransaction.amount
+        : (wallet.current_balance || 0) - pendingTransaction.amount
+      await supabase.from('user_wallets').update({ current_balance: newBalance }).eq('id', wallet.id)
 
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: `✅ Oke! Transaksi bisnis (${pendingTransaction.business_category}) Rp ${pendingTransaction.amount.toLocaleString('id-ID')} udah tersimpan!`
-        }])
-      }
+      const label = pendingTransaction.type === 'business'
+        ? `Transaksi bisnis (${pendingTransaction.business_category})`
+        : `Transaksi ${txnType === 'income' ? 'pemasukan' : 'pengeluaran'}`
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ Oke! ${label} Rp ${pendingTransaction.amount.toLocaleString('id-ID')} udah tersimpan & saldo dompet diperbarui!`
+      }])
 
       setPendingTransaction(null)
-    } catch (error) {
-      Alert.alert('Gagal', 'Gagal menyimpan transaksi. Coba lagi ya!')
+    } catch (error: any) {
+      notify('Gagal', `Gagal menyimpan transaksi: ${error?.message || 'coba lagi ya!'}`)
     }
 
     setSavingTransaction(false)
@@ -321,23 +346,26 @@ Jika ini struk operasional (sewa, listrik) → category: "operasional"
 
 Return ONLY valid JSON, no markdown, no explanation.`
       } else {
-        prompt = `Analisis struk belanja ini dan extract data dalam format JSON:
+        prompt = `Kamu menganalisis sebuah gambar yang bisa berupa STRUK BELANJA atau BUKTI TRANSFER/MUTASI BANK/E-WALLET. Extract data dalam format JSON:
 {
-  "store_name": "nama toko",
+  "doc_type": "struk" | "transfer",
+  "flow": "in" | "out",
+  "store_name": "nama toko / nama pengirim atau penerima transfer",
   "date": "YYYY-MM-DD",
   "items": [{"name": "nama item", "price": 15000}],
   "total": 50000,
-  "category": "makanan/belanja/transport/hiburan/kesehatan/tagihan/lainnya",
+  "category": "makanan/belanja/transport/hiburan/kesehatan/tagihan/transfer/gaji/lainnya",
   "is_business": false
 }
 
-Kategori berdasarkan jenis pembelian:
-- Resto/cafe/warung → "makanan"
-- Supermarket/minimarket → "belanja"
-- Bensin/parkir/grab → "transport"
-- Bioskop/game → "hiburan"
-- Apotek/klinik → "kesehatan"
-- Listrik/pulsa/internet → "tagihan"
+ATURAN:
+1. Kalau ini STRUK BELANJA (ada daftar item, nama toko, total bayar) → doc_type "struk", flow "out".
+   Kategori: Resto/cafe/warung → "makanan"; Supermarket/minimarket → "belanja"; Bensin/parkir/grab → "transport"; Bioskop/game → "hiburan"; Apotek/klinik → "kesehatan"; Listrik/pulsa/internet → "tagihan".
+2. Kalau ini BUKTI TRANSFER / MUTASI (mobile banking, e-wallet, ATM, "Transfer Berhasil", nominal + nama rekening) → doc_type "transfer", items [].
+   - Kalau uang KELUAR / kamu mengirim (kata: "Transfer ke", "Pembayaran ke", "Kirim", "Pengeluaran") → flow "out", category "transfer".
+   - Kalau uang MASUK / kamu menerima (kata: "Transfer dari", "Dana masuk", "Diterima dari", "Kredit", gaji/payroll) → flow "in", category "transfer" (atau "gaji" kalau jelas gaji).
+   - "store_name" = nama lawan transaksi (pengirim kalau masuk, penerima kalau keluar).
+   - "total" = nominal transfer.
 
 Return ONLY valid JSON, no markdown, no explanation.`
       }
@@ -363,16 +391,23 @@ Return ONLY valid JSON, no markdown, no explanation.`
         setPendingTransaction(parsed)
         setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil scan struk bisnis dari ${data.store_name}!` }])
       } else {
+        const isTransfer = data.doc_type === 'transfer'
+        const isIncome = data.flow === 'in'
+        const itemsText = data.items?.map((i: any) => i.name).join(', ')
+        const desc = isTransfer
+          ? `${isIncome ? 'Transfer masuk dari' : 'Transfer ke'} ${data.store_name || '-'}`
+          : `${data.store_name || 'Struk'}${itemsText ? ` - ${itemsText}` : ''}`
         const parsed: ParsedTransaction = {
           type: 'personal',
-          transaction_type: 'expense',
+          transaction_type: isIncome ? 'income' : 'expense',
           amount: data.total,
-          description: `${data.store_name} - ${data.items?.map((i: any) => i.name).join(', ') || 'Scan struk'}`,
-          category: data.category || 'lainnya',
+          description: desc,
+          category: data.category || (isTransfer ? 'transfer' : 'lainnya'),
           confidence: 0.9,
         }
         setPendingTransaction(parsed)
-        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil scan struk dari ${data.store_name}!` }])
+        const kind = isTransfer ? `bukti transfer (${isIncome ? 'masuk' : 'keluar'})` : 'struk'
+        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil baca ${kind} — ${data.store_name || ''}!` }])
       }
     } catch (error) {
       console.error('OCR Error:', error)
@@ -468,6 +503,16 @@ Return ONLY valid JSON, no markdown, no explanation.`
     }
   }
 
+  const handleNewChat = async () => {
+    const ok = await confirmAsync('Mulai chat baru?', 'Percakapan sekarang akan dihapus. Transaksi yang sudah tersimpan tidak terpengaruh.')
+    if (!ok) return
+    if (userIdRef.current) await clearChatHistory(userIdRef.current)
+    setPendingTransaction(null)
+    historyReadyRef.current = false
+    setInitLoading(true)
+    await initChat()
+  }
+
   const getPersonaLabel = () => {
     const labels: Record<Persona, string> = {
       bestie: 'Si Bestie',
@@ -501,6 +546,9 @@ Return ONLY valid JSON, no markdown, no explanation.`
           <Text style={styles.headerTitle}>Zena AI</Text>
           <Text style={styles.headerSub}>{getPersonaLabel()} · Online</Text>
         </View>
+        <TouchableOpacity onPress={handleNewChat} style={styles.newChatBtn}>
+          <Text style={styles.newChatText}>＋ Baru</Text>
+        </TouchableOpacity>
         {/* Voice toggle disabled - TODO: Implement with expo-audio */}
         {/* <TouchableOpacity
           style={[styles.voiceToggle, voiceEnabled && styles.voiceToggleActive]}
@@ -610,6 +658,8 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 80 },
   backText: { fontSize: 14, color: PRIMARY },
+  newChatBtn: { width: 80, alignItems: 'flex-end' },
+  newChatText: { fontSize: 14, color: PRIMARY, fontWeight: '600' },
   headerCenter: { alignItems: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
   headerSub: { fontSize: 11, color: PRIMARY, marginTop: 2 },

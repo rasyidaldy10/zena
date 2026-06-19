@@ -89,6 +89,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-06-19) - FIX ZENA AI: CATAT, KONTEKS, SCAN BUKTI TF ✅
+
+**🤖 3 perbaikan Zena AI chat (`app/chat.tsx`):**
+1. **BUG catat transaksi (kritis):** insert dulu pakai kolom `description` yg **TIDAK ADA** di tabel `transactions` (cuma ada `note`) → insert gagal total, di web error ke-telan (Alert.alert mati). Plus saldo dompet **gak pernah di-update**. FIX: insert pakai `note` + field samain dgn `tambah-transaksi` (`wallet_source`, `is_categorized`, `is_wallet_transfer:false`) + **update `user_wallets.current_balance`** + pakai `notify()` (bukan Alert) biar error keliatan di web. Sekarang catat lewat chat → masuk history + saldo berubah.
+2. **Konteks reset 1 hari:** chat dulu selalu mulai dari welcome baru tiap keluar-masuk. Baru: `lib/chatHistory.ts` (AsyncStorage, per-user, TTL 24 jam, max 60 pesan). Buka lagi < 24 jam → percakapan lanjut (Claude otomatis tau konteks). Tombol header **"＋ Baru"** buat reset manual (`clearChatHistory`).
+3. **Scan struk + bukti transfer:** prompt Vision personal di-upgrade bisa bedain `doc_type` struk vs transfer/mutasi + `flow` in/out → bukti TF masuk jadi **income**, keluar jadi **expense** (gak lagi dipaksa expense). Deskripsi otomatis "Transfer masuk/keluar dari/ke <nama>".
+
+**File baru:** `lib/chatHistory.ts`. tsc 0 errors. (Belum di-commit — tunggu instruksi.)
+
+---
+
 ## LATEST SESSION (2026-06-15) - POLISH + PORTFOLIO README ✅
 
 **🛠️ Fix kecil + README portfolio + keamanan + jenis project custom.**
@@ -406,7 +417,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Wallet:** Multi-wallet support (Cash, Bank, E-Wallet, Bisnis, dll), Tambah wallet, Picker icon + warna, Saldo awal, Filter transaksi per wallet, Brick.co Open Banking integration (50+ banks Indonesia)  
 **✅ Laporan:** Filter per bulan, Breakdown kategori, Budget tracking (kebutuhan/keinginan/tabungan), Saving rate indicator, Share laporan (WhatsApp/etc)  
 **✅ Profil:** Financial Score (0-100), Tier system (Starter → Sovereign), Edit nama/income, Ganti persona/budgeting, ZENA Intelligence banner, Marketing Dashboard (hidden - tap 5x header)  
-**✅ AI Chat:** Claude API proxy (6 personas), Context-aware (3 bulan transaksi), Prediksi akhir bulan, Analisis pattern, Quick replies berbasis data, Scan struk (Claude Vision), Voice note (Groq Whisper + Mixtral parsing), Adaptive max_tokens (2-3x faster)  
+**✅ AI Chat:** Claude API proxy (6 personas), Context-aware (3 bulan transaksi), Prediksi akhir bulan, Analisis pattern, Quick replies berbasis data, Catat transaksi via chat (masuk history + update saldo), Persistensi percakapan (reset 24 jam, tombol "＋ Baru"), Scan struk **& bukti transfer** (Claude Vision, deteksi income/expense), Voice note (Groq Whisper + Mixtral parsing), Adaptive max_tokens (2-3x faster)  
 **✅ Market Data:** CoinGecko crypto widget (BTC, ETH, BNB, SOL, ADA), Stock watchlist (IHSG + 16 Indonesian stocks), Investment Portfolio screen (stocks, crypto, reksadana, obligasi)  
 **✅ ZENA Intelligence System:** 6 autonomous agents (Budget Monitor, Anomaly Detector, Weekly Insight, Gmail Parser placeholder, Daily Summary, Smart Categorization), Realtime alerts, AI Insights visualization  
 **✅ Business Mode:** Projects (termin tracking, stats), Receivables (piutang/hutang, WhatsApp reminder), Inventory (products, stock movements, low stock alerts, stock opname), HPP tracking, PPN system (tax summary)  
