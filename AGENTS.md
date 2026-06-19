@@ -89,6 +89,17 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-06-19b) - SCAN MUTASI MULTI-TRANSAKSI ✅
+
+**📷 Scan di Zena AI di-upgrade jadi multi-transaksi + editable + pilih dompet.**
+- **Prompt Vision baru:** balikin array `transactions` (flow in/out, amount, description, category). Bisa baca STRUK, bukti transfer tunggal, **dan MUTASI/riwayat rekening banyak baris** → tiap baris jadi 1 transaksi.
+- **Komponen baru `components/ScanReviewCard.tsx`:** kartu review hasil scan — **pilih dompet** (chips, saldo dompet itu yang berubah), tiap baris bisa di-**toggle ✓**, **ubah arah masuk/keluar**, **edit nominal**, **ganti kategori** (modal, kategori sesuai mode). Ringkasan total masuk/keluar + efek bersih saldo. Tombol "Simpan N transaksi".
+- **Simpan batch:** insert semua baris tercentang sekaligus, **tanggal = hari ini (saat scan)** untuk semua, update saldo dompet **sekali** = net (masuk−keluar). Mode bisnis: map label→`business_category`, `penjualan`=income.
+- Kategori dari `EXPENSE_CATEGORIES`/`INCOME_CATEGORIES` (personal) atau `BUSINESS_CATEGORIES` (bisnis). Scan tunggal (1 struk) juga lewat kartu ini (list isi 1, tetap bisa pilih dompet). Typed/voice note tetap pakai `TransactionConfirmCard` lama.
+- tsc 0 errors. (Belum commit/push.)
+
+---
+
 ## LATEST SESSION (2026-06-19) - FIX ZENA AI: CATAT, KONTEKS, SCAN BUKTI TF ✅
 
 **🤖 3 perbaikan Zena AI chat (`app/chat.tsx`):**
@@ -417,7 +428,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Wallet:** Multi-wallet support (Cash, Bank, E-Wallet, Bisnis, dll), Tambah wallet, Picker icon + warna, Saldo awal, Filter transaksi per wallet, Brick.co Open Banking integration (50+ banks Indonesia)  
 **✅ Laporan:** Filter per bulan, Breakdown kategori, Budget tracking (kebutuhan/keinginan/tabungan), Saving rate indicator, Share laporan (WhatsApp/etc)  
 **✅ Profil:** Financial Score (0-100), Tier system (Starter → Sovereign), Edit nama/income, Ganti persona/budgeting, ZENA Intelligence banner, Marketing Dashboard (hidden - tap 5x header)  
-**✅ AI Chat:** Claude API proxy (6 personas), Context-aware (3 bulan transaksi), Prediksi akhir bulan, Analisis pattern, Quick replies berbasis data, Catat transaksi via chat (masuk history + update saldo), Persistensi percakapan (reset 24 jam, tombol "＋ Baru"), Scan struk **& bukti transfer** (Claude Vision, deteksi income/expense), Voice note (Groq Whisper + Mixtral parsing), Adaptive max_tokens (2-3x faster)  
+**✅ AI Chat:** Claude API proxy (6 personas), Context-aware (3 bulan transaksi), Prediksi akhir bulan, Analisis pattern, Quick replies berbasis data, Catat transaksi via chat (masuk history + update saldo), Persistensi percakapan (reset 24 jam, tombol "＋ Baru"), Scan struk, bukti transfer **& mutasi multi-transaksi** (Claude Vision, kartu review editable: pilih dompet/arah/nominal/kategori, simpan batch tanggal hari ini), Voice note (Groq Whisper + Mixtral parsing), Adaptive max_tokens (2-3x faster)  
 **✅ Market Data:** CoinGecko crypto widget (BTC, ETH, BNB, SOL, ADA), Stock watchlist (IHSG + 16 Indonesian stocks), Investment Portfolio screen (stocks, crypto, reksadana, obligasi)  
 **✅ ZENA Intelligence System:** 6 autonomous agents (Budget Monitor, Anomaly Detector, Weekly Insight, Gmail Parser placeholder, Daily Summary, Smart Categorization), Realtime alerts, AI Insights visualization  
 **✅ Business Mode:** Projects (termin tracking, stats), Receivables (piutang/hutang, WhatsApp reminder), Inventory (products, stock movements, low stock alerts, stock opname), HPP tracking, PPN system (tax summary)  

@@ -14,9 +14,13 @@ import { speak, stopSpeaking } from '../lib/speech'
 import { processVoiceNote } from '../lib/groq'
 import { parseTransactionText, ParsedTransaction } from '../lib/transaction-parser'
 import TransactionConfirmCard from '../components/TransactionConfirmCard'
-import { Persona, Language, BudgetMethod, Transaction } from '../types'
+import ScanReviewCard, { ScanRow } from '../components/ScanReviewCard'
+import { Persona, Language, BudgetMethod, Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
+import { BUSINESS_CATEGORIES } from '../constants/business'
 import { notify, confirmAsync } from '../lib/alert'
 import { loadChatHistory, saveChatHistory, clearChatHistory } from '../lib/chatHistory'
+
+interface ScanWalletOpt { id: string; wallet_name: string; current_balance: number }
 
 const PRIMARY = '#185FA5'
 
@@ -49,6 +53,10 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false)
   const [pendingTransaction, setPendingTransaction] = useState<ParsedTransaction | null>(null)
   const [savingTransaction, setSavingTransaction] = useState(false)
+  const [scanRows, setScanRows] = useState<ScanRow[] | null>(null)
+  const [scanWallets, setScanWallets] = useState<ScanWalletOpt[]>([])
+  const [scanWalletInitial, setScanWalletInitial] = useState<string | undefined>(undefined)
+  const [savingScan, setSavingScan] = useState(false)
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
   const userIdRef = useRef<string | null>(null)
   const historyReadyRef = useRef(false)
@@ -327,101 +335,150 @@ export default function ChatScreen() {
     ])
   }
 
+  // Kategori sesuai mode (buat prompt + picker di kartu review)
+  const incomeCats = activeMode === 'business'
+    ? BUSINESS_CATEGORIES.filter(c => c.value === 'penjualan').map(c => c.label)
+    : INCOME_CATEGORIES
+  const expenseCats = activeMode === 'business'
+    ? BUSINESS_CATEGORIES.filter(c => c.value !== 'penjualan').map(c => c.label)
+    : EXPENSE_CATEGORIES
+
   const processStruk = async (uri: string) => {
     setLoading(true)
-    setMessages(prev => [...prev, { role: 'user', content: '📷 [Mengirim foto struk...]' }])
+    setMessages(prev => [...prev, { role: 'user', content: '📷 [Mengirim foto untuk discan...]' }])
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
       const mimeType = uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg'
 
-      // Different prompts for personal vs business
-      let prompt = ''
-      if (activeMode === 'business') {
-        prompt = `Analisis struk/invoice bisnis ini dan extract data dalam format JSON:
-{
-  "store_name": "nama toko/supplier",
-  "date": "YYYY-MM-DD",
-  "items": [{"name": "nama item", "qty": 1, "price": 50000}],
-  "total": 150000,
-  "category": "penjualan/pembelian_alat/operasional",
-  "is_business": true
-}
+      const prompt = `Kamu menganalisis gambar keuangan: bisa STRUK BELANJA, BUKTI TRANSFER tunggal, atau MUTASI/RIWAYAT REKENING (banyak baris transaksi sekaligus).
 
-Jika ini struk penjualan produk kamu → category: "penjualan"
-Jika ini struk beli alat/bahan → category: "pembelian_alat"
-Jika ini struk operasional (sewa, listrik) → category: "operasional"
-
-Return ONLY valid JSON, no markdown, no explanation.`
-      } else {
-        prompt = `Kamu menganalisis sebuah gambar yang bisa berupa STRUK BELANJA atau BUKTI TRANSFER/MUTASI BANK/E-WALLET. Extract data dalam format JSON:
+Ekstrak SEMUA transaksi yang terlihat ke dalam JSON:
 {
-  "doc_type": "struk" | "transfer",
-  "flow": "in" | "out",
-  "store_name": "nama toko / nama pengirim atau penerima transfer",
-  "date": "YYYY-MM-DD",
-  "items": [{"name": "nama item", "price": 15000}],
-  "total": 50000,
-  "category": "makanan/belanja/transport/hiburan/kesehatan/tagihan/transfer/gaji/lainnya",
-  "is_business": false
+  "transactions": [
+    { "flow": "in" | "out", "amount": 50000, "description": "keterangan singkat / nama lawan transaksi", "category": "<salah satu kategori valid>" }
+  ]
 }
 
 ATURAN:
-1. Kalau ini STRUK BELANJA (ada daftar item, nama toko, total bayar) → doc_type "struk", flow "out".
-   Kategori: Resto/cafe/warung → "makanan"; Supermarket/minimarket → "belanja"; Bensin/parkir/grab → "transport"; Bioskop/game → "hiburan"; Apotek/klinik → "kesehatan"; Listrik/pulsa/internet → "tagihan".
-2. Kalau ini BUKTI TRANSFER / MUTASI (mobile banking, e-wallet, ATM, "Transfer Berhasil", nominal + nama rekening) → doc_type "transfer", items [].
-   - Kalau uang KELUAR / kamu mengirim (kata: "Transfer ke", "Pembayaran ke", "Kirim", "Pengeluaran") → flow "out", category "transfer".
-   - Kalau uang MASUK / kamu menerima (kata: "Transfer dari", "Dana masuk", "Diterima dari", "Kredit", gaji/payroll) → flow "in", category "transfer" (atau "gaji" kalau jelas gaji).
-   - "store_name" = nama lawan transaksi (pengirim kalau masuk, penerima kalau keluar).
-   - "total" = nominal transfer.
+- "flow" = "in" kalau uang MASUK/diterima/kredit; "out" kalau uang KELUAR/dibayar/debet.
+- Kalau ini MUTASI/riwayat → buat SATU objek per baris transaksi (boleh banyak).
+- Kalau STRUK belanja → satu transaksi "out", description = nama toko.
+- "amount" = angka bersih tanpa titik/koma/Rp.
+- ABAIKAN baris saldo/total/biaya admin gabungan; ambil transaksi sebenarnya saja.
+${activeMode === 'business'
+  ? `- Kategori valid (income): ${incomeCats.join(', ')}. Kategori valid (expense): ${expenseCats.join(', ')}.`
+  : `- Kategori valid untuk uang KELUAR: ${expenseCats.join(', ')}.\n- Kategori valid untuk uang MASUK: ${incomeCats.join(', ')}.`}
+- Pilih kategori paling masuk akal. Kalau ragu pakai "Lainnya".
 
 Return ONLY valid JSON, no markdown, no explanation.`
-      }
 
       const result = await claudeVision(base64, mimeType, prompt)
-
-      // Parse JSON response
       const cleanResult = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       const data = JSON.parse(cleanResult)
 
-      // Create parsed transaction from OCR data
-      if (data.is_business) {
-        const parsed: ParsedTransaction = {
-          type: 'business',
-          business_category: data.category || 'lainnya',
-          amount: data.total,
-          description: `${data.store_name} - ${data.items?.map((i: any) => i.name).join(', ') || 'Scan struk'}`,
-          product_name: data.items?.[0]?.name,
-          quantity: data.items?.[0]?.qty,
-          ppn_type: data.category === 'penjualan' ? 'keluaran' : 'masukan',
-          confidence: 0.9,
-        }
-        setPendingTransaction(parsed)
-        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil scan struk bisnis dari ${data.store_name}!` }])
+      const rawList: any[] = Array.isArray(data?.transactions) ? data.transactions : []
+      const validCats = (flow: string) => (flow === 'in' ? incomeCats : expenseCats)
+      const rows: ScanRow[] = rawList
+        .map((t) => {
+          const flow: 'in' | 'out' = t?.flow === 'in' ? 'in' : 'out'
+          const amount = parseInt(String(t?.amount ?? '').replace(/[^0-9]/g, ''), 10) || 0
+          const cats = validCats(flow)
+          const category = cats.includes(t?.category) ? t.category : (cats[cats.length - 1] || 'Lainnya')
+          return { flow, amount, description: String(t?.description || '').slice(0, 120), category, include: true }
+        })
+        .filter(r => r.amount > 0)
+
+      if (rows.length === 0) {
+        setMessages(prev => [...prev, { role: 'assistant', content: 'Hmm, gak nemu transaksi yang kebaca. Pastikan foto jelas ya — boleh struk, bukti transfer, atau mutasi rekening.' }])
       } else {
-        const isTransfer = data.doc_type === 'transfer'
-        const isIncome = data.flow === 'in'
-        const itemsText = data.items?.map((i: any) => i.name).join(', ')
-        const desc = isTransfer
-          ? `${isIncome ? 'Transfer masuk dari' : 'Transfer ke'} ${data.store_name || '-'}`
-          : `${data.store_name || 'Struk'}${itemsText ? ` - ${itemsText}` : ''}`
-        const parsed: ParsedTransaction = {
-          type: 'personal',
-          transaction_type: isIncome ? 'income' : 'expense',
-          amount: data.total,
-          description: desc,
-          category: data.category || (isTransfer ? 'transfer' : 'lainnya'),
-          confidence: 0.9,
+        // Ambil dompet untuk dipilih (sesuai mode aktif)
+        const { data: { user } } = await supabase.auth.getUser()
+        const { data: wallets } = await supabase
+          .from('user_wallets')
+          .select('id, wallet_name, current_balance')
+          .eq('user_id', user?.id)
+          .eq('wallet_function', activeMode)
+          .eq('is_active', true)
+          .order('created_at', { ascending: true })
+
+        const wl = (wallets || []) as ScanWalletOpt[]
+        if (wl.length === 0) {
+          setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
+        } else {
+          setScanWallets(wl)
+          setScanWalletInitial(wl[0]?.id)
+          setScanRows(rows)
+          setMessages(prev => [...prev, { role: 'assistant', content: `✅ Kebaca ${rows.length} transaksi. Cek dulu — kamu bisa pilih dompet, ubah masuk/keluar, nominal, atau kategorinya sebelum simpan.` }])
         }
-        setPendingTransaction(parsed)
-        const kind = isTransfer ? `bukti transfer (${isIncome ? 'masuk' : 'keluar'})` : 'struk'
-        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil baca ${kind} — ${data.store_name || ''}!` }])
       }
     } catch (error) {
       console.error('OCR Error:', error)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gagal baca struk. Pastikan foto jelas ya!' }])
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gagal baca gambar. Pastikan foto jelas ya!' }])
     }
     setLoading(false)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+  }
+
+  // ── SIMPAN HASIL SCAN (batch, banyak transaksi sekaligus) ──
+  const handleSaveScan = async (rows: ScanRow[], walletId: string) => {
+    if (rows.length === 0 || !walletId) return
+    setSavingScan(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setSavingScan(false); return }
+
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const bizValueByLabel = new Map(BUSINESS_CATEGORIES.map(c => [c.label, c.value]))
+
+      const payload = rows.map(r => {
+        const type: 'income' | 'expense' = r.flow === 'in' ? 'income' : 'expense'
+        const base: any = {
+          user_id: user.id,
+          wallet_id: walletId,
+          wallet_source: walletId,
+          type,
+          amount: r.amount,
+          note: r.description || '',
+          source: 'manual',
+          is_categorized: true,
+          is_wallet_transfer: false,
+          date: today,
+        }
+        if (activeMode === 'business') {
+          base.business_category = bizValueByLabel.get(r.category) || 'lainnya'
+          base.category = 'lainnya'
+        } else {
+          base.category = r.category || 'Lainnya'
+        }
+        return base
+      })
+
+      const { error } = await supabase.from('transactions').insert(payload)
+      if (error) throw error
+
+      // Update saldo dompet sekali: net = total masuk − total keluar
+      const net = rows.reduce((s, r) => s + (r.flow === 'in' ? r.amount : -r.amount), 0)
+      const { data: w } = await supabase
+        .from('user_wallets').select('current_balance').eq('id', walletId).limit(1)
+      const cur = w?.[0]?.current_balance || 0
+      await supabase.from('user_wallets').update({ current_balance: cur + net }).eq('id', walletId)
+
+      setScanRows(null)
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: `✅ ${rows.length} transaksi tersimpan! Saldo dompet diperbarui ${net >= 0 ? '+' : '−'}Rp ${Math.abs(net).toLocaleString('id-ID')}.`
+      }])
+    } catch (error: any) {
+      notify('Gagal', `Gagal menyimpan transaksi: ${error?.message || 'coba lagi ya!'}`)
+    }
+    setSavingScan(false)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+  }
+
+  const handleCancelScan = () => {
+    setScanRows(null)
+    setMessages(prev => [...prev, { role: 'assistant', content: 'Oke, hasil scan dibatalin. Ada lagi yang bisa gue bantu?' }])
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
   }
 
@@ -593,6 +650,18 @@ Return ONLY valid JSON, no markdown, no explanation.`
             onConfirm={handleSaveTransaction}
             onCancel={handleCancelTransaction}
             loading={savingTransaction}
+          />
+        )}
+        {scanRows && (
+          <ScanReviewCard
+            rows={scanRows}
+            wallets={scanWallets}
+            incomeCategories={incomeCats}
+            expenseCategories={expenseCats}
+            initialWalletId={scanWalletInitial}
+            loading={savingScan}
+            onSave={handleSaveScan}
+            onCancel={handleCancelScan}
           />
         )}
         {loading && (
