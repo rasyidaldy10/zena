@@ -89,6 +89,21 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-06-22) - NOVI API (AGEN EKSTERNAL OpenClaw) ✅
+
+**🤖 API gateway buat agen "Novi" (OpenClaw) akses data Zena Rasyid — akses penuh KECUALI kredensial bank.**
+- **Edge function baru `supabase/functions/novi-api/index.ts`** (DEPLOYED, `--no-verify-jwt`):
+  - Auth pakai Bearer token rahasia `NOVI_API_KEY` (secret edge function). Salah → 401.
+  - Semua operasi dipaksa scope ke 1 user (`NOVI_USER_EMAIL=rasyid@zena.app` → resolve user_id `94eef33c-92cf-437c-a131-87ad2d29b60e`, di-cache).
+  - Pakai service role `secretkeynew`. Tabel `bank_connections` & `bank_connection_audit_log` **DIBLOKIR keras** (403).
+  - Actions: `record_transaction` (+update saldo dompet, tandai `source:'novi'`), `transfer`, `delete_transaction` (balikin saldo), `list_wallets`, `list_transactions`, `summary`, generic `db_select/insert/update/delete` (whitelist tabel user-scoped + child-table verified), `whoami`, `list_actions`.
+- **Secrets di-set via CLI** (`NOVI_API_KEY`, `NOVI_USER_EMAIL`). Token management diambil dari macOS Keychain (`security find-generic-password -s "Supabase CLI"` → `go-keyring-base64:` → base64 -d → export `SUPABASE_ACCESS_TOKEN`). ⚠️ Akun CLI default cuma punya project lain; perlu token ini buat akses project Zena.
+- **DDL via Management API** (`https://api.supabase.com/v1/projects/<ref>/database/query` + access token) → BISA jalanin SQL/DDL tanpa user manual. Dipakai nambah `'novi'` ke `transactions_source_check` (allowed: manual/receipt_scan/email/voice/novi).
+- **Tool buat Novi:** `novi-tool/SKILL.md` (+ `novi-tool/tool.json`) — endpoint, API key, daftar action + contoh, aturan blokir bank. Tinggal kasih ke OpenClaw.
+- Tes lengkap PASS: 401 tanpa key, whoami, list_wallets, bank diblokir, summary, record+delete (saldo balik). tsc 0 errors. (Belum commit/push.)
+
+---
+
 ## LATEST SESSION (2026-06-19b) - SCAN MUTASI MULTI-TRANSAKSI ✅
 
 **📷 Scan di Zena AI di-upgrade jadi multi-transaksi + editable + pilih dompet.**

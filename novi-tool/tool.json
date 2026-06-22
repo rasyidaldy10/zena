@@ -1,0 +1,55 @@
+{
+  "name": "zena",
+  "description": "Akses data keuangan Zena milik Rasyid: catat transaksi (record_transaction), transfer, hapus transaksi (delete_transaction), lihat dompet (list_wallets), riwayat (list_transactions), ringkasan bulan (summary), serta CRUD umum (db_select/db_insert/db_update/db_delete) untuk project, invoice (documents), investasi, reminder, produk. Data kredensial bank konvensional DIBLOKIR.",
+  "endpoint": {
+    "method": "POST",
+    "url": "https://lcvenmsxauasaemjjxtc.supabase.co/functions/v1/novi-api",
+    "headers": {
+      "Authorization": "Bearer novi_31892b8bd514dfbb7ee8669767fbaee5631d7bf4b8cdf66a51e4171266ea55b4",
+      "Content-Type": "application/json"
+    },
+    "note": "Body request = objek JSON di bawah ini, dikirim apa adanya sebagai body POST."
+  },
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "record_transaction",
+          "transfer",
+          "delete_transaction",
+          "list_wallets",
+          "list_transactions",
+          "summary",
+          "db_select",
+          "db_insert",
+          "db_update",
+          "db_delete",
+          "whoami",
+          "list_actions"
+        ],
+        "description": "Operasi yang dijalankan."
+      },
+      "type": { "type": "string", "enum": ["income", "expense", "transfer"], "description": "Untuk record_transaction." },
+      "amount": { "type": "number", "description": "Nominal rupiah (angka murni, tanpa titik)." },
+      "category": { "type": "string", "description": "Kategori transaksi, mis. Makanan/Transport/Gaji." },
+      "note": { "type": "string", "description": "Keterangan bebas." },
+      "wallet_id": { "type": "string", "description": "ID dompet (paling akurat; dapatkan dari list_wallets)." },
+      "wallet_name": { "type": "string", "description": "Nama dompet (fuzzy match)." },
+      "from_wallet_id": { "type": "string" },
+      "to_wallet_id": { "type": "string" },
+      "date": { "type": "string", "description": "YYYY-MM-DD. Default hari ini (WIB)." },
+      "month": { "type": "string", "description": "YYYY-MM untuk summary." },
+      "id": { "type": "string", "description": "ID baris untuk delete/update." },
+      "table": { "type": "string", "description": "Nama tabel untuk db_*. Tabel bank diblokir." },
+      "filters": { "type": "object", "description": "Filter kolom=nilai untuk db_select." },
+      "values": { "type": "object", "description": "Data untuk db_insert/db_update." },
+      "columns": { "type": "string", "description": "Daftar kolom untuk db_select, mis. 'id,name'." },
+      "order": { "type": "string" },
+      "ascending": { "type": "boolean" },
+      "limit": { "type": "number" }
+    },
+    "required": ["action"]
+  }
+}
