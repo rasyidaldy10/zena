@@ -89,6 +89,16 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-06-28) - AKUN BARU + LOGIN SHOW-PASSWORD ✅
+
+- **Akun Zena baru `fikri@zena.app`** (pw `fikri2026`, user_id `69ab621a-11d0-46ba-a177-65e8875ea1c6`) dibuat via auth admin API + `email_confirm:true`. Cara bikin user (legacy service_role mati): ambil secret key aktif via Management API `GET /v1/projects/<ref>/api-keys?reveal=true` (pakai key `secretkeynew`), lalu `POST /auth/v1/admin/users`.
+- **Akun `oki@zena.app`** (pw `oki2026`, user_id `fa44f712-72ee-44d7-839c-350d747ff4aa`) juga dibuat — sebelumnya gagal login karena belum ada.
+- **Login show-password** di `app/(auth)/login.tsx`: state `showPassword` + tombol Ionicons `eye-outline`/`eye-off-outline`, input password dibungkus `passwordWrap`/`passwordInput`.
+- **Scan struk 2 pilihan (Kamera / Galeri) konsisten web & native:** komponen baru `components/ScanSourceSheet.tsx` (bottom sheet, pengganti Alert chooser yg mati di web). Dipasang di `app/chat.tsx` & `app/tambah-transaksi.tsx` (`handleScanStruk` buka sheet → `runScan(source)`; kamera pakai `launchCameraAsync` termasuk di web). tsc 0 errors.
+- ⚠️ Found: working-copy AGENTS.md sempat ke-reset jadi "tol" (uncommitted) — di-restore dari HEAD. Versi lengkap aman di commit 37747a8.
+
+---
+
 ## LATEST SESSION (2026-06-22) - NOVI API (AGEN EKSTERNAL OpenClaw) ✅
 
 **🤖 API gateway buat agen "Novi" (OpenClaw) akses data Zena Rasyid — akses penuh KECUALI kredensial bank.**

@@ -18,6 +18,7 @@ import ScanReviewCard, { ScanRow } from '../components/ScanReviewCard'
 import { Persona, Language, BudgetMethod, Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 import { BUSINESS_CATEGORIES } from '../constants/business'
 import { notify, confirmAsync } from '../lib/alert'
+import ScanSourceSheet from '../components/ScanSourceSheet'
 import { loadChatHistory, saveChatHistory, clearChatHistory } from '../lib/chatHistory'
 
 interface ScanWalletOpt { id: string; wallet_name: string; current_balance: number }
@@ -53,6 +54,7 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false)
   const [pendingTransaction, setPendingTransaction] = useState<ParsedTransaction | null>(null)
   const [savingTransaction, setSavingTransaction] = useState(false)
+  const [scanSheet, setScanSheet] = useState(false)
   const [scanRows, setScanRows] = useState<ScanRow[] | null>(null)
   const [scanWallets, setScanWallets] = useState<ScanWalletOpt[]>([])
   const [scanWalletInitial, setScanWalletInitial] = useState<string | undefined>(undefined)
@@ -301,38 +303,32 @@ export default function ChatScreen() {
   }
 
   // ── SCAN STRUK ──
-  const handleScanStruk = async () => {
-    const permission = await ImagePicker.requestCameraPermissionsAsync()
-    if (!permission.granted) {
-      const galleryPermission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      if (!galleryPermission.granted) {
-        Alert.alert('Izin diperlukan', 'Izin kamera atau galeri dibutuhkan.')
-        return
+  // Buka sheet pilihan (Kamera / Galeri) — konsisten di web & native
+  const handleScanStruk = () => setScanSheet(true)
+
+  const runScan = async (source: 'camera' | 'gallery') => {
+    setScanSheet(false)
+    try {
+      let result: ImagePicker.ImagePickerResult
+      if (source === 'camera') {
+        const perm = await ImagePicker.requestCameraPermissionsAsync()
+        if (!perm.granted) {
+          notify('Izin diperlukan', 'Izin kamera dibutuhkan untuk foto struk.')
+          return
+        }
+        result = await ImagePicker.launchCameraAsync({ quality: 0.8 })
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+        if (!perm.granted && Platform.OS !== 'web') {
+          notify('Izin diperlukan', 'Izin galeri dibutuhkan.')
+          return
+        }
+        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
       }
+      if (!result.canceled && result.assets?.[0]) await processStruk(result.assets[0].uri)
+    } catch {
+      notify('Gagal Buka Kamera', 'Coba pilih dari galeri/upload ya.')
     }
-
-    // Di web, Alert chooser tidak jalan + kamera browser terbatas → langsung galeri/file picker
-    if (Platform.OS === 'web') {
-      const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
-      if (!result.canceled) await processStruk(result.assets[0].uri)
-      return
-    }
-
-    Alert.alert('Scan Struk', 'Pilih sumber gambar:', [
-      {
-        text: 'Kamera', onPress: async () => {
-          const result = await ImagePicker.launchCameraAsync({ quality: 0.8 })
-          if (!result.canceled) await processStruk(result.assets[0].uri)
-        }
-      },
-      {
-        text: 'Galeri', onPress: async () => {
-          const result = await ImagePicker.launchImageLibraryAsync({ quality: 0.8 })
-          if (!result.canceled) await processStruk(result.assets[0].uri)
-        }
-      },
-      { text: 'Batal', style: 'cancel' }
-    ])
   }
 
   // Kategori sesuai mode (buat prompt + picker di kartu review)
@@ -602,6 +598,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <ScanSourceSheet visible={scanSheet} onClose={() => setScanSheet(false)} onPick={runScan} />
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>

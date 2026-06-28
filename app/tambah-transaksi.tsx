@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, ActivityIndicator,
   ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native'
 import * as ImagePicker from 'expo-image-picker'
@@ -9,6 +9,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { notify } from '../lib/alert'
+import ScanSourceSheet from '../components/ScanSourceSheet'
 import { claudeVision } from '../lib/claude'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 import { COLORS, RADIUS, SHADOW } from '../constants/theme'
@@ -160,6 +161,7 @@ export default function TambahTransaksiScreen() {
   const [productQty, setProductQty] = useState('1')
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [scanning, setScanning] = useState(false)
+  const [scanSheet, setScanSheet] = useState(false)
 
   useEffect(() => {
     fetchWallets()
@@ -248,16 +250,21 @@ export default function TambahTransaksiScreen() {
     hiburan: 'Hiburan', kesehatan: 'Kesehatan', tagihan: 'Tagihan', pendidikan: 'Pendidikan',
   }
 
-  const handleScanStruk = async () => {
+  const handleScanStruk = () => setScanSheet(true)
+
+  const runScan = async (source: 'camera' | 'gallery') => {
+    setScanSheet(false)
     try {
       let result: ImagePicker.ImagePickerResult
-      if (Platform.OS === 'web') {
-        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true })
-      } else {
+      if (source === 'camera') {
         const perm = await ImagePicker.requestCameraPermissionsAsync()
-        result = perm.granted
-          ? await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true })
-          : await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true })
+        if (!perm.granted) {
+          notify('Izin diperlukan', 'Izin kamera dibutuhkan untuk foto struk.')
+          return
+        }
+        result = await ImagePicker.launchCameraAsync({ quality: 0.7, base64: true })
+      } else {
+        result = await ImagePicker.launchImageLibraryAsync({ quality: 0.7, base64: true })
       }
       if (result.canceled || !result.assets?.[0]?.base64) return
 
@@ -522,6 +529,8 @@ Return ONLY valid JSON, tanpa markdown.`
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <ScanSourceSheet visible={scanSheet} onClose={() => setScanSheet(false)} onPick={runScan} />
+
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.closeBtn}>
           <Ionicons name="close" size={24} color={TEXT_MAIN} />

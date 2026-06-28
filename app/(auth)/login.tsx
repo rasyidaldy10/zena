@@ -3,6 +3,7 @@ import {
   View, Text, TouchableOpacity, TextInput,
   StyleSheet, Alert, ActivityIndicator, Platform, Image, KeyboardAvoidingView, ScrollView
 } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 
 const PRIMARY = '#185FA5'
@@ -10,6 +11,7 @@ const PRIMARY = '#185FA5'
 export default function LoginScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
 
   // Safety timeout: reset loading jika stuck lebih dari 8 detik
@@ -87,18 +89,32 @@ export default function LoginScreen() {
               autoCorrect={false}
               editable={!loading}
             />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#555"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              editable={!loading}
-              onSubmitEditing={handleLogin}
-            />
+            <View style={styles.passwordWrap}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Password"
+                placeholderTextColor="#555"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!loading}
+                onSubmitEditing={handleLogin}
+              />
+              <TouchableOpacity
+                style={styles.eyeBtn}
+                onPress={() => setShowPassword((v) => !v)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                  size={22}
+                  color="#888780"
+                />
+              </TouchableOpacity>
+            </View>
             <TouchableOpacity
               style={styles.submitBtn}
               onPress={handleLogin}
@@ -142,6 +158,25 @@ const styles = StyleSheet.create({
     color: '#fff',
     borderWidth: 1,
     borderColor: '#2A2A2A',
+  },
+  passwordWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    paddingRight: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    fontSize: 15,
+    color: '#fff',
+  },
+  eyeBtn: {
+    padding: 6,
   },
   submitBtn: {
     backgroundColor: PRIMARY,
