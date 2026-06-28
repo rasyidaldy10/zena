@@ -10,15 +10,16 @@ const getAuthHeader = async () => {
 
 export const claudeChat = async (
   systemPrompt: string,
-  messages: { role: 'user' | 'assistant'; content: string }[]
+  messages: { role: 'user' | 'assistant'; content: string }[],
+  opts?: { maxTokens?: number }
 ): Promise<string> => {
   const auth = await getAuthHeader()
 
-  // SPEED OPTIMIZATION: Reduce max_tokens for faster response
-  // Simple queries need ~300 tokens, complex ~800
+  // SPEED OPTIMIZATION: Reduce max_tokens for faster response.
+  // Bisa di-override (mis. ekstraksi banyak transaksi butuh output JSON panjang).
   const lastUserMsg = messages[messages.length - 1]?.content || ''
   const isSimpleQuery = lastUserMsg.length < 50
-  const maxTokens = isSimpleQuery ? 300 : 600 // Was: 1024
+  const maxTokens = opts?.maxTokens ?? (isSimpleQuery ? 300 : 600) // Was: 1024
 
   const response = await fetch(PROXY_URL, {
     method: 'POST',
@@ -29,8 +30,7 @@ export const claudeChat = async (
       system: systemPrompt,
       messages,
       // CATATAN: anthropic_version DIHAPUS dari body — itu header, bukan field
-      // body. Kalau dikirim di body, Anthropic nolak 400 "Extra inputs not
-      // permitted" -> AI selalu gagal. Edge function sudah set header-nya.
+      // body. Edge function (claude-proxy) sudah set header-nya.
     }),
   })
 

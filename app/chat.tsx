@@ -39,6 +39,15 @@ const QUICK_REPLIES = [
   'Kategori terboros aku apa?',
 ]
 
+// Hitung jumlah "nominal" di teks: dotted ribuan (50.000), shorthand (50rb/5jt), atau angka 4+ digit
+const countAmounts = (text: string): number => {
+  const m = text.match(/(\b\d{1,3}(?:[.,]\d{3})+\b)|(\b\d+\s*(?:k|rb|ribu|jt|juta)\b)|(\b\d{4,}\b)/gi)
+  return m ? m.length : 0
+}
+// Pertanyaan/analisa → jangan dianggap input transaksi
+const looksLikeQuestion = (text: string): boolean =>
+  /\?|^\s*(berapa|brp|gimana|gmn|bagaimana|kenapa|napa|apa|apakah|kapan|tips|analisa|analisis|prediksi|rekap|saran|budget|sisa)/i.test(text)
+
 export default function ChatScreen() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -176,7 +185,17 @@ export default function ChatScreen() {
     const messageText = text || input.trim()
     if (!messageText || loading) return
 
-    // Try to parse as transaction input first
+    // Banyak transaksi sekaligus / tempelan mutasi (≥2 nominal & bukan pertanyaan)
+    // → ekstrak via AI jadi banyak kartu editable
+    if (!looksLikeQuestion(messageText) && countAmounts(messageText) >= 2) {
+      setMessages(prev => [...prev, { role: 'user', content: messageText }])
+      setInput('')
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
+      await processTypedTransactions(messageText)
+      return
+    }
+
+    // Try to parse as transaction input first (single)
     const parsed = parseTransactionText(messageText, activeMode)
     if (parsed && parsed.confidence >= 0.5) {
       // Show confirmation card
@@ -339,6 +358,73 @@ export default function ChatScreen() {
     ? BUSINESS_CATEGORIES.filter(c => c.value !== 'penjualan').map(c => c.label)
     : EXPENSE_CATEGORIES
 
+  // Bangun kartu review dari array transaksi mentah (dipakai scan & input teks)
+  const presentRows = async (rawList: any[], emptyMsg: string) => {
+    const validCats = (flow: string) => (flow === 'in' ? incomeCats : expenseCats)
+    const rows: ScanRow[] = rawList
+      .map((t) => {
+        const flow: 'in' | 'out' = t?.flow === 'in' ? 'in' : 'out'
+        const amount = parseInt(String(t?.amount ?? '').replace(/[^0-9]/g, ''), 10) || 0
+        const cats = validCats(flow)
+        const category = cats.includes(t?.category) ? t.category : (cats[cats.length - 1] || 'Lainnya')
+        return { flow, amount, description: String(t?.description || '').slice(0, 120), category, include: true }
+      })
+      .filter(r => r.amount > 0)
+
+    if (rows.length === 0) {
+      setMessages(prev => [...prev, { role: 'assistant', content: emptyMsg }])
+      return
+    }
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: wallets } = await supabase
+      .from('user_wallets')
+      .select('id, wallet_name, current_balance')
+      .eq('user_id', user?.id)
+      .eq('wallet_function', activeMode)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+
+    const wl = (wallets || []) as ScanWalletOpt[]
+    if (wl.length === 0) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
+      return
+    }
+    setScanWallets(wl)
+    setScanWalletInitial(wl[0]?.id)
+    setScanRows(rows)
+    setMessages(prev => [...prev, { role: 'assistant', content: `✅ Kebaca ${rows.length} transaksi. Cek satu-satu — bisa pilih dompet, ubah masuk/keluar, nominal, kategori, batalin per item, atau simpan sekaligus.` }])
+  }
+
+  // Input TEKS dengan banyak transaksi / tempelan mutasi → ekstrak jadi banyak kartu
+  const processTypedTransactions = async (text: string) => {
+    setLoading(true)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
+    try {
+      const sys = 'Kamu mesin ekstraksi transaksi keuangan. Balas HANYA JSON valid, tanpa penjelasan.'
+      const prompt = `Dari teks user berikut, ekstrak SEMUA transaksi (bisa beberapa transaksi sekaligus, atau tempelan mutasi/riwayat rekening) ke JSON:
+{ "transactions": [ { "flow": "in" | "out", "amount": 50000, "description": "keterangan singkat", "category": "<kategori valid>" } ] }
+ATURAN:
+- "flow" = "in" kalau uang MASUK/diterima; "out" kalau uang KELUAR/dibayar.
+- "amount" = angka bersih tanpa titik/Rp. "50rb"=50000, "1jt"=1000000, "1.000.000"=1000000.
+- Pisahkan tiap transaksi jadi objek sendiri (mis. "belanja A 20rb dan B 35rb" = 2 objek).
+- ${activeMode === 'business'
+  ? `Kategori valid (income): ${incomeCats.join(', ')}. Kategori valid (expense): ${expenseCats.join(', ')}.`
+  : `Kategori untuk uang KELUAR: ${expenseCats.join(', ')}. Kategori untuk uang MASUK: ${incomeCats.join(', ')}.`}
+- Ragu kategori → "Lainnya". Abaikan baris saldo/total.
+Teks user: """${text}"""
+Return ONLY valid JSON.`
+      const result = await claudeChat(sys, [{ role: 'user', content: prompt }], { maxTokens: 1800 })
+      const clean = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const data = JSON.parse(clean)
+      const rawList: any[] = Array.isArray(data?.transactions) ? data.transactions : []
+      await presentRows(rawList, 'Hmm, belum kebaca transaksinya. Coba tulis lebih jelas ya, misal: "belanja sayur 20rb dan ayam 35rb".')
+    } catch {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Hmm, belum kebaca transaksinya. Coba tulis lebih jelas ya, misal: "belanja sayur 20rb dan ayam 35rb".' }])
+    }
+    setLoading(false)
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+  }
+
   const processStruk = async (uri: string) => {
     setLoading(true)
     setMessages(prev => [...prev, { role: 'user', content: '📷 [Mengirim foto untuk discan...]' }])
@@ -374,40 +460,7 @@ Return ONLY valid JSON, no markdown, no explanation.`
       const data = JSON.parse(cleanResult)
 
       const rawList: any[] = Array.isArray(data?.transactions) ? data.transactions : []
-      const validCats = (flow: string) => (flow === 'in' ? incomeCats : expenseCats)
-      const rows: ScanRow[] = rawList
-        .map((t) => {
-          const flow: 'in' | 'out' = t?.flow === 'in' ? 'in' : 'out'
-          const amount = parseInt(String(t?.amount ?? '').replace(/[^0-9]/g, ''), 10) || 0
-          const cats = validCats(flow)
-          const category = cats.includes(t?.category) ? t.category : (cats[cats.length - 1] || 'Lainnya')
-          return { flow, amount, description: String(t?.description || '').slice(0, 120), category, include: true }
-        })
-        .filter(r => r.amount > 0)
-
-      if (rows.length === 0) {
-        setMessages(prev => [...prev, { role: 'assistant', content: 'Hmm, gak nemu transaksi yang kebaca. Pastikan foto jelas ya — boleh struk, bukti transfer, atau mutasi rekening.' }])
-      } else {
-        // Ambil dompet untuk dipilih (sesuai mode aktif)
-        const { data: { user } } = await supabase.auth.getUser()
-        const { data: wallets } = await supabase
-          .from('user_wallets')
-          .select('id, wallet_name, current_balance')
-          .eq('user_id', user?.id)
-          .eq('wallet_function', activeMode)
-          .eq('is_active', true)
-          .order('created_at', { ascending: true })
-
-        const wl = (wallets || []) as ScanWalletOpt[]
-        if (wl.length === 0) {
-          setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
-        } else {
-          setScanWallets(wl)
-          setScanWalletInitial(wl[0]?.id)
-          setScanRows(rows)
-          setMessages(prev => [...prev, { role: 'assistant', content: `✅ Kebaca ${rows.length} transaksi. Cek dulu — kamu bisa pilih dompet, ubah masuk/keluar, nominal, atau kategorinya sebelum simpan.` }])
-        }
-      }
+      await presentRows(rawList, 'Hmm, gak nemu transaksi yang kebaca. Pastikan foto jelas ya — boleh struk, bukti transfer, atau mutasi rekening.')
     } catch (error) {
       console.error('OCR Error:', error)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, gagal baca gambar. Pastikan foto jelas ya!' }])

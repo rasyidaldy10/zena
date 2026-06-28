@@ -95,6 +95,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - **Akun `oki@zena.app`** (pw `oki2026`, user_id `fa44f712-72ee-44d7-839c-350d747ff4aa`) juga dibuat — sebelumnya gagal login karena belum ada.
 - **Login show-password** di `app/(auth)/login.tsx`: state `showPassword` + tombol Ionicons `eye-outline`/`eye-off-outline`, input password dibungkus `passwordWrap`/`passwordInput`.
 - **Scan struk 2 pilihan (Kamera / Galeri) konsisten web & native:** komponen baru `components/ScanSourceSheet.tsx` (bottom sheet, pengganti Alert chooser yg mati di web). Dipasang di `app/chat.tsx` & `app/tambah-transaksi.tsx` (`handleScanStruk` buka sheet → `runScan(source)`; kamera pakai `launchCameraAsync` termasuk di web). tsc 0 errors.
+- **Zena AI: input teks MULTI-transaksi + tempelan mutasi → banyak kartu editable.** `sendMessage` routing: kalau teks ada ≥2 nominal & bukan pertanyaan (`countAmounts`/`looksLikeQuestion`) → `processTypedTransactions` (Claude ekstrak `{transactions:[...]}`, `claudeChat` dikasih opsi `maxTokens` di `lib/claude.ts`) → reuse flow `scanRows`/`ScanReviewCard` (refactor jadi helper `presentRows`). 1 nominal → kartu tunggal lama; 0 → chat biasa. Tiap kartu bisa edit/batalin per item/simpan batch. Zena AI = Claude `claude-sonnet-4-6` via `claude-proxy`; voice = Groq.
 - ⚠️ Found: working-copy AGENTS.md sempat ke-reset jadi "tol" (uncommitted) — di-restore dari HEAD. Versi lengkap aman di commit 37747a8.
 
 ---
