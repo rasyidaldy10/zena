@@ -43,13 +43,15 @@ serve(async (req) => {
 
         const { data: todayTxns } = await admin
           .from('transactions')
-          .select('amount, type, category')
+          .select('amount, amount_idr, type, category')
           .eq('user_id', prefs.user_id)
           .eq('date', today)
           .eq('is_wallet_transfer', false)
 
-        const totalExpense = (todayTxns ?? []).filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-        const totalIncome = (todayTxns ?? []).filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+        // Transaksi valas: nilai rupiahnya di `amount_idr` (terkunci saat dicatat), bukan `amount`.
+        const idrOf = (t: { amount: number; amount_idr?: number | null }) => t.amount_idr ?? t.amount
+        const totalExpense = (todayTxns ?? []).filter(t => t.type === 'expense').reduce((s, t) => s + idrOf(t), 0)
+        const totalIncome = (todayTxns ?? []).filter(t => t.type === 'income').reduce((s, t) => s + idrOf(t), 0)
         const txnCount = (todayTxns ?? []).length
 
         // Hitung daily budget

@@ -7,6 +7,8 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { confirmAsync, notify } from '../lib/alert'
 import { WALLET_TYPE_CONFIG, WalletType } from '../types'
+import { formatMoney, parseAmountInput } from '../lib/format'
+import { isForeign } from '../lib/fx'
 
 const PRIMARY = '#185FA5'
 const COLORS = ['#185FA5', '#534AB7', '#BA7517', '#1D9E75', '#E24B4A', '#888780']
@@ -20,6 +22,7 @@ export default function EditWalletScreen() {
   const [type, setType] = useState<WalletType>('personal')
   const [walletFunction, setWalletFunction] = useState<'personal' | 'business'>('personal')
   const [balance, setBalance] = useState('')
+  const [currency, setCurrency] = useState('IDR')
   const [icon, setIcon] = useState('💵')
   const [color, setColor] = useState(PRIMARY)
   const [loading, setLoading] = useState(true)
@@ -44,7 +47,13 @@ export default function EditWalletScreen() {
       setName(data.wallet_name)
       setType(data.wallet_type || 'personal')
       setWalletFunction(data.wallet_function || 'personal')
-      setBalance(data.current_balance.toString())
+      const cur = data.currency || 'IDR'
+      setCurrency(cur)
+      setBalance(
+        cur === 'IDR'
+          ? Math.round(data.current_balance).toLocaleString('id-ID').replace(/,/g, '.')
+          : String(data.current_balance)
+      )
       setIcon(data.icon || '💵')
       setColor(data.color || PRIMARY)
     }
@@ -70,7 +79,7 @@ export default function EditWalletScreen() {
         wallet_name: name.trim(),
         wallet_type: type,
         wallet_function: walletFunction,
-        current_balance: parseFloat(balance.replace(/\./g, '')) || 0,
+        current_balance: parseBalance(),
         icon,
         color,
       })
@@ -110,11 +119,22 @@ export default function EditWalletScreen() {
     }
   }
 
+  // Rupiah dipisah ribuan pakai titik; valas pakai titik sebagai DESIMAL,
+  // jadi keduanya tidak boleh diproses dengan aturan yang sama.
+  const foreign = isForeign(currency)
+
   const formatBalance = (text: string) => {
+    if (foreign) {
+      const cleaned = text.replace(/[^\d.,]/g, '').replace(/,/g, '.')
+      const parts = cleaned.split('.')
+      setBalance(parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned)
+      return
+    }
     const numbers = text.replace(/\D/g, '')
-    const formatted = numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-    setBalance(formatted)
+    setBalance(numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.'))
   }
+
+  const parseBalance = (): number => parseAmountInput(balance)
 
   if (loading) {
     return (
@@ -143,7 +163,7 @@ export default function EditWalletScreen() {
           <Text style={styles.previewIcon}>{icon}</Text>
           <Text style={styles.previewName}>{name || 'Nama Dompet'}</Text>
           <Text style={styles.previewBalance}>
-            Rp {balance ? parseFloat(balance.replace(/\./g, '')).toLocaleString('id-ID') : '0'}
+            {formatMoney(parseBalance(), currency)}
           </Text>
         </View>
 

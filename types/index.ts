@@ -46,7 +46,14 @@ export interface UserWallet {
   wallet_name: string
   wallet_type: WalletType
   wallet_function?: WalletFunction
+  /** Saldo dalam mata uang dompet ini (bukan selalu rupiah — lihat `currency`) */
   current_balance: number
+  /** ISO 4217. 'IDR' = dompet rupiah biasa */
+  currency?: string
+  /** Dompet induk, supaya dompet valas tampil nempel di rekening yang sama */
+  parent_wallet_id?: string | null
+  /** Kurs rata-rata tertimbang saat memperoleh valas (buat hitung untung/rugi) */
+  avg_buy_rate?: number | null
   bank_name?: string
   last_4_digits?: string
   color: string
@@ -64,7 +71,14 @@ export type BusinessCategory =
 export interface Transaction {
   id: string
   user_id: string
+  /** Nominal dalam mata uang transaksi (lihat `currency`) */
   amount: number
+  /** ISO 4217 mata uang transaksi. Default 'IDR' */
+  currency?: string
+  /** Nilai rupiah TERKUNCI pakai kurs saat transaksi — ini yang dipakai semua laporan */
+  amount_idr?: number
+  /** Kurs yang dipakai saat transaksi (1 unit valas = berapa rupiah) */
+  fx_rate?: number | null
   type: TransactionType
   category: string
   wallet_source: string

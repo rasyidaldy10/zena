@@ -14,6 +14,8 @@ import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
 import { setAppMode } from '../../lib/modeStore'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 import PortfolioWidget from '../../components/PortfolioWidget'
+import { formatMoney, formatDelta } from '../../lib/format'
+import { getRates, toIDR, dailyMovement, isForeign, type FxRateMap } from '../../lib/fx'
 
 // Design system v2
 const PRIMARY = COLORS.primary       // #1763D6
@@ -42,6 +44,7 @@ export default function HomeScreen() {
   const [activeMode, setActiveMode] = useState<TabMode>('personal')
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [rincianExpanded, setRincianExpanded] = useState(false)
+  const [rates, setRates] = useState<FxRateMap>({})
   const [showCEOWelcome, setShowCEOWelcome] = useState(false)
   const channelRef = useRef<any>(null)
   const [businessStats, setBusinessStats] = useState({
@@ -71,9 +74,16 @@ export default function HomeScreen() {
 
     const prefsObj = (Array.isArray(p) ? p[0] : p) as UserPreferences | undefined
     setPrefs(prefsObj as UserPreferences)
-    setWallets((w ?? []) as UserWallet[])
+    const walletList = (w ?? []) as UserWallet[]
+    setWallets(walletList)
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
+
+    // Kurs cuma diambil kalau user memang punya dompet valas
+    const foreignCodes = [...new Set(walletList.map(x => x.currency).filter(isForeign))] as string[]
+    if (foreignCodes.length > 0) {
+      getRates(foreignCodes).then(setRates).catch(() => { /* saldo valas tampil apa adanya */ })
+    }
 
     // Set active mode from preferences
     if (prefsObj?.active_mode) {
@@ -197,15 +207,33 @@ export default function HomeScreen() {
     }
   }
 
-  const getBalance = () => {
-    if (activeMode === 'personal') {
-      return wallets.filter(w => w.wallet_function === 'personal').reduce((s, w) => s + w.current_balance, 0)
-    }
-    if (activeMode === 'business') {
-      return wallets.filter(w => w.wallet_function === 'business').reduce((s, w) => s + w.current_balance, 0)
-    }
-    return 0
-  }
+  // Saldo dompet valas dikonversi ke rupiah pakai kurs BELI bank — nilai yang
+  // benar-benar kita terima kalau dicairkan hari ini. Kalau kursnya belum
+  // termuat, dompet itu dilewati (lebih baik kurang dari mengarang angka).
+  const walletValueIDR = (w: UserWallet): number =>
+    isForeign(w.currency) ? (toIDR(w.current_balance, w.currency!, rates) ?? 0) : w.current_balance
+
+  const modeWallets = wallets.filter(w => w.wallet_function === activeMode)
+
+  const getBalance = () => modeWallets.reduce((s, w) => s + walletValueIDR(w), 0)
+
+  // Dompet valas yang kursnya belum termuat ikut jadi 0 di total. Tanpa penanda,
+  // user cuma lihat total yang diam-diam kurang — jadi hitung berapa yang belum
+  // terkonversi supaya bisa diberi tahu.
+  const unconvertedCount = modeWallets.filter(
+    w => isForeign(w.currency) && w.current_balance !== 0 &&
+         toIDR(w.current_balance, w.currency!, rates) === null
+  ).length
+
+  // Gerak nilai rupiah seluruh saldo valas sejak kurs terakhir
+  const fxDailyTotal = modeWallets
+    .filter(w => isForeign(w.currency))
+    .reduce<{ delta: number; hasData: boolean }>((acc, w) => {
+      const mv = dailyMovement(w.current_balance, w.currency!, rates)
+      return mv
+        ? { delta: acc.delta + mv.amountIDR, hasData: true }
+        : acc
+    }, { delta: 0, hasData: false })
 
   // Calculate streak
   const calcStreak = (txns: Transaction[]): number => {
@@ -338,6 +366,32 @@ export default function HomeScreen() {
                 <Ionicons name="trending-up" size={13} color={INCOME_COLOR} />
                 <Text style={styles.balanceChange}>12% bulan ini</Text>
               </View>
+              {/* Gerak nilai valas hari ini — hanya muncul kalau punya dompet valas
+                  DAN sudah ada snapshot kurs hari sebelumnya buat dibandingkan */}
+              {balanceVisible && fxDailyTotal.hasData && fxDailyTotal.delta !== 0 && (
+                <View style={styles.balanceChangeRow}>
+                  <Ionicons
+                    name={fxDailyTotal.delta > 0 ? 'arrow-up' : 'arrow-down'}
+                    size={12}
+                    color={fxDailyTotal.delta > 0 ? INCOME_COLOR : EXPENSE_COLOR}
+                  />
+                  <Text style={[
+                    styles.balanceChange,
+                    { color: fxDailyTotal.delta > 0 ? INCOME_COLOR : EXPENSE_COLOR },
+                  ]}>
+                    {formatDelta(fxDailyTotal.delta)} valas hari ini
+                  </Text>
+                </View>
+              )}
+              {/* Total di atas belum lengkap — jangan sampai user mengira itu angka penuh */}
+              {balanceVisible && unconvertedCount > 0 && (
+                <View style={styles.balanceChangeRow}>
+                  <Ionicons name="alert-circle-outline" size={12} color={EXPENSE_COLOR} />
+                  <Text style={[styles.balanceChange, { color: EXPENSE_COLOR }]}>
+                    {unconvertedCount} dompet valas belum terhitung (kurs gagal dimuat)
+                  </Text>
+                </View>
+              )}
             </View>
             <View style={{ alignItems: 'flex-end', justifyContent: 'space-between', alignSelf: 'stretch' }}>
               <TouchableOpacity
@@ -362,17 +416,58 @@ export default function HomeScreen() {
               dengan Total Saldo (personal mode → wallet pribadi, dst) */}
           {rincianExpanded && (
             <View style={styles.walletList}>
-              {wallets.filter(w => w.wallet_function === activeMode).map(w => (
-                <View key={w.id} style={styles.walletItem}>
-                  <Text style={styles.walletIcon}>{w.icon}</Text>
-                  <View style={styles.walletInfo}>
-                    <Text style={styles.walletName}>{w.wallet_name}</Text>
-                    <Text style={styles.walletType}>{w.wallet_type}</Text>
-                  </View>
-                  <Text style={styles.walletBalance}>Rp {w.current_balance.toLocaleString('id-ID')}</Text>
-                </View>
-              ))}
-              {wallets.filter(w => w.wallet_function === activeMode).length === 0 && (
+              {(() => {
+                const visible = modeWallets
+                const childrenOf = (id: string) => visible.filter(w => w.parent_wallet_id === id)
+                // Dompet valas yang punya induk ditampilkan menjorok di bawah induknya,
+                // bukan sebagai kartu terpisah, supaya terbaca sebagai satu rekening.
+                const roots = visible.filter(
+                  w => !w.parent_wallet_id || !visible.some(p => p.id === w.parent_wallet_id)
+                )
+
+                const renderWallet = (w: UserWallet, isChild: boolean) => {
+                  const foreign = isForeign(w.currency)
+                  const idrValue = foreign ? toIDR(w.current_balance, w.currency!, rates) : null
+                  const move = foreign ? dailyMovement(w.current_balance, w.currency!, rates) : null
+                  return (
+                    <View key={w.id}>
+                      <View style={[styles.walletItem, isChild && styles.walletItemChild]}>
+                        {isChild && <View style={styles.walletChildBar} />}
+                        <Text style={styles.walletIcon}>{w.icon}</Text>
+                        <View style={styles.walletInfo}>
+                          <Text style={styles.walletName}>{w.wallet_name}</Text>
+                          <Text style={styles.walletType}>
+                            {foreign ? w.currency : w.wallet_type}
+                          </Text>
+                        </View>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={styles.walletBalance}>
+                            {formatMoney(w.current_balance, w.currency)}
+                          </Text>
+                          {foreign && (
+                            <Text style={styles.walletSubBalance}>
+                              {idrValue !== null ? `≈ ${formatMoney(idrValue)}` : 'kurs belum termuat'}
+                            </Text>
+                          )}
+                          {move && move.direction !== 'flat' && (
+                            <Text style={[
+                              styles.walletDelta,
+                              { color: move.direction === 'up' ? INCOME_COLOR : EXPENSE_COLOR },
+                            ]}>
+                              {move.direction === 'up' ? '▲' : '▼'} {formatDelta(move.amountIDR)}
+                              {' '}({move.percent > 0 ? '+' : ''}{move.percent.toFixed(2)}%)
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      {childrenOf(w.id).map(c => renderWallet(c, true))}
+                    </View>
+                  )
+                }
+
+                return roots.map(w => renderWallet(w, false))
+              })()}
+              {modeWallets.length === 0 && (
                 <Text style={styles.walletEmptyHint}>
                   {activeMode === 'business'
                     ? 'Belum ada dompet bisnis. Tambah di Profil (pilih "Bisnis").'
@@ -624,7 +719,7 @@ export default function HomeScreen() {
                   <Text style={styles.txnDate}>{new Date(txn.date).toLocaleDateString('id-ID')}</Text>
                 </View>
                 <Text style={[styles.txnAmount, { color: txn.type === 'income' ? INCOME_COLOR : EXPENSE_COLOR }]}>
-                  {txn.type === 'income' ? '+' : '-'}Rp {txn.amount.toLocaleString('id-ID')}
+                  {txn.type === 'income' ? '+' : '-'}{formatMoney(txn.amount, txn.currency)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -694,6 +789,10 @@ const styles = StyleSheet.create({
   walletList: { marginTop: 16, gap: 12 },
   walletEmptyHint: { fontSize: 12, color: '#888780', lineHeight: 18, paddingVertical: 4 },
   walletItem: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  walletItemChild: { paddingLeft: 8, marginTop: 12 },
+  walletChildBar: { width: 2, height: 28, borderRadius: 1, backgroundColor: BORDER, marginRight: 2 },
+  walletSubBalance: { fontSize: 11, color: TEXT_SECONDARY, marginTop: 2 },
+  walletDelta: { fontSize: 10, fontWeight: '600', marginTop: 1 },
   walletIcon: { fontSize: 24 },
   walletInfo: { flex: 1 },
   walletName: { fontSize: 14, fontWeight: '600', color: TEXT_MAIN },

@@ -11,7 +11,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { UserWallet } from '../types'
 import { COLORS } from '../constants/theme'
-import { formatRupiah } from '../lib/format'
+import { formatMoney } from '../lib/format'
 
 interface Props {
   visible: boolean
@@ -66,7 +66,7 @@ export default function ModalPilihWallet({ visible, onClose, onSelect }: Props) 
             )}
           </View>
         </View>
-        <Text style={styles.walletBalance}>{formatRupiah(item.current_balance)}</Text>
+        <Text style={styles.walletBalance}>{formatMoney(item.current_balance, item.currency)}</Text>
       </TouchableOpacity>
     )
   }

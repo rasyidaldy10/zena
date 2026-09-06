@@ -13,6 +13,7 @@ import { getContextualSystemPrompt } from '../lib/personas'
 import { speak, stopSpeaking } from '../lib/speech'
 import { processVoiceNote } from '../lib/groq'
 import { parseTransactionText, ParsedTransaction } from '../lib/transaction-parser'
+import { amountInIDR } from '../lib/format'
 import TransactionConfirmCard from '../components/TransactionConfirmCard'
 import ScanReviewCard, { ScanRow } from '../components/ScanReviewCard'
 import { Persona, Language, BudgetMethod, Transaction, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
@@ -116,7 +117,7 @@ export default function ChatScreen() {
     if (income > 0 && txns.length > 0) {
       const currentMonth = new Date().toISOString().slice(0, 7)
       const thisMonthTxns = txns.filter(t => !t.is_wallet_transfer && t.date?.startsWith(currentMonth))
-      const totalExp = thisMonthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
+      const totalExp = thisMonthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + amountInIDR(t), 0)
 
       if (totalExp > 0) {
         const pct = Math.round((totalExp / income) * 100)
@@ -248,17 +249,20 @@ export default function ChatScreen() {
     }
 
     try {
-      // Ambil dompet pertama sesuai mode (sekalian saldo buat update current_balance)
+      // Ambil dompet pertama sesuai mode (sekalian saldo buat update current_balance).
+      // Dibatasi ke dompet RUPIAH: nominal dari chat/voice selalu dalam rupiah,
+      // jadi kalau nyasar ke dompet valas, "Rp 50.000" akan memotong 50.000 dolar.
       const { data: wallets } = await supabase
         .from('user_wallets')
         .select('id, current_balance')
         .eq('user_id', user.id)
         .eq('wallet_function', activeMode)
         .eq('is_active', true)
+        .or('currency.eq.IDR,currency.is.null')
         .limit(1)
 
       if (!wallets || wallets.length === 0) {
-        notify('Oops', `Kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dulu ya!`)
+        notify('Oops', `Kamu belum punya dompet rupiah ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dulu ya!`)
         setPendingTransaction(null)
         setSavingTransaction(false)
         return
@@ -278,6 +282,8 @@ export default function ChatScreen() {
         wallet_source: wallet.id,
         type: txnType,
         amount: pendingTransaction.amount,
+        currency: 'IDR',
+        amount_idr: pendingTransaction.amount,
         category: pendingTransaction.type === 'personal' ? (pendingTransaction.category || 'lainnya') : 'lainnya',
         business_category: pendingTransaction.type === 'business' ? pendingTransaction.business_category : null,
         note: pendingTransaction.description || '',
@@ -376,17 +382,20 @@ export default function ChatScreen() {
       return
     }
     const { data: { user } } = await supabase.auth.getUser()
+    // Hasil scan struk/mutasi selalu dalam rupiah, jadi hanya tawarkan dompet
+    // rupiah — memilih dompet valas akan memotong saldo dalam satuan yang salah.
     const { data: wallets } = await supabase
       .from('user_wallets')
       .select('id, wallet_name, current_balance')
       .eq('user_id', user?.id)
       .eq('wallet_function', activeMode)
       .eq('is_active', true)
+      .or('currency.eq.IDR,currency.is.null')
       .order('created_at', { ascending: true })
 
     const wl = (wallets || []) as ScanWalletOpt[]
     if (wl.length === 0) {
-      setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
+      setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet rupiah ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
       return
     }
     setScanWallets(wl)
@@ -488,6 +497,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
           wallet_source: walletId,
           type,
           amount: r.amount,
+          currency: 'IDR',
+          amount_idr: r.amount,
           note: r.description || '',
           source: 'manual',
           is_categorized: true,

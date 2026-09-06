@@ -13,6 +13,8 @@ import ScanSourceSheet from '../components/ScanSourceSheet'
 import { claudeVision } from '../lib/claude'
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 import { COLORS, RADIUS, SHADOW } from '../constants/theme'
+import { formatMoney, formatDelta, parseAmountInput } from '../lib/format'
+import { getRates, isForeign, currencyMeta, weightedAvgRate, type FxRateMap } from '../lib/fx'
 
 const PRIMARY = COLORS.primary
 const GREEN = COLORS.income
@@ -43,6 +45,8 @@ type Wallet = {
   icon: string
   color: string
   current_balance: number
+  currency?: string
+  avg_buy_rate?: number | null
 }
 
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des']
@@ -162,12 +166,31 @@ export default function TambahTransaksiScreen() {
   const [showProductPicker, setShowProductPicker] = useState(false)
   const [scanning, setScanning] = useState(false)
   const [scanSheet, setScanSheet] = useState(false)
+  const [rates, setRates] = useState<FxRateMap>({})
+  const [rateInput, setRateInput] = useState('')       // kurs yang dipakai mengunci nilai rupiah
+  const [receiveAmount, setReceiveAmount] = useState('') // sisi tujuan saat tukar valas
 
   useEffect(() => {
     fetchWallets()
     fetchProjects()
     fetchProducts()
+    getRates().then(setRates).catch(() => { /* form tetap jalan; valas dicegah di handleSave */ })
   }, [])
+
+  // --- valas ---
+  const walletData    = wallets.find(w => w.id === selectedWallet)
+  const txCurrency    = walletData?.currency || 'IDR'
+  const foreignTx     = isForeign(txCurrency)
+  const txMeta        = currencyMeta(txCurrency)
+  // Nilai saldo (dan karenanya nilai transaksi) memakai kurs BELI bank, sama
+  // seperti cara Home menilai saldo — supaya angka di dua layar tidak beda.
+  const defaultRate   = rates[txCurrency]?.buy ?? null
+  const effectiveRate = parseAmountInput(rateInput) || defaultRate || 0
+  const nominalInput  = parseAmountInput(amount)
+  const previewIDR    = foreignTx ? nominalInput * effectiveRate : nominalInput
+
+  // Ganti dompet -> kurs ikut ganti; kosongkan supaya tidak terbawa kurs mata uang lain
+  useEffect(() => { setRateInput('') }, [selectedWallet])
 
   // Auto-select project from query param
   useEffect(() => {
@@ -198,7 +221,7 @@ export default function TambahTransaksiScreen() {
     const [{ data }, { data: prefsRows }] = await Promise.all([
       supabase
         .from('user_wallets')
-        .select('id, wallet_name, wallet_function, icon, color, current_balance')
+        .select('id, wallet_name, wallet_function, icon, color, current_balance, currency, avg_buy_rate')
         .eq('user_id', user?.id)
         .eq('is_active', true),
       supabase
@@ -348,9 +371,16 @@ Return ONLY valid JSON, tanpa markdown.`
       return
     }
 
+    // Transaksi valas butuh kurs untuk mengunci nilai rupiahnya. Tanpa kurs,
+    // laporan akan menganggap "50" itu Rp 50 — jadi lebih baik ditolak.
+    if (foreignTx && type !== 'transfer' && !(effectiveRate > 0)) {
+      notify('Kurs Belum Ada', `Kurs ${txCurrency} belum termuat, jadi nilai rupiahnya belum bisa dihitung. Coba lagi sebentar atau isi kurs manual.`)
+      return
+    }
+
     setLoading(true)
     const { data: { user } } = await supabase.auth.getUser()
-    const nominal = parseFloat(amount.replace(/\./g, ''))
+    const nominal = parseAmountInput(amount)
 
     if (type === 'transfer') {
       const fromWalletData = wallets.find(w => w.id === selectedWallet)
@@ -363,7 +393,33 @@ Return ONLY valid JSON, tanpa markdown.`
       }
 
       if (fromWalletData.current_balance < nominal) {
-        notify('Saldo Tidak Cukup', `Saldo ${fromWalletData.wallet_name}: ${formatRupiah(fromWalletData.current_balance)}`)
+        notify('Saldo Tidak Cukup', `Saldo ${fromWalletData.wallet_name}: ${formatMoney(fromWalletData.current_balance, fromWalletData.currency)}`)
+        setLoading(false)
+        return
+      }
+
+      // Tukar valas: dompet asal & tujuan beda mata uang, jadi kedua kaki
+      // transfer punya NOMINAL BERBEDA (mis. keluar Rp 1.180.000, masuk S$100).
+      // Nilai rupiahnya sama supaya laporan tetap seimbang.
+      const fromCur   = fromWalletData.currency || 'IDR'
+      const toCur     = toWalletData.currency || 'IDR'
+      const isExchange = fromCur !== toCur
+      const received  = isExchange ? parseAmountInput(receiveAmount) : nominal
+
+      if (isExchange && !(received > 0)) {
+        notify('Oops', `Isi jumlah ${toCur} yang kamu terima`)
+        setLoading(false)
+        return
+      }
+
+      // Kurs riil transaksi = perbandingan kedua sisi, jadi spread & biaya bank
+      // ikut terhitung tanpa perlu kolom biaya terpisah.
+      const idrValue = isExchange
+        ? (fromCur === 'IDR' ? nominal : received)   // sisi rupiah adalah nilai rupiahnya
+        : (isForeign(fromCur) ? nominal * effectiveRate : nominal)
+
+      if (isExchange && fromCur !== 'IDR' && toCur !== 'IDR') {
+        notify('Belum Didukung', 'Tukar langsung antar dua mata uang asing belum bisa. Tukar ke rupiah dulu ya.')
         setLoading(false)
         return
       }
@@ -374,6 +430,9 @@ Return ONLY valid JSON, tanpa markdown.`
       const { data: expenseTxn, error: e1 } = await supabase.from('transactions').insert({
         user_id: user?.id,
         amount: nominal,
+        currency: fromCur,
+        amount_idr: idrValue,
+        fx_rate: isForeign(fromCur) ? idrValue / nominal : null,
         type: 'expense',
         category: 'Transfer',
         note: `Transfer ke ${toWalletData.wallet_name}${note ? ' · ' + note : ''}`,
@@ -390,7 +449,10 @@ Return ONLY valid JSON, tanpa markdown.`
 
       const { error: e2 } = await supabase.from('transactions').insert({
         user_id: user?.id,
-        amount: nominal,
+        amount: received,
+        currency: toCur,
+        amount_idr: idrValue,
+        fx_rate: isForeign(toCur) ? idrValue / received : null,
         type: 'income',
         category: 'Transfer',
         note: `Transfer dari ${fromWalletData.wallet_name}${note ? ' · ' + note : ''}`,
@@ -406,13 +468,40 @@ Return ONLY valid JSON, tanpa markdown.`
 
       if (e2) { notify('Gagal', e2.message); setLoading(false); return }
 
-      await supabase.from('user_wallets').update({ current_balance: fromWalletData.current_balance - nominal }).eq('id', selectedWallet)
-      await supabase.from('user_wallets').update({ current_balance: toWalletData.current_balance + nominal }).eq('id', toWallet)
+      await supabase.from('user_wallets')
+        .update({ current_balance: fromWalletData.current_balance - nominal })
+        .eq('id', selectedWallet)
+
+      // Beli valas: kurs rata-rata perolehan dompet tujuan dihitung ulang.
+      const toUpdate: Record<string, unknown> = { current_balance: toWalletData.current_balance + received }
+      let realized: number | null = null
+      if (isExchange && isForeign(toCur)) {
+        toUpdate.avg_buy_rate = weightedAvgRate(
+          toWalletData.current_balance, toWalletData.avg_buy_rate, received, idrValue / received
+        )
+      }
+      // Jual valas: kurs rata-rata TIDAK berubah (metode average cost); yang
+      // terjadi adalah untung/rugi terealisasi sebesar selisih dengan modal.
+      if (isExchange && isForeign(fromCur) && fromWalletData.avg_buy_rate) {
+        realized = idrValue - nominal * fromWalletData.avg_buy_rate
+      }
+      await supabase.from('user_wallets').update(toUpdate).eq('id', toWallet)
 
       setLoading(false)
       router.replace('/(tabs)')
       setTimeout(() => {
-        notify('Transfer Berhasil! 🔄', `${formatRupiah(nominal)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`)
+        if (isExchange) {
+          const kurs = fromCur === 'IDR' ? nominal / received : idrValue / nominal
+          const cuan = realized !== null && Math.abs(realized) >= 1
+            ? `\n\n${realized > 0 ? '🎉 Cuan' : '📉 Rugi'} ${formatDelta(realized)} terealisasi.`
+            : ''
+          notify(
+            'Tukar Valas Berhasil! 💱',
+            `${formatMoney(nominal, fromCur)} → ${formatMoney(received, toCur)}\nKurs ${formatMoney(kurs)} per ${fromCur === 'IDR' ? toCur : fromCur}${cuan}`
+          )
+        } else {
+          notify('Transfer Berhasil! 🔄', `${formatMoney(nominal, fromCur)} berhasil dipindahkan dari ${fromWalletData.wallet_name} ke ${toWalletData.wallet_name}`)
+        }
       }, 300)
       return
     } else {
@@ -435,10 +524,17 @@ Return ONLY valid JSON, tanpa markdown.`
         }
       }
 
+      // Nilai rupiah DIKUNCI di sini. Semua laporan membaca amount_idr, jadi
+      // angka bulan lalu tidak ikut bergerak saat kurs berubah.
+      const amountIDR = foreignTx ? nominal * effectiveRate : nominal
+
       // Catatan: kolom wallet_function ADA di tabel wallets, BUKAN transactions.
       const { data: txn, error } = await supabase.from('transactions').insert({
         user_id: user?.id,
         amount: nominal,
+        currency: txCurrency,
+        amount_idr: amountIDR,
+        fx_rate: foreignTx ? effectiveRate : null,
         type,
         category,
         note,
@@ -484,16 +580,27 @@ Return ONLY valid JSON, tanpa markdown.`
       }
 
       if (wallet) {
+        // Saldo dompet selalu dalam mata uangnya sendiri, jadi pakai nominal asli.
         const newBalance = type === 'income'
           ? wallet.current_balance + nominal
           : wallet.current_balance - nominal
-        await supabase.from('user_wallets').update({ current_balance: newBalance }).eq('id', selectedWallet)
+
+        const update: Record<string, unknown> = { current_balance: newBalance }
+        // Valas masuk = menambah kepemilikan valas, jadi kurs rata-rata perolehan
+        // dihitung ulang tertimbang — sama seperti "Tambah Posisi" di investasi.
+        if (foreignTx && type === 'income') {
+          update.avg_buy_rate = weightedAvgRate(
+            wallet.current_balance, wallet.avg_buy_rate, nominal, effectiveRate
+          )
+        }
+        await supabase.from('user_wallets').update(update).eq('id', selectedWallet)
       }
 
-      // Trigger agents (fire and forget — tidak blok UI)
+      // Trigger agents (fire and forget — tidak blok UI).
+      // Kirim nilai rupiah: budget & anomali dibandingkan terhadap angka rupiah.
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          triggerAgents(session.access_token, { amount: nominal, type, category, note: note || '' })
+          triggerAgents(session.access_token, { amount: amountIDR, type, category, note: note || '' })
         }
       })
 
@@ -512,15 +619,20 @@ Return ONLY valid JSON, tanpa markdown.`
     setLoading(false)
   }
 
-  const formatAmount = (text: string) => {
+  // Rupiah: titik = pemisah ribuan. Valas: titik/koma = desimal (S$ 100,50).
+  // Dua aturan ini tidak boleh dicampur — lihat parseAmountInput di lib/format.
+  const formatMoneyInput = (text: string, currency: string): string => {
+    if (isForeign(currency)) {
+      const cleaned = text.replace(/[^\d.,]/g, '').replace(/,/g, '.')
+      const parts = cleaned.split('.')
+      return parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned
+    }
     const numbers = text.replace(/\D/g, '')
-
-    // Prevent leading zeros (e.g., "0123" → "123", "00" → "0")
     const cleaned = numbers.replace(/^0+/, '') || (numbers ? '0' : '')
-
-    const formatted = cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-    setAmount(formatted)
+    return cleaned.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
   }
+
+  const formatAmount = (text: string) => setAmount(formatMoneyInput(text, txCurrency))
 
   const typeColor = type === 'expense' ? RED : type === 'income' ? GREEN : PURPLE
 
@@ -581,16 +693,93 @@ Return ONLY valid JSON, tanpa markdown.`
 
         {/* Amount */}
         <View style={[styles.amountWrap, { borderColor: typeColor }]}>
-          <Text style={styles.amountPrefix}>Rp</Text>
+          <Text style={styles.amountPrefix}>{txMeta.symbol}</Text>
           <TextInput
             style={styles.amountInput}
-            placeholder="0"
+            placeholder={foreignTx ? '0,00' : '0'}
             placeholderTextColor="#444"
             value={amount}
             onChangeText={formatAmount}
             keyboardType="numeric"
           />
         </View>
+
+        {/* Konversi + kurs — hanya untuk transaksi non-transfer di dompet valas */}
+        {foreignTx && type !== 'transfer' && (
+          <View style={styles.fxPanel}>
+            <View style={styles.fxPanelRow}>
+              <Text style={styles.fxPanelLabel}>Nilai rupiah</Text>
+              <Text style={styles.fxPanelValue}>
+                {effectiveRate > 0 ? `≈ ${formatMoney(previewIDR)}` : 'kurs belum termuat'}
+              </Text>
+            </View>
+            <View style={styles.fxPanelRow}>
+              <Text style={styles.fxPanelLabel}>Kurs</Text>
+              <View style={styles.fxRateInputWrap}>
+                <Text style={styles.fxRatePrefix}>Rp</Text>
+                <TextInput
+                  style={styles.fxRateInput}
+                  placeholder={defaultRate ? String(Math.round(defaultRate)) : '0'}
+                  placeholderTextColor="#8A96A3"
+                  value={rateInput}
+                  onChangeText={(t) => setRateInput(t.replace(/[^\d.,]/g, ''))}
+                  keyboardType="numeric"
+                />
+              </View>
+            </View>
+            <Text style={styles.fxPanelNote}>
+              Nilai rupiah dikunci di angka ini — laporan bulan ini tidak akan berubah
+              walau kurs bergerak. Kosongkan untuk pakai kurs BCA hari ini.
+            </Text>
+          </View>
+        )}
+
+        {/* Tukar valas: sisi yang diterima di dompet tujuan */}
+        {type === 'transfer' && (() => {
+          const toW = wallets.find(w => w.id === toWallet)
+          const toCur = toW?.currency || 'IDR'
+          if (!toW || toCur === txCurrency) return null
+          const got = parseAmountInput(receiveAmount)
+          const paid = parseAmountInput(amount)
+          const kurs = got > 0 && paid > 0
+            ? (txCurrency === 'IDR' ? paid / got : paid > 0 ? got / paid : 0)
+            : 0
+          const foreignCode = txCurrency === 'IDR' ? toCur : txCurrency
+          const market = rates[foreignCode]
+          return (
+            <View style={styles.fxPanel}>
+              <Text style={styles.fxPanelTitle}>💱 Tukar {txCurrency} → {toCur}</Text>
+              <View style={styles.fxPanelRow}>
+                <Text style={styles.fxPanelLabel}>Diterima ({toCur})</Text>
+                <View style={styles.fxRateInputWrap}>
+                  <Text style={styles.fxRatePrefix}>{currencyMeta(toCur).symbol}</Text>
+                  <TextInput
+                    style={styles.fxRateInput}
+                    placeholder={isForeign(toCur) ? '0,00' : '0'}
+                    placeholderTextColor="#8A96A3"
+                    value={receiveAmount}
+                    onChangeText={(t) => setReceiveAmount(formatMoneyInput(t, toCur))}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+              {kurs > 0 && (
+                <View style={styles.fxPanelRow}>
+                  <Text style={styles.fxPanelLabel}>Kurs kamu</Text>
+                  <Text style={styles.fxPanelValue}>{formatMoney(kurs)} / {foreignCode}</Text>
+                </View>
+              )}
+              {kurs > 0 && market && (
+                <Text style={styles.fxPanelNote}>
+                  Kurs BCA hari ini: beli {formatMoney(market.buy)} / jual {formatMoney(market.sell)}.
+                </Text>
+              )}
+              <Text style={styles.fxPanelNote}>
+                Isi apa adanya sesuai mutasi bank — selisih kurs & biaya admin otomatis ikut terhitung.
+              </Text>
+            </View>
+          )
+        })()}
 
         {/* Date */}
         <Text style={styles.label}>Tanggal</Text>
@@ -916,6 +1105,25 @@ const styles = StyleSheet.create({
   },
   amountPrefix: { fontSize: 24, color: TEXT_MUTED, marginRight: 8, fontWeight: '700' },
   amountInput: { flex: 1, fontSize: 32, fontWeight: '800', color: TEXT_MAIN, paddingVertical: 16 },
+  fxPanel: {
+    backgroundColor: '#EEF4FD', borderRadius: RADIUS.md, padding: 14,
+    marginBottom: 20, borderWidth: 1, borderColor: PRIMARY + '30',
+  },
+  fxPanelTitle: { fontSize: 13, fontWeight: '700', color: PRIMARY, marginBottom: 10 },
+  fxPanelRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 8,
+  },
+  fxPanelLabel: { fontSize: 13, color: TEXT_MUTED },
+  fxPanelValue: { fontSize: 14, fontWeight: '700', color: TEXT_MAIN },
+  fxRateInputWrap: {
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff',
+    borderRadius: 8, paddingHorizontal: 10, borderWidth: 1, borderColor: PRIMARY + '30',
+    minWidth: 130,
+  },
+  fxRatePrefix: { fontSize: 12, color: TEXT_MUTED, marginRight: 6 },
+  fxRateInput: { flex: 1, fontSize: 14, fontWeight: '700', color: TEXT_MAIN, paddingVertical: 8, textAlign: 'right' },
+  fxPanelNote: { fontSize: 11, color: TEXT_MUTED, lineHeight: 16, marginTop: 4 },
   label: { fontSize: 12, fontWeight: '700', color: TEXT_MUTED, marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
   dateBtn: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',

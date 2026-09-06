@@ -35,7 +35,7 @@ serve(async (req) => {
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
     const { data: history } = await admin
       .from('transactions')
-      .select('amount')
+      .select('amount, amount_idr')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .eq('category', category)
@@ -43,7 +43,13 @@ serve(async (req) => {
       .gte('date', thirtyDaysAgo)
 
     if (history && history.length >= 3) {
-      const avg = history.reduce((s: number, t: { amount: number }) => s + t.amount, 0) / history.length
+      // `amount` di sini (parameter request) sudah nilai rupiah — dikirim oleh
+      // tambah-transaksi.tsx sebagai amount_idr. Riwayat pembanding harus rupiah
+      // juga, kalau tidak transaksi valas (nominal kecil, mis. 50) akan menyeret
+      // rata-rata turun drastis dan memicu anomali palsu untuk transaksi normal.
+      const avg = history.reduce(
+        (s: number, t: { amount: number; amount_idr?: number | null }) => s + (t.amount_idr ?? t.amount), 0
+      ) / history.length
       if (amount > avg * 3) {
         const title = '🔍 Pengeluaran Tidak Wajar'
         const message = `Pengeluaran ${category} Rp ${amount.toLocaleString('id-ID')} adalah ${Math.round(amount / avg)}x lebih besar dari rata-rata (Rp ${Math.round(avg).toLocaleString('id-ID')})`

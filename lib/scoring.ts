@@ -1,4 +1,5 @@
 import { Transaction, FinancialScore, TierName, TIER_CONFIG } from '../types'
+import { amountInIDR } from './format'
 
 export const calculateFinancialScore = (
   transactions: Transaction[],
@@ -12,7 +13,7 @@ export const calculateFinancialScore = (
   // 2. Budget adherence (25%) — pengeluaran vs income
   const totalExpense = transactions
     .filter(t => t.type === 'expense' && !t.is_wallet_transfer)
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + amountInIDR(t), 0)
 
   const budgetScore = monthlyIncome > 0
     ? Math.max(0, 100 - ((totalExpense / monthlyIncome) * 100 - 70))
@@ -21,7 +22,7 @@ export const calculateFinancialScore = (
   // 3. Saving rate (25%) — berapa persen yang ditabung
   const totalIncome = transactions
     .filter(t => t.type === 'income' && !t.is_wallet_transfer)
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + amountInIDR(t), 0)
 
   const savingRate = totalIncome > 0
     ? ((totalIncome - totalExpense) / totalIncome) * 100

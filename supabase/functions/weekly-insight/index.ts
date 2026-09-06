@@ -44,18 +44,20 @@ serve(async (req) => {
 
         const { data: txns } = await admin
           .from('transactions')
-          .select('amount, type, category, date')
+          .select('amount, amount_idr, type, category, date')
           .eq('user_id', prefs.user_id)
           .eq('is_wallet_transfer', false)
           .gte('date', sevenDaysAgo)
 
         if (!txns?.length) continue
 
-        const totalExpense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0)
-        const totalIncome = txns.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+        // Transaksi valas: nilai rupiahnya di `amount_idr` (terkunci saat dicatat), bukan `amount`.
+        const idrOf = (t: { amount: number; amount_idr?: number | null }) => t.amount_idr ?? t.amount
+        const totalExpense = txns.filter(t => t.type === 'expense').reduce((s, t) => s + idrOf(t), 0)
+        const totalIncome = txns.filter(t => t.type === 'income').reduce((s, t) => s + idrOf(t), 0)
         const byCategory: Record<string, number> = {}
         txns.filter(t => t.type === 'expense').forEach(t => {
-          byCategory[t.category] = (byCategory[t.category] ?? 0) + t.amount
+          byCategory[t.category] = (byCategory[t.category] ?? 0) + idrOf(t)
         })
         const topCat = Object.entries(byCategory).sort((a, b) => b[1] - a[1]).slice(0, 3)
           .map(([c, a]) => `${c}: Rp ${a.toLocaleString('id-ID')}`).join(', ')

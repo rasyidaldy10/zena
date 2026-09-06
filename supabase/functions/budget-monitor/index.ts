@@ -42,14 +42,18 @@ serve(async (req) => {
     const month = new Date().toISOString().slice(0, 7)
     const { data: expenses } = await admin
       .from('transactions')
-      .select('amount')
+      .select('amount, amount_idr')
       .eq('user_id', user.id)
       .eq('type', 'expense')
       .eq('is_wallet_transfer', false)
       .gte('date', `${month}-01`)
       .lte('date', `${month}-31`)
 
-    const totalExpense = (expenses ?? []).reduce((s: number, t: { amount: number }) => s + t.amount, 0)
+    // Transaksi valas menyimpan nominal aslinya di `amount` (mis. 50 untuk $50) dan
+    // nilai rupiah TERKUNCI di `amount_idr` — budget harus dibandingkan dalam rupiah.
+    const totalExpense = (expenses ?? []).reduce(
+      (s: number, t: { amount: number; amount_idr?: number | null }) => s + (t.amount_idr ?? t.amount), 0
+    )
 
     let budget = prefs.monthly_income
     const m = prefs.budget_method

@@ -5,14 +5,21 @@ import {
 import { router } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { UserWallet, InvestmentHolding, WALLET_TYPE_CONFIG } from '../types'
+import { formatMoney, formatDelta } from '../lib/format'
+import {
+  getRates, toIDR, dailyMovement, unrealizedPL, isForeign, spreadPercent, type FxRateMap,
+} from '../lib/fx'
 
 const PRIMARY = '#185FA5'
+const GAIN = '#16A06A'
+const LOSS = '#E24B4A'
 
 export default function DetailWalletScreen() {
   const [wallets, setWallets] = useState<UserWallet[]>([])
   const [holdings, setHoldings] = useState<Record<string, InvestmentHolding[]>>({})
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [rates, setRates] = useState<FxRateMap>({})
 
   useEffect(() => {
     fetchData()
@@ -30,7 +37,13 @@ export default function DetailWalletScreen() {
       .eq('is_active', true)
       .order('created_at', { ascending: true })
 
-    setWallets((w ?? []) as UserWallet[])
+    const walletList = (w ?? []) as UserWallet[]
+    setWallets(walletList)
+
+    const foreignCodes = [...new Set(walletList.map(x => x.currency).filter(isForeign))] as string[]
+    if (foreignCodes.length > 0) {
+      getRates(foreignCodes).then(setRates).catch(() => { /* tampil tanpa nilai rupiah */ })
+    }
 
     // Fetch holdings untuk wallet investasi
     const investmentWallets = (w ?? []).filter(wallet => wallet.wallet_type === 'investasi')
@@ -59,7 +72,13 @@ export default function DetailWalletScreen() {
     fetchData()
   }
 
-  const totalBalance = wallets.reduce((sum, w) => sum + w.current_balance, 0)
+  // Dompet valas dikonversi pakai kurs BELI bank (nilai cair hari ini)
+  const totalBalance = wallets.reduce(
+    (sum, w) => sum + (isForeign(w.currency)
+      ? (toIDR(w.current_balance, w.currency!, rates) ?? 0)
+      : w.current_balance),
+    0
+  )
 
   if (loading) {
     return (
@@ -123,8 +142,85 @@ export default function DetailWalletScreen() {
               <View style={styles.walletBody}>
                 <View style={styles.balanceRow}>
                   <Text style={styles.balanceLabel}>Saldo Saat Ini</Text>
-                  <Text style={styles.balanceAmount}>Rp {wallet.current_balance.toLocaleString('id-ID')}</Text>
+                  <Text style={styles.balanceAmount}>
+                    {formatMoney(wallet.current_balance, wallet.currency)}
+                  </Text>
                 </View>
+
+                {/* Blok valas: nilai rupiah, gerak harian, untung/rugi */}
+                {isForeign(wallet.currency) && (() => {
+                  const cur = wallet.currency!
+                  const rate = rates[cur]
+                  const idrValue = toIDR(wallet.current_balance, cur, rates)
+                  const move = dailyMovement(wallet.current_balance, cur, rates)
+                  const pl = unrealizedPL(wallet.current_balance, cur, wallet.avg_buy_rate, rates)
+                  const spread = spreadPercent(cur, rates)
+
+                  if (!rate) {
+                    return (
+                      <View style={styles.fxBox}>
+                        <Text style={styles.fxMuted}>
+                          Kurs belum termuat. Tarik ke bawah untuk memuat ulang.
+                        </Text>
+                      </View>
+                    )
+                  }
+
+                  return (
+                    <View style={styles.fxBox}>
+                      <View style={styles.fxRow}>
+                        <Text style={styles.fxLabel}>Nilai Rupiah</Text>
+                        <Text style={styles.fxValue}>
+                          {idrValue !== null ? formatMoney(idrValue) : '—'}
+                        </Text>
+                      </View>
+
+                      <View style={styles.fxRow}>
+                        <Text style={styles.fxLabel}>Hari Ini</Text>
+                        {move ? (
+                          <Text style={[
+                            styles.fxValue,
+                            { color: move.direction === 'up' ? GAIN : move.direction === 'down' ? LOSS : '#888780' },
+                          ]}>
+                            {move.direction === 'up' ? '▲ ' : move.direction === 'down' ? '▼ ' : ''}
+                            {formatDelta(move.amountIDR)} ({move.percent > 0 ? '+' : ''}
+                            {move.percent.toFixed(2)}%)
+                          </Text>
+                        ) : (
+                          // Butuh dua hari snapshot kurs buat bisa dibandingkan
+                          <Text style={styles.fxMuted}>belum ada pembanding</Text>
+                        )}
+                      </View>
+
+                      {pl && (
+                        <View style={styles.fxRow}>
+                          <Text style={styles.fxLabel}>Untung/Rugi</Text>
+                          <Text style={[styles.fxValue, { color: pl.amountIDR >= 0 ? GAIN : LOSS }]}>
+                            {formatDelta(pl.amountIDR)} ({pl.percent > 0 ? '+' : ''}
+                            {pl.percent.toFixed(2)}%)
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={styles.fxDivider} />
+
+                      <Text style={styles.fxNote}>
+                        Kurs BCA {cur} — beli {formatMoney(rate.buy)} / jual {formatMoney(rate.sell)}
+                        {spread ? ` · spread ${spread.toFixed(2)}%` : ''}
+                      </Text>
+                      {!!wallet.avg_buy_rate && (
+                        <Text style={styles.fxNote}>
+                          Kurs rata-rata perolehan {formatMoney(wallet.avg_buy_rate)}
+                        </Text>
+                      )}
+                      <Text style={styles.fxNote}>
+                        Nilai saldo dihitung pakai kurs beli bank — yang kamu terima kalau dicairkan
+                        sekarang.{rate.source === 'yahoo' ? ' Sumber: kurs pasar (BCA tidak terbaca).' : ''}
+                        {rate.source_time ? ` Diperbarui ${rate.source_time}.` : ''}
+                      </Text>
+                    </View>
+                  )
+                })()}
 
                 {/* Investment Holdings */}
                 {isInvestment && (
@@ -255,6 +351,19 @@ const styles = StyleSheet.create({
   balanceLabel: { fontSize: 12, color: '#888780' },
   balanceAmount: { fontSize: 18, fontWeight: '700', color: '#fff' },
   divider: { height: 0.5, backgroundColor: '#2A2A2A', marginVertical: 12 },
+  fxBox: {
+    marginTop: 12, padding: 12, borderRadius: 12,
+    backgroundColor: '#12202E', borderWidth: 1, borderColor: PRIMARY + '35',
+  },
+  fxRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 6,
+  },
+  fxLabel: { fontSize: 12, color: '#7E8B99' },
+  fxValue: { fontSize: 13, fontWeight: '700', color: '#fff' },
+  fxMuted: { fontSize: 11, color: '#7E8B99', fontStyle: 'italic' },
+  fxDivider: { height: 0.5, backgroundColor: '#2A3A4A', marginVertical: 8 },
+  fxNote: { fontSize: 10, color: '#7E8B99', lineHeight: 15, marginTop: 2 },
   holdingsTitle: {
     fontSize: 12, fontWeight: '700', color: '#888780',
     textTransform: 'uppercase', marginBottom: 8,

@@ -9,6 +9,7 @@ import { supabase } from '../../lib/supabase'
 import { Transaction, CATEGORIES, BudgetMethod } from '../../types'
 import { BUDGET_METHODS } from '../../constants'
 import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
+import { amountInIDR, formatMoney } from '../../lib/format'
 import LineChart from '../../components/LineChart'
 
 const PRIMARY = COLORS.primary
@@ -114,8 +115,8 @@ export default function LaporanScreen() {
     t => !t.is_wallet_transfer && txMode(t) === activeMode
   )
 
-  const totalIncome = realTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + t.amount, 0)
-  const totalExpense = realTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+  const totalIncome = realTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + amountInIDR(t), 0)
+  const totalExpense = realTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + amountInIDR(t), 0)
 
   // Metrik bisnis (piutang/hutang) — dari receivables pending
   const totalPiutang = receivables
@@ -134,7 +135,7 @@ export default function LaporanScreen() {
     realTransactions.forEach(t => {
       const day = parseInt(t.date.slice(8, 10)) - 1
       if (day >= 0 && day < daysInMonth) {
-        daily[day] += t.type === 'income' ? t.amount : -t.amount
+        daily[day] += t.type === 'income' ? amountInIDR(t) : -amountInIDR(t)
       }
     })
     // kumulatif
@@ -145,7 +146,7 @@ export default function LaporanScreen() {
   const formatRupiah = (amount: number) => 'Rp ' + Math.abs(amount).toLocaleString('id-ID')
 
   const getCategoryTotal = (category: string) =>
-    realTransactions.filter(t => t.category === category && t.type === 'expense').reduce((sum, t) => sum + t.amount, 0)
+    realTransactions.filter(t => t.category === category && t.type === 'expense').reduce((sum, t) => sum + amountInIDR(t), 0)
 
   const getMonthLabel = (month: string) => {
     const [year, m] = month.split('-')
@@ -177,13 +178,13 @@ export default function LaporanScreen() {
 
     const needsSpent = realTransactions
       .filter(t => t.type === 'expense' && NEEDS_CATEGORIES.includes(t.category))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + amountInIDR(t), 0)
     const wantsSpent = realTransactions
       .filter(t => t.type === 'expense' && WANTS_CATEGORIES.includes(t.category))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + amountInIDR(t), 0)
     const savingsSpent = realTransactions
       .filter(t => t.type === 'expense' && SAVINGS_CATEGORIES.includes(t.category))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + amountInIDR(t), 0)
 
     const method = BUDGET_METHODS[budgetMethod]
     if (!method) return []
@@ -469,7 +470,7 @@ Dicatat pakai Zena 🌿`
                     txn.type === 'income' ? styles.income : styles.expense,
                     txn.is_wallet_transfer && { color: '#888780' }
                   ]}>
-                    {txn.type === 'income' ? '+' : '-'}{formatRupiah(txn.amount)}
+                    {txn.type === 'income' ? '+' : '-'}{formatMoney(txn.amount, txn.currency)}
                   </Text>
                 </View>
               ))

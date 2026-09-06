@@ -8,6 +8,8 @@ import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
 import { confirmAsync, notify } from '../lib/alert'
 import { CATEGORIES, Transaction } from '../types'
+import { formatMoney, parseAmountInput } from '../lib/format'
+import { isForeign, currencyMeta } from '../lib/fx'
 
 const PRIMARY = '#185FA5'
 const GREEN = '#1D9E75'
@@ -93,6 +95,7 @@ type Wallet = {
   icon: string
   color: string
   current_balance: number
+  currency?: string
 }
 
 export default function EditTransaksiScreen() {
@@ -109,6 +112,10 @@ export default function EditTransaksiScreen() {
   const [saving, setSaving] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
 
+  // Mata uang transaksi mengikuti dompetnya; transaksi lama default rupiah.
+  const txCurrency = wallets.find(w => w.id === selectedWallet)?.currency
+    || transaction?.currency || 'IDR'
+
   useEffect(() => {
     fetchData()
   }, [id])
@@ -118,13 +125,14 @@ export default function EditTransaksiScreen() {
 
     const [{ data: txn }, { data: walletsData }] = await Promise.all([
       supabase.from('transactions').select('*').eq('id', id).single(),
-      supabase.from('user_wallets').select('id, wallet_name, icon, color, current_balance').eq('user_id', user?.id).eq('is_active', true),
+      supabase.from('user_wallets').select('id, wallet_name, icon, color, current_balance, currency').eq('user_id', user?.id).eq('is_active', true),
     ])
 
     if (txn) {
       setTransaction(txn)
       setType(txn.type === 'income' ? 'income' : 'expense')
-      setAmount(txn.amount.toLocaleString('id-ID').replace(/,/g, '.'))
+      const cur = txn.currency || 'IDR'
+      setAmount(isForeign(cur) ? String(txn.amount) : txn.amount.toLocaleString('id-ID').replace(/,/g, '.'))
       setCategory(txn.category || '')
       setNote(txn.note || '')
       setSelectedDate(txn.date || new Date().toISOString().split('T')[0])
@@ -136,6 +144,13 @@ export default function EditTransaksiScreen() {
   }
 
   const formatAmount = (text: string) => {
+    // Valas pakai titik/koma sebagai desimal; rupiah pakai titik sebagai ribuan.
+    if (isForeign(txCurrency)) {
+      const cleaned = text.replace(/[^\d.,]/g, '').replace(/,/g, '.')
+      const parts = cleaned.split('.')
+      setAmount(parts.length > 2 ? `${parts[0]}.${parts.slice(1).join('')}` : cleaned)
+      return
+    }
     const numbers = text.replace(/\D/g, '')
     setAmount(numbers.replace(/\B(?=(\d{3})+(?!\d))/g, '.'))
   }
@@ -154,8 +169,20 @@ export default function EditTransaksiScreen() {
       return
     }
 
+    // Pindah dompet lintas mata uang tidak bisa ditangani di sini: saldo lama
+    // dikembalikan dalam mata uang lama lalu dipotong dalam mata uang baru,
+    // sehingga angkanya tercampur (Rp 100.000 jadi $100.000). Tolak dengan jelas.
+    const originalCurrency = transaction?.currency || 'IDR'
+    if (txCurrency !== originalCurrency) {
+      notify(
+        'Tidak Bisa Pindah Mata Uang',
+        `Transaksi ini tercatat dalam ${originalCurrency} (${formatMoney(transaction?.amount ?? 0, originalCurrency)}), sedangkan dompet tujuan pakai ${txCurrency}. Hapus transaksi ini lalu catat ulang di dompet yang benar ya.`
+      )
+      return
+    }
+
     setSaving(true)
-    const nominal = parseFloat(amount.replace(/\./g, ''))
+    const nominal = parseAmountInput(amount)
 
     const oldWalletId = transaction?.wallet_id || transaction?.wallet_source || ''
     const oldAmount = transaction?.amount || 0
@@ -178,9 +205,17 @@ export default function EditTransaksiScreen() {
       await supabase.from('user_wallets').update({ current_balance: restored }).eq('id', oldWalletId)
     }
 
+    // Nilai rupiah dikunci ulang pakai kurs asli transaksi ini (fx_rate), bukan
+    // kurs hari ini — mengedit catatan lama tidak boleh menggeser laporan bulan itu.
+    const lockedRate = transaction?.fx_rate || null
+    const newAmountIDR = isForeign(txCurrency) && lockedRate
+      ? nominal * lockedRate
+      : nominal
+
     // Update transaksi
     const { error } = await supabase.from('transactions').update({
       amount: nominal,
+      amount_idr: newAmountIDR,
       type,
       category,
       note,
@@ -319,7 +354,7 @@ export default function EditTransaksiScreen() {
 
         {/* Amount */}
         <View style={[styles.amountWrap, { borderColor: typeColor }]}>
-          <Text style={styles.amountPrefix}>Rp</Text>
+          <Text style={styles.amountPrefix}>{currencyMeta(txCurrency).symbol}</Text>
           <TextInput
             style={styles.amountInput}
             placeholder="0"
