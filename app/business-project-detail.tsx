@@ -282,44 +282,42 @@ export default function BusinessProjectDetailScreen() {
           <Text style={styles.projectType}>{getProjectTypeLabel(project.type)}</Text>
         </View>
 
-        {/* Detail Card */}
+        {/* Detail Card — grid kompak 2 kolom, bukan baris besar satu-satu */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Detail Keuangan</Text>
 
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Nilai Kontrak</Text>
-            <Text style={styles.detailValue}>{formatRupiah(project.contract_value)}</Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Dibayar</Text>
-            <Text style={[styles.detailValue, { color: COLORS.SUCCESS }]}>
-              {formatRupiah(project.total_paid || 0)}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Sisa Piutang</Text>
-            <Text style={[styles.detailValue, { color: COLORS.WARNING }]}>
-              {formatRupiah(sisaPiutang)}
-            </Text>
+          <View style={styles.statGrid}>
+            <View style={styles.statCell}>
+              <Text style={styles.statLabel}>Nilai Kontrak</Text>
+              <Text style={styles.statValue}>{formatRupiah(project.contract_value)}</Text>
+            </View>
+            <View style={styles.statCell}>
+              <Text style={styles.statLabel}>Total Dibayar</Text>
+              <Text style={[styles.statValue, { color: COLORS.SUCCESS }]}>
+                {formatRupiah(project.total_paid || 0)}
+              </Text>
+            </View>
+            <View style={styles.statCell}>
+              <Text style={styles.statLabel}>Sisa Piutang</Text>
+              <Text style={[styles.statValue, { color: COLORS.WARNING }]}>
+                {formatRupiah(sisaPiutang)}
+              </Text>
+            </View>
+            <View style={styles.statCell}>
+              <Text style={styles.statLabel}>Total Pengeluaran</Text>
+              <Text style={[styles.statValue, { color: COLORS.DANGER }]}>
+                {formatRupiah(project.total_expense || 0)}
+              </Text>
+            </View>
           </View>
 
           <View style={styles.separator} />
 
           <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Total Pengeluaran</Text>
-            <Text style={[styles.detailValue, { color: COLORS.DANGER }]}>
-              {formatRupiah(project.total_expense || 0)}
-            </Text>
-          </View>
-
-          <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Estimasi Profit</Text>
             <Text
               style={[
-                styles.detailValue,
-                styles.detailValueLarge,
+                styles.detailValueBold,
                 { color: (project.estimated_profit || 0) >= 0 ? COLORS.SUCCESS : COLORS.DANGER },
               ]}
             >
@@ -331,8 +329,7 @@ export default function BusinessProjectDetailScreen() {
             <Text style={styles.detailLabel}>Margin</Text>
             <Text
               style={[
-                styles.detailValue,
-                styles.detailValueLarge,
+                styles.detailValueBold,
                 { color: (project.margin_pct || 0) >= 0 ? COLORS.SUCCESS : COLORS.DANGER },
               ]}
             >
@@ -364,16 +361,15 @@ export default function BusinessProjectDetailScreen() {
             <Text style={styles.emptyText}>Belum ada termin</Text>
           ) : (
             <View style={styles.termList}>
-              {terms.map((term, index) => (
+              {terms.map((term) => (
                 <View key={term.id} style={styles.termItem}>
                   <View style={styles.termLeft}>
-                    <Text style={styles.termLabel}>{term.label}</Text>
+                    <Text style={styles.termLabel} numberOfLines={1}>{term.label}</Text>
                     {term.condition_text && (
-                      <Text style={styles.termCondition}>{term.condition_text}</Text>
+                      <Text style={styles.termCondition} numberOfLines={1}>{term.condition_text}</Text>
                     )}
-                    <Text style={styles.termAmount}>{formatRupiah(term.amount)}</Text>
                   </View>
-
+                  <Text style={styles.termAmount}>{formatRupiah(term.amount)}</Text>
                   {term.paid_at ? (
                     <View style={styles.paidBadge}>
                       <Text style={styles.paidText}>✓ Lunas</Text>
@@ -383,7 +379,7 @@ export default function BusinessProjectDetailScreen() {
                       style={styles.payButton}
                       onPress={() => handleTandaiLunas(term)}
                     >
-                      <Text style={styles.payButtonText}>Tandai Lunas</Text>
+                      <Text style={styles.payButtonText}>Bayar</Text>
                     </TouchableOpacity>
                   )}
                 </View>
@@ -395,7 +391,9 @@ export default function BusinessProjectDetailScreen() {
         {/* Pengeluaran Section */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <Text style={styles.cardTitle}>Pengeluaran</Text>
+            <Text style={styles.cardTitle}>
+              Pengeluaran{expenses.length > 0 ? ` (${expenses.length})` : ''}
+            </Text>
             <TouchableOpacity
               onPress={() =>
                 router.push(`/tambah-transaksi?mode=business&project_id=${id}`)
@@ -408,21 +406,31 @@ export default function BusinessProjectDetailScreen() {
           {expenses.length === 0 ? (
             <Text style={styles.emptyText}>Belum ada pengeluaran</Text>
           ) : (
-            <View style={styles.expenseList}>
-              {expenses.slice(0, 5).map((expense) => (
-                <View key={expense.id} style={styles.expenseItem}>
-                  <View style={styles.expenseLeft}>
-                    <Text style={styles.expenseNote}>{expense.note || expense.category}</Text>
-                    <Text style={styles.expenseDate}>
-                      {new Date(expense.date).toLocaleDateString('id-ID', {
-                        day: 'numeric',
-                        month: 'short',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </View>
-                  <Text style={styles.expenseAmount}>{formatRupiah(expense.amount)}</Text>
-                </View>
+            <View style={styles.table}>
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableHeaderCell, styles.colDate]}>Tanggal</Text>
+                <Text style={[styles.tableHeaderCell, styles.colNote]}>Keterangan</Text>
+                <Text style={[styles.tableHeaderCell, styles.colAmount]}>Nominal</Text>
+              </View>
+              {expenses.map((expense) => (
+                <TouchableOpacity
+                  key={expense.id}
+                  style={styles.tableRow}
+                  onPress={() => router.push(`/edit-transaksi?id=${expense.id}`)}
+                >
+                  <Text style={[styles.tableCellDate, styles.colDate]}>
+                    {new Date(expense.date).toLocaleDateString('id-ID', {
+                      day: '2-digit',
+                      month: 'short',
+                    })}
+                  </Text>
+                  <Text style={[styles.tableCellNote, styles.colNote]} numberOfLines={1}>
+                    {expense.note || expense.category}
+                  </Text>
+                  <Text style={[styles.tableCellAmount, styles.colAmount]} numberOfLines={1}>
+                    {formatRupiah(expense.amount)}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
           )}
@@ -497,14 +505,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 8,
   },
   headerCard: {
     backgroundColor: COLORS.PRIMARY,
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 8,
   },
   headerTop: {
     flexDirection: 'row',
@@ -518,17 +526,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   projectIcon: {
-    fontSize: 32,
+    fontSize: 26,
   },
   projectName: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.WHITE,
   },
   clientName: {
-    fontSize: 14,
+    fontSize: 11,
     color: COLORS.WHITE + 'CC',
-    marginTop: 2,
+    marginTop: 1,
   },
   statusBadge: {
     paddingHorizontal: 10,
@@ -536,18 +544,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
   },
   projectType: {
-    fontSize: 13,
+    fontSize: 11,
     color: COLORS.WHITE + 'AA',
   },
   card: {
     backgroundColor: COLORS.CARD,
     borderRadius: 12,
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 6,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -555,31 +563,47 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: COLORS.TEXT,
   },
   addButton: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.PRIMARY,
+  },
+  // Grid 2 kolom buat 4 angka utama — lebih rapat daripada satu baris per angka
+  statGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  statCell: {
+    width: '50%',
+    paddingVertical: 6,
+    gap: 2,
+  },
+  statLabel: {
+    fontSize: 11,
+    color: COLORS.TEXT_LIGHT,
+  },
+  statValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.TEXT,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingVertical: 3,
   },
   detailLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: COLORS.TEXT_LIGHT,
   },
-  detailValue: {
+  detailValueBold: {
     fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.TEXT,
-  },
-  detailValueLarge: {
-    fontSize: 16,
+    fontWeight: '700',
   },
   separator: {
     height: 1,
@@ -587,8 +611,8 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   progressContainer: {
-    gap: 6,
-    marginTop: 4,
+    gap: 4,
+    marginTop: 2,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -596,18 +620,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 11,
     color: COLORS.TEXT_LIGHT,
   },
   progressPct: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.PRIMARY,
   },
   progressBarBg: {
-    height: 8,
+    height: 6,
     backgroundColor: COLORS.BORDER,
-    borderRadius: 4,
+    borderRadius: 3,
     overflow: 'hidden',
   },
   progressBarFill: {
@@ -615,79 +639,93 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.PRIMARY,
   },
   termList: {
-    gap: 12,
+    gap: 0,
   },
   termItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    gap: 8,
+    paddingVertical: 8,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.BORDER,
   },
   termLeft: {
     flex: 1,
-    gap: 4,
+    gap: 1,
   },
   termLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.TEXT,
   },
   termCondition: {
-    fontSize: 12,
+    fontSize: 10,
     color: COLORS.TEXT_LIGHT,
   },
   termAmount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.PRIMARY,
   },
   paidBadge: {
     backgroundColor: COLORS.SUCCESS + '20',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   paidText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: COLORS.SUCCESS,
   },
   payButton: {
     backgroundColor: COLORS.PRIMARY,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
   },
   payButtonText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
     color: COLORS.WHITE,
   },
-  expenseList: {
-    gap: 12,
+  // Tabel pengeluaran: 1 baris ringkas per transaksi (tanggal | keterangan | nominal)
+  table: {
+    gap: 0,
   },
-  expenseItem: {
+  tableHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
+  },
+  tableHeaderCell: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.TEXT_LIGHT,
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  tableRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.BORDER,
   },
-  expenseLeft: {
-    flex: 1,
-    gap: 4,
-  },
-  expenseNote: {
-    fontSize: 14,
-    color: COLORS.TEXT,
-  },
-  expenseDate: {
-    fontSize: 12,
+  colDate: { width: 44 },
+  colNote: { flex: 1, paddingHorizontal: 6 },
+  colAmount: { width: 98, textAlign: 'right' },
+  tableCellDate: {
+    fontSize: 11,
     color: COLORS.TEXT_LIGHT,
   },
-  expenseAmount: {
-    fontSize: 14,
+  tableCellNote: {
+    fontSize: 12,
+    color: COLORS.TEXT,
+  },
+  tableCellAmount: {
+    fontSize: 12,
     fontWeight: '600',
     color: COLORS.DANGER,
   },
