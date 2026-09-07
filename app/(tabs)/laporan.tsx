@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Share, Alert
@@ -32,6 +32,31 @@ const NEEDS_CATEGORIES = ['Makan & Minum', 'Transport', 'Tagihan', 'Kesehatan']
 const WANTS_CATEGORIES = ['Hiburan', 'Belanja', 'Lainnya', 'Biaya Admin & Fee', 'Bisnis']
 const SAVINGS_CATEGORIES = ['Tabungan', 'Investasi']
 
+type ProductSalesRow = {
+  product_id: string
+  product_name: string
+  qty_sold: number
+  total_hpp: number
+  total_sales: number
+  profit: number
+  margin_pct: number
+}
+
+type GrossProfit = {
+  total_sales: number
+  total_hpp: number
+  gross_profit: number
+  gross_margin_pct: number
+}
+
+const TAB_LABEL = {
+  ringkasan: 'Ringkasan',
+  cashflow: 'Cashflow',
+  kategori: 'Kategori',
+  laba: 'Laba Kotor',
+} as const
+type ReportTab = keyof typeof TAB_LABEL
+
 type BudgetBucket = {
   label: string
   emoji: string
@@ -51,7 +76,9 @@ export default function LaporanScreen() {
   const [activeMode, setActiveMode] = useState<'personal' | 'business'>('personal')
   const [wallets, setWallets] = useState<{ id: string; wallet_function: string }[]>([])
   const [receivables, setReceivables] = useState<{ type: string; status: string; amount: number }[]>([])
-  const [reportTab, setReportTab] = useState<'ringkasan' | 'cashflow' | 'kategori'>('ringkasan')
+  const [reportTab, setReportTab] = useState<ReportTab>('ringkasan')
+  const [grossProfit, setGrossProfit] = useState<GrossProfit | null>(null)
+  const [productSales, setProductSales] = useState<ProductSalesRow[]>([])
 
   const fetchData = async () => {
     setLoading(true)
@@ -93,13 +120,37 @@ export default function LaporanScreen() {
     if (walletRows) setWallets(walletRows)
     if (receivableRows) setReceivables(receivableRows)
     const prefs = prefsRows?.[0]
+    const mode = (prefs?.active_mode as 'personal' | 'business') || 'personal'
     if (prefs) {
       setMonthlyIncome(prefs.monthly_income || 0)
       setBudgetMethod((prefs.budget_method as BudgetMethod) || '503020')
-      setActiveMode((prefs.active_mode as 'personal' | 'business') || 'personal')
+      setActiveMode(mode)
     }
+
+    // Laba kotor hanya relevan untuk mode bisnis, jadi RPC-nya tidak dipanggil
+    // saat mode pribadi. Angkanya berasal dari transaction_items (harga jual
+    // dikurangi HPP per item), bukan dari total transaksi.
+    if (mode === 'business') {
+      const [{ data: gp }, { data: ps }] = await Promise.all([
+        supabase.rpc('get_monthly_gross_profit', { p_user_id: user?.id, p_month: m, p_year: y }),
+        supabase.rpc('get_product_sales_report', { p_user_id: user?.id, p_month: m, p_year: y }),
+      ])
+      setGrossProfit((gp?.[0] as GrossProfit) ?? null)
+      setProductSales((ps ?? []) as ProductSalesRow[])
+    } else {
+      setGrossProfit(null)
+      setProductSales([])
+    }
+
     setLoading(false)
   }
+
+  // Tab "Laba Kotor" hanya ada di mode bisnis. Kalau user pindah ke mode
+  // pribadi saat tab itu terbuka, kembalikan ke Ringkasan supaya tidak
+  // tersangkut di tab yang tombolnya sudah tidak tampil.
+  useEffect(() => {
+    if (activeMode !== 'business' && reportTab === 'laba') setReportTab('ringkasan')
+  }, [activeMode, reportTab])
 
   useFocusEffect(useCallback(() => { fetchData() }, [selectedMonth]))
 
@@ -264,17 +315,22 @@ Dicatat pakai Zena 🌿`
         </TouchableOpacity>
       </View>
 
-      {/* Tab pills */}
+      {/* Tab pills — "Laba Kotor" khusus mode bisnis */}
       <View style={styles.tabPills}>
-        {(['ringkasan', 'cashflow', 'kategori'] as const).map(tab => (
+        {((activeMode === 'business'
+            ? ['ringkasan', 'cashflow', 'kategori', 'laba']
+            : ['ringkasan', 'cashflow', 'kategori']) as ReportTab[]).map(tab => (
           <TouchableOpacity
             key={tab}
             style={[styles.tabPill, reportTab === tab && styles.tabPillActive]}
             onPress={() => setReportTab(tab)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabPillText, reportTab === tab && styles.tabPillTextActive]}>
-              {tab === 'ringkasan' ? 'Ringkasan' : tab === 'cashflow' ? 'Cashflow' : 'Kategori'}
+            <Text
+              style={[styles.tabPillText, reportTab === tab && styles.tabPillTextActive]}
+              numberOfLines={1}
+            >
+              {TAB_LABEL[tab]}
             </Text>
           </TouchableOpacity>
         ))}
@@ -442,7 +498,94 @@ Dicatat pakai Zena 🌿`
             </View>
           )}
 
-          {/* Transaction list */}
+          {/* ── Tab Laba Kotor ── */}
+          {reportTab === 'laba' && (
+            <>
+              <View style={styles.gpCard}>
+                <Text style={styles.gpTitle}>Laba Kotor {getMonthLabel(selectedMonth)}</Text>
+                <Text style={styles.gpBig}>
+                  {formatRupiah(grossProfit?.gross_profit ?? 0)}
+                </Text>
+                <View style={styles.gpMarginRow}>
+                  <Ionicons
+                    name={(grossProfit?.gross_margin_pct ?? 0) >= 0 ? 'trending-up' : 'trending-down'}
+                    size={14}
+                    color={(grossProfit?.gross_margin_pct ?? 0) >= 0 ? INCOME : EXPENSE}
+                  />
+                  <Text style={[
+                    styles.gpMargin,
+                    { color: (grossProfit?.gross_margin_pct ?? 0) >= 0 ? INCOME : EXPENSE },
+                  ]}>
+                    Margin {(grossProfit?.gross_margin_pct ?? 0).toFixed(1)}%
+                  </Text>
+                </View>
+
+                <View style={styles.gpSplit}>
+                  <View style={styles.gpSplitCell}>
+                    <Text style={styles.gpSplitLabel}>Penjualan Produk</Text>
+                    <Text style={[styles.gpSplitValue, { color: INCOME }]}>
+                      {formatRupiah(grossProfit?.total_sales ?? 0)}
+                    </Text>
+                  </View>
+                  <View style={styles.gpSplitCell}>
+                    <Text style={styles.gpSplitLabel}>Modal (HPP)</Text>
+                    <Text style={[styles.gpSplitValue, { color: EXPENSE }]}>
+                      {formatRupiah(grossProfit?.total_hpp ?? 0)}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={styles.gpNote}>
+                  Dihitung dari harga jual dikurangi HPP tiap produk yang terjual.
+                  Pengeluaran operasional tidak termasuk di sini.
+                </Text>
+              </View>
+
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Rincian per Produk</Text>
+                {productSales.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyIcon}>📦</Text>
+                    <Text style={styles.emptyText}>
+                      Belum ada penjualan produk bulan ini.{'\n'}
+                      Catat lewat Catat → Jual Produk supaya HPP ikut tersimpan.
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.gpTable}>
+                    <View style={styles.gpHeadRow}>
+                      <Text style={[styles.gpHeadCell, styles.gpColName]}>Produk</Text>
+                      <Text style={[styles.gpHeadCell, styles.gpColQty]}>Qty</Text>
+                      <Text style={[styles.gpHeadCell, styles.gpColMoney]}>Penjualan</Text>
+                      <Text style={[styles.gpHeadCell, styles.gpColMoney]}>Laba</Text>
+                    </View>
+                    {productSales.map(row => (
+                      <View key={row.product_id} style={styles.gpRow}>
+                        <View style={styles.gpColName}>
+                          <Text style={styles.gpName} numberOfLines={1}>{row.product_name}</Text>
+                          <Text style={styles.gpSub}>margin {row.margin_pct.toFixed(1)}%</Text>
+                        </View>
+                        <Text style={[styles.gpCell, styles.gpColQty]}>{row.qty_sold}</Text>
+                        <Text style={[styles.gpCell, styles.gpColMoney]} numberOfLines={1}>
+                          {formatRupiah(row.total_sales)}
+                        </Text>
+                        <Text
+                          style={[styles.gpCell, styles.gpColMoney, { color: INCOME, fontWeight: '700' }]}
+                          numberOfLines={1}
+                        >
+                          {formatRupiah(row.profit)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* Transaction list — disembunyikan di tab Laba Kotor karena
+              tab itu sudah menampilkan rincian per produk */}
+          {reportTab !== 'laba' && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Semua Transaksi</Text>
             {transactions.length === 0 ? (
@@ -481,6 +624,7 @@ Dicatat pakai Zena 🌿`
               ))
             )}
           </View>
+          )}
 
           <View style={{ height: 40 }} />
         </ScrollView>
@@ -506,9 +650,44 @@ const styles = StyleSheet.create({
     flexDirection: 'row', backgroundColor: '#EAEEF4', borderRadius: RADIUS.md,
     padding: 4, marginHorizontal: 20, marginTop: 6, gap: 4,
   },
+  // ── Tab Laba Kotor ──
+  gpCard: {
+    backgroundColor: CARD, marginHorizontal: 20, marginTop: 4, padding: 16,
+    borderRadius: RADIUS.md, ...SHADOW.card,
+  },
+  gpTitle: { fontSize: 12, color: TEXT_MUTED, fontWeight: '600' },
+  gpBig: { fontSize: 26, fontWeight: '800', color: TEXT_MAIN, marginTop: 4 },
+  gpMarginRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  gpMargin: { fontSize: 12, fontWeight: '700' },
+  gpSplit: {
+    flexDirection: 'row', marginTop: 14, paddingTop: 12,
+    borderTopWidth: 1, borderTopColor: BORDER,
+  },
+  gpSplitCell: { flex: 1, gap: 3 },
+  gpSplitLabel: { fontSize: 11, color: TEXT_MUTED },
+  gpSplitValue: { fontSize: 14, fontWeight: '700' },
+  gpNote: { fontSize: 10.5, color: TEXT_MUTED, lineHeight: 15, marginTop: 12 },
+  gpTable: { marginTop: 4 },
+  gpHeadRow: {
+    flexDirection: 'row', paddingBottom: 7, borderBottomWidth: 1, borderBottomColor: BORDER,
+  },
+  gpHeadCell: {
+    fontSize: 10, fontWeight: '700', color: TEXT_MUTED,
+    textTransform: 'uppercase', letterSpacing: 0.3,
+  },
+  gpRow: {
+    flexDirection: 'row', alignItems: 'center', paddingVertical: 9,
+    borderBottomWidth: 1, borderBottomColor: BORDER,
+  },
+  gpColName: { flex: 1, paddingRight: 6 },
+  gpColQty: { width: 34, textAlign: 'center' },
+  gpColMoney: { width: 86, textAlign: 'right' },
+  gpName: { fontSize: 12, fontWeight: '600', color: TEXT_MAIN },
+  gpSub: { fontSize: 10, color: TEXT_MUTED, marginTop: 1 },
+  gpCell: { fontSize: 11.5, color: TEXT_MAIN },
   tabPill: { flex: 1, paddingVertical: 9, borderRadius: RADIUS.sm, alignItems: 'center' },
   tabPillActive: { backgroundColor: PRIMARY, ...SHADOW.card },
-  tabPillText: { fontSize: 12.5, fontWeight: '700', color: TEXT_MUTED },
+  tabPillText: { fontSize: 11.5, fontWeight: '700', color: TEXT_MUTED },
   tabPillTextActive: { color: '#fff' },
   monthSelector: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',

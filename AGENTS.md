@@ -95,6 +95,24 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-09-07b) - TAB LABA KOTOR ✅
+
+**Tab "Laba Kotor" di Laporan (khusus mode bisnis)** — menampilkan penjualan produk, HPP, laba kotor, margin, plus rincian per produk.
+
+**2 bug ditemukan di fungsi SQL yang katanya "sudah ready":**
+1. **Selalu mengembalikan NOL.** `get_monthly_gross_profit` dan `get_product_sales_report` sama-sama menyaring `t.business_category = 'penjualan'`. Padahal jalur pencatatan yang benar-benar dipakai — tombol "Jual Produk" di `app/tambah-transaksi.tsx` — hanya mengisi `has_items` + baris `transaction_items`, TIDAK pernah mengisi `business_category`. Komponen yang mengisinya (`components/BusinessTransactionForm.tsx`) **dead code, tidak dipakai di layar mana pun**. Terbukti di data nyata: 11 penjualan berisi HPP lengkap, tapi 0 transaksi ber-`business_category='penjualan'`.
+2. **Fan-out di `get_monthly_gross_profit`**: `SUM(t.amount)` dijumlahkan di atas hasil JOIN ke `transaction_items`, jadi transaksi dengan >1 item nilainya terhitung berkali-kali. Belum kena karena kebetulan semua transaksi saat ini cuma punya 1 item, tapi keranjang produk multi-item memang didukung.
+
+**Fix (`FIX_LABA_KOTOR.sql`, sudah dijalankan via Management API):** kedua fungsi kini bertumpu penuh pada `transaction_items` — `penjualan = SUM(subtotal)`, `HPP = SUM(hpp_total)`. Ini sekaligus menghapus ketergantungan pada `business_category` DAN menghilangkan fan-out. **Aturan: laba kotor = harga jual dikurangi HPP per item, sumber kebenarannya `transaction_items`, bukan `transactions.amount`.**
+
+**Hasil setelah fix** (sebelumnya semua nol): Jun laba kotor Rp 11.300.000 (margin 53,8%), Jul Rp 7.200.000, Agu Rp 2.700.000, Sep Rp 900.000 (margin 54,5%). Diverifikasi lewat RPC dengan token user (bukan hanya SQL langsung) supaya RLS ikut teruji, plus cek konsistensi: jumlah laba per produk = total laba kotor. Bulan tanpa penjualan mengembalikan nol + array kosong (tampilan kosong, tidak error).
+
+**UI (`app/(tabs)/laporan.tsx`):** tab pill jadi 4 di mode bisnis (`TAB_LABEL` + `ReportTab`), font pill 12,5→11,5 supaya muat. Kartu ringkasan (laba kotor besar, margin, pecahan Penjualan vs Modal) + tabel rincian per produk (Produk/Qty/Penjualan/Laba, margin per produk sebagai sub-teks). RPC hanya dipanggil saat mode bisnis. `useEffect` mengembalikan tab ke Ringkasan kalau user pindah ke mode pribadi saat tab Laba terbuka. Daftar "Semua Transaksi" disembunyikan di tab ini karena sudah ada rincian produk.
+
+⚠️ **Catatan**: laba kotor hanya menghitung penjualan BER-PRODUK (yang punya HPP). Pemasukan jasa/proyek tanpa item tidak masuk hitungan ini — itu memang definisi laba kotor, dan dijelaskan di kartu lewat catatan kecil.
+
+---
+
 ## LATEST SESSION (2026-09-07) - RIWAYAT TRANSAKSI + LOGO BARU ✅
 
 **Hasil audit UI**: ditemukan 7 celah, dikerjakan yang paling merusak kepercayaan & fungsi.
@@ -125,8 +143,8 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **SISA temuan audit yang BELUM dikerjakan** (sudah dibahas, user memilih prioritas lain dulu):
 - Laporan tanpa pembanding bulan lalu (angka tanpa konteks)
 - Reminder: kolom `is_recurring`/`recur_interval` ADA di DB tapi UI tidak pernah memakainya → langganan/cicilan masih manual tiap bulan
-- Tab Laba Kotor & Pajak di Laporan (`get_monthly_gross_profit`, tabel `tax_summary` sudah siap, UI belum ada)
-- Dead code: `components/MarketWidget.tsx`, `components/StockWidget.tsx` (0 pemakaian)
+- ~~Tab Laba Kotor~~ SELESAI (2026-09-07b). Sisa: tab Pajak (tabel `tax_summary` sudah siap, UI belum ada)
+- Dead code: `components/MarketWidget.tsx`, `components/StockWidget.tsx`, **`components/BusinessTransactionForm.tsx`** (semua 0 pemakaian)
 
 ---
 
@@ -563,6 +581,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Profil Usaha:** Nama bisnis, singkatan (utk nomor invoice), upload logo, alamat, telepon, catatan default, kelola rekening bank (multi + default)  
 **✅ Invoice & Penawaran:** Buat/edit dokumen, nomor otomatis terkunci (`003/GMC/VI/2026` / `PNW-...`), item dinamis, PPN, pilih rekening + 3 template, preview, kirim WhatsApp, Download PDF (HTML cetak via edge function), ubah status (draft/sent/paid/approved/rejected)  
 **✅ Reminder:** Add tagihan, Toggle paid/unpaid  
+**✅ Laporan Laba Kotor (mode bisnis):** Tab "Laba Kotor" — penjualan produk, HPP, laba kotor, margin, dan rincian per produk (qty, penjualan, laba, margin). Dihitung dari `transaction_items` sehingga tidak bergantung pada `business_category` yang tidak pernah terisi.  
 **✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan, pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya.  
 **✅ Bottom Nav:** Home, Laporan, + (tambah transaksi), Reminder, Profil  
 **✅ Security:** Elite-level (9.2/10) - Defense-in-depth encryption (7 layers), Rate limiting, Input validation (12 validators), Token theft detection, RLS policies  
