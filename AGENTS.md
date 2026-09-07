@@ -95,6 +95,41 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-09-07) - RIWAYAT TRANSAKSI + LOGO BARU ✅
+
+**Hasil audit UI**: ditemukan 7 celah, dikerjakan yang paling merusak kepercayaan & fungsi.
+
+**1. Angka PALSU di Home dihapus.** `app/(tabs)/index.tsx` menampilkan `12% bulan ini` yang **di-hardcode** — angka sama untuk semua user, selamanya, lengkap dengan panah hijau naik. Diganti **arus kas bersih bulan berjalan** yang dihitung dari transaksi asli (`amountInIDR`, transfer antar dompet tidak dihitung, disaring per mode aktif). Query baru di `fetchData` hanya mengambil kolom seperlunya. Verified pada data nyata: mode personal **−Rp 11.850.000**, bisnis **+Rp 112.500** — jadi UI lama menampilkan "naik 12%" padahal user sedang minus 11,8 juta.
+⚠️ Tidak bisa bikin "% pertumbuhan saldo" yang akurat: app tidak menyimpan riwayat saldo harian, hanya saldo terkini. Arus kas bersih adalah angka jujur yang bisa dihitung.
+
+**2. Layar baru `app/riwayat-transaksi.tsx`** — sebelumnya transaksi lama TIDAK BISA diedit sama sekali: Home cuma 5 terakhir (bisa ditekan), Laporan menampilkan semua transaksi bulan itu tapi memakai `View` (tidak bisa ditekan), dan tidak ada layar riwayat. Data user: 268 transaksi / 4 bulan.
+- Pencarian catatan + kategori (`ilike`, jeda ketik 350ms, `reqId` guard supaya hasil basi tidak menimpa hasil baru)
+- Saring arah uang (Semua/Masuk/Keluar/Transfer) + saring bulan (12 bulan terakhir)
+- Muat bertahap 50 baris (`range`) + tarik-untuk-muat-ulang, semua baris menuju `edit-transaksi`
+- Nominal via `formatMoney(amount, currency)`; transaksi valas menampilkan `≈ Rp` nilai terkuncinya
+- Home "Semua →" dialihkan ke layar ini (dulu ke Laporan); transaksi di Laporan kini `TouchableOpacity`
+
+**Bug ditemukan saat tes (zona waktu):** batas akhir filter bulan awalnya `new Date(y, m, 1).toISOString()`. Di WIB (UTC+7) konversi UTC memundurkan tanggal sehari → `2026-09` menghasilkan batas `2026-09-30`, membuang transaksi hari terakhir bulan itu. Terbukti pada data nyata: Juni 2026 jadi 65 transaksi, seharusnya **72** (7 transaksi 30 Juni hilang). Fix: rakit batas sebagai teks (pola yang sudah dipakai `laporan.tsx`), diuji lintas tahun (Des→Jan) & Februari.
+
+**3. Logo & ikon aplikasi dirombak.**
+- Logo lama: marka kecil + wordmark "zena" di latar HITAM, teks navy nyaris tak terbaca, dan **4 file aset (`android-icon-background/foreground/monochrome`, `splash-icon`) ternyata IDENTIK** (md5 sama) — jadi lapisan latar/depan Android isinya sama persis.
+- `adaptiveIcon.foregroundImage` menunjuk `icon.png` yang latarnya biru solid → di dalam mask Android akan tampak kotak biru menumpuk di atas `backgroundColor`.
+- Logo baru: **huruf Z geometris, sudut luar membulat, putih di atas gradien biru merek** (#1763D6 → #0F4FB5). Dipilih dari 3 kandidat (bersudut miring / geometris-bulat / campuran) karena paling terbaca di 44px dan tidak ambigu kebaca "2"/"7".
+- Dibuat lewat **generator Python murni tanpa dependensi** (rasterizer + encoder PNG sendiri, supersampling 3x): `scratchpad/logo/{gen,refine,build}.py`. Ukuran turun drastis (icon.png 86KB → 10KB).
+- Aset: `icon.png` (persegi penuh, iOS memotong sendiri — TIDAK dibulatkan di sini), `adaptive-icon.png` (transparan, marka di zona aman 66%), `android-icon-background.png` (gradien), `android-icon-monochrome.png` (siluet tema Android 13+), `splash-icon.png` (Z biru di atas transparan), `favicon.png` 256. Alpha diverifikasi per peran.
+- `app.json`: foregroundImage → `adaptive-icon.png`, tambah `monochromeImage` + `backgroundImage`, `backgroundColor` #185FA5 → **#1763D6**, `web.themeColor` → #1763D6, `web.backgroundColor` #0F0F0F → **#F5F7FA** (UI sudah tema terang), dan **tambah kunci `splash`** yang selama ini tidak ada (makanya `splash-icon.png` menganggur). Divalidasi lewat `npx expo config --type public` (SDK 56).
+- Aset sisa `android-icon-foreground.png` dihapus (tidak dirujuk siapa pun).
+
+⚠️ Ikon baru baru muncul di aplikasi native setelah build ulang (`versionCode` sengaja TIDAK dinaikkan — naikkan saat mau build APK). Di web cukup deploy ulang.
+
+**SISA temuan audit yang BELUM dikerjakan** (sudah dibahas, user memilih prioritas lain dulu):
+- Laporan tanpa pembanding bulan lalu (angka tanpa konteks)
+- Reminder: kolom `is_recurring`/`recur_interval` ADA di DB tapi UI tidak pernah memakainya → langganan/cicilan masih manual tiap bulan
+- Tab Laba Kotor & Pajak di Laporan (`get_monthly_gross_profit`, tabel `tax_summary` sudah siap, UI belum ada)
+- Dead code: `components/MarketWidget.tsx`, `components/StockWidget.tsx` (0 pemakaian)
+
+---
+
 ## LATEST SESSION (2026-09-06) - DOMPET VALAS FASE 1 (KURS BCA) ✅
 
 **💱 Dompet multi-mata-uang (USD/SGD/EUR) dengan kurs BCA e-Rate + naik-turun harian & untung/rugi.**
@@ -528,6 +563,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Profil Usaha:** Nama bisnis, singkatan (utk nomor invoice), upload logo, alamat, telepon, catatan default, kelola rekening bank (multi + default)  
 **✅ Invoice & Penawaran:** Buat/edit dokumen, nomor otomatis terkunci (`003/GMC/VI/2026` / `PNW-...`), item dinamis, PPN, pilih rekening + 3 template, preview, kirim WhatsApp, Download PDF (HTML cetak via edge function), ubah status (draft/sent/paid/approved/rejected)  
 **✅ Reminder:** Add tagihan, Toggle paid/unpaid  
+**✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan, pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya.  
 **✅ Bottom Nav:** Home, Laporan, + (tambah transaksi), Reminder, Profil  
 **✅ Security:** Elite-level (9.2/10) - Defense-in-depth encryption (7 layers), Rate limiting, Input validation (12 validators), Token theft detection, RLS policies  
 **✅ Marketing Manager:** Higgsfield AI integration (IG/TikTok/WA content), Virality prediction, Campaign generator  

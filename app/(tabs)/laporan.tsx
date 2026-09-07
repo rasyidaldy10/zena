@@ -3,7 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Share, Alert
 } from 'react-native'
-import { useFocusEffect } from 'expo-router'
+import { router, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../../lib/supabase'
 import { Transaction, CATEGORIES, BudgetMethod } from '../../types'
@@ -452,7 +452,12 @@ Dicatat pakai Zena 🌿`
               </View>
             ) : (
               transactions.map((txn) => (
-                <View key={txn.id} style={styles.txnItem}>
+                <TouchableOpacity
+                  key={txn.id}
+                  style={styles.txnItem}
+                  activeOpacity={0.6}
+                  onPress={() => router.push(`/edit-transaksi?id=${txn.id}`)}
+                >
                   <View style={styles.txnIcon}>
                     <Text>{txn.is_wallet_transfer ? '🔄' : (CATEGORY_EMOJI[txn.category] || '📦')}</Text>
                   </View>
@@ -472,7 +477,7 @@ Dicatat pakai Zena 🌿`
                   ]}>
                     {txn.type === 'income' ? '+' : '-'}{formatMoney(txn.amount, txn.currency)}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))
             )}
           </View>

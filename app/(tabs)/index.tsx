@@ -14,7 +14,7 @@ import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
 import { setAppMode } from '../../lib/modeStore'
 import CEOWelcomeModal from '../../components/CEOWelcomeModal'
 import PortfolioWidget from '../../components/PortfolioWidget'
-import { formatMoney, formatDelta } from '../../lib/format'
+import { formatMoney, formatDelta, amountInIDR } from '../../lib/format'
 import { getRates, toIDR, dailyMovement, isForeign, type FxRateMap } from '../../lib/fx'
 
 // Design system v2
@@ -45,6 +45,7 @@ export default function HomeScreen() {
   const [balanceVisible, setBalanceVisible] = useState(true)
   const [rincianExpanded, setRincianExpanded] = useState(false)
   const [rates, setRates] = useState<FxRateMap>({})
+  const [monthTxns, setMonthTxns] = useState<Transaction[]>([])
   const [showCEOWelcome, setShowCEOWelcome] = useState(false)
   const channelRef = useRef<any>(null)
   const [businessStats, setBusinessStats] = useState({
@@ -60,16 +61,27 @@ export default function HomeScreen() {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return
 
+    const now = new Date()
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+
     const [
       { data: p },
       { data: w },
       { data: t },
-      { data: n }
+      { data: n },
+      { data: mtx }
     ] = await Promise.all([
       supabase.from('user_preferences').select('*').eq('user_id', session.user.id).order('created_at', { ascending: true }).limit(1),
       supabase.from('user_wallets').select('*').eq('user_id', session.user.id).eq('is_active', true),
       supabase.from('transactions').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(5),
-      supabase.from('notifications').select('id').eq('user_id', session.user.id).eq('is_read', false)
+      supabase.from('notifications').select('id').eq('user_id', session.user.id).eq('is_read', false),
+      // Transaksi bulan berjalan — dipakai menghitung arus kas bersih di kartu saldo.
+      // Kolomnya dibatasi supaya muatannya tetap ringan.
+      supabase.from('transactions')
+        .select('amount, amount_idr, type, is_wallet_transfer, wallet_id')
+        .eq('user_id', session.user.id)
+        .eq('is_wallet_transfer', false)
+        .gte('date', monthStart)
     ])
 
     const prefsObj = (Array.isArray(p) ? p[0] : p) as UserPreferences | undefined
@@ -78,6 +90,7 @@ export default function HomeScreen() {
     setWallets(walletList)
     setTransactions((t ?? []) as Transaction[])
     setNotifCount(n?.length ?? 0)
+    setMonthTxns((mtx ?? []) as Transaction[])
 
     // Kurs cuma diambil kalau user memang punya dompet valas
     const foreignCodes = [...new Set(walletList.map(x => x.currency).filter(isForeign))] as string[]
@@ -225,6 +238,14 @@ export default function HomeScreen() {
          toIDR(w.current_balance, w.currency!, rates) === null
   ).length
 
+  // Arus kas bersih bulan berjalan: pemasukan dikurangi pengeluaran.
+  // Transfer antar dompet sudah disaring di query (bukan uang masuk/keluar),
+  // dan nilainya dibaca lewat amountInIDR supaya transaksi valas ikut benar.
+  const modeWalletIds = new Set(modeWallets.map(w => w.id))
+  const monthNet = monthTxns
+    .filter(t => !t.wallet_id || modeWalletIds.has(t.wallet_id))
+    .reduce((s, t) => s + (t.type === 'income' ? 1 : -1) * amountInIDR(t), 0)
+
   // Gerak nilai rupiah seluruh saldo valas sejak kurs terakhir
   const fxDailyTotal = modeWallets
     .filter(w => isForeign(w.currency))
@@ -362,10 +383,24 @@ export default function HomeScreen() {
               <Text style={styles.balanceAmount}>
                 {balanceVisible ? `Rp ${balance.toLocaleString('id-ID')}` : 'Rp ••••••'}
               </Text>
-              <View style={styles.balanceChangeRow}>
-                <Ionicons name="trending-up" size={13} color={INCOME_COLOR} />
-                <Text style={styles.balanceChange}>12% bulan ini</Text>
-              </View>
+              {/* Arus kas bersih bulan berjalan — dihitung dari transaksi asli.
+                  Sebelumnya di sini tertulis "12% bulan ini" yang di-hardcode,
+                  jadi angkanya sama terus untuk semua orang. */}
+              {balanceVisible && (
+                <View style={styles.balanceChangeRow}>
+                  <Ionicons
+                    name={monthNet >= 0 ? 'trending-up' : 'trending-down'}
+                    size={13}
+                    color={monthNet >= 0 ? INCOME_COLOR : EXPENSE_COLOR}
+                  />
+                  <Text style={[
+                    styles.balanceChange,
+                    { color: monthNet >= 0 ? INCOME_COLOR : EXPENSE_COLOR },
+                  ]}>
+                    {formatDelta(monthNet)} bulan ini
+                  </Text>
+                </View>
+              )}
               {/* Gerak nilai valas hari ini — hanya muncul kalau punya dompet valas
                   DAN sudah ada snapshot kurs hari sebelumnya buat dibandingkan */}
               {balanceVisible && fxDailyTotal.hasData && fxDailyTotal.delta !== 0 && (
@@ -688,7 +723,7 @@ export default function HomeScreen() {
         {/* TRANSAKSI TERAKHIR (show in both modes, but filtered by mode) */}
         <View style={styles.txnHeader}>
           <Text style={styles.sectionTitle}>Transaksi Terakhir</Text>
-          <TouchableOpacity onPress={() => router.push('/(tabs)/laporan')}>
+          <TouchableOpacity onPress={() => router.push('/riwayat-transaksi')}>
             <Text style={styles.txnSeeAll}>Semua →</Text>
           </TouchableOpacity>
         </View>
