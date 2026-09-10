@@ -373,7 +373,18 @@ Return ONLY valid JSON, tanpa markdown.`
 
     // Transaksi valas butuh kurs untuk mengunci nilai rupiahnya. Tanpa kurs,
     // laporan akan menganggap "50" itu Rp 50 — jadi lebih baik ditolak.
-    if (foreignTx && type !== 'transfer' && !(effectiveRate > 0)) {
+    // Tapi kurs bisa saja BELUM selesai dimuat kalau user cepat mengisi form
+    // (pengambilan ke BCA makan ~2 detik). Coba ambil sekali lagi di sini
+    // supaya user tidak perlu menutup lalu membuka ulang formnya.
+    let rateForTx = effectiveRate
+    if (foreignTx && !(rateForTx > 0)) {
+      try {
+        const fresh = await getRates([txCurrency])
+        setRates(prev => ({ ...prev, ...fresh }))
+        rateForTx = parseAmountInput(rateInput) || fresh[txCurrency]?.buy || 0
+      } catch { /* dibiarkan, ditolak di bawah */ }
+    }
+    if (foreignTx && type !== 'transfer' && !(rateForTx > 0)) {
       notify('Kurs Belum Ada', `Kurs ${txCurrency} belum termuat, jadi nilai rupiahnya belum bisa dihitung. Coba lagi sebentar atau isi kurs manual.`)
       return
     }
@@ -416,7 +427,7 @@ Return ONLY valid JSON, tanpa markdown.`
       // ikut terhitung tanpa perlu kolom biaya terpisah.
       const idrValue = isExchange
         ? (fromCur === 'IDR' ? nominal : received)   // sisi rupiah adalah nilai rupiahnya
-        : (isForeign(fromCur) ? nominal * effectiveRate : nominal)
+        : (isForeign(fromCur) ? nominal * rateForTx : nominal)
 
       if (isExchange && fromCur !== 'IDR' && toCur !== 'IDR') {
         notify('Belum Didukung', 'Tukar langsung antar dua mata uang asing belum bisa. Tukar ke rupiah dulu ya.')
@@ -526,7 +537,7 @@ Return ONLY valid JSON, tanpa markdown.`
 
       // Nilai rupiah DIKUNCI di sini. Semua laporan membaca amount_idr, jadi
       // angka bulan lalu tidak ikut bergerak saat kurs berubah.
-      const amountIDR = foreignTx ? nominal * effectiveRate : nominal
+      const amountIDR = foreignTx ? nominal * rateForTx : nominal
 
       // Catatan: kolom wallet_function ADA di tabel wallets, BUKAN transactions.
       const { data: txn, error } = await supabase.from('transactions').insert({
@@ -534,7 +545,7 @@ Return ONLY valid JSON, tanpa markdown.`
         amount: nominal,
         currency: txCurrency,
         amount_idr: amountIDR,
-        fx_rate: foreignTx ? effectiveRate : null,
+        fx_rate: foreignTx ? rateForTx : null,
         type,
         category,
         note,
@@ -590,7 +601,7 @@ Return ONLY valid JSON, tanpa markdown.`
         // dihitung ulang tertimbang — sama seperti "Tambah Posisi" di investasi.
         if (foreignTx && type === 'income') {
           update.avg_buy_rate = weightedAvgRate(
-            wallet.current_balance, wallet.avg_buy_rate, nominal, effectiveRate
+            wallet.current_balance, wallet.avg_buy_rate, nominal, rateForTx
           )
         }
         await supabase.from('user_wallets').update(update).eq('id', selectedWallet)
@@ -811,7 +822,7 @@ Return ONLY valid JSON, tanpa markdown.`
                       <Text style={[styles.walletName, selectedWallet === w.id && styles.walletNameActive]}>
                         {w.wallet_name}
                       </Text>
-                      <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                      <Text style={styles.walletBalance}>{formatMoney(w.current_balance, w.currency)}</Text>
                       <Text style={[styles.walletBadge, { color: w.wallet_function === 'business' ? GREEN : PRIMARY }]}>
                         {w.wallet_function === 'business' ? '💼 Bisnis' : '👤 Pribadi'}
                       </Text>
@@ -847,7 +858,7 @@ Return ONLY valid JSON, tanpa markdown.`
                       <Text style={[styles.walletName, toWallet === w.id && { color: PURPLE }]}>
                         {w.wallet_name}
                       </Text>
-                      <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                      <Text style={styles.walletBalance}>{formatMoney(w.current_balance, w.currency)}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}

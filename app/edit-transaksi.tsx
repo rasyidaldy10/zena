@@ -395,7 +395,7 @@ export default function EditTransaksiScreen() {
                       <Text style={[styles.walletName, selectedWallet === w.id && styles.walletNameActive]}>
                         {w.wallet_name}
                       </Text>
-                      <Text style={styles.walletBalance}>{formatRupiah(w.current_balance)}</Text>
+                      <Text style={styles.walletBalance}>{formatMoney(w.current_balance, w.currency)}</Text>
                     </View>
                   </TouchableOpacity>
                 ))}

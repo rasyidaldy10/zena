@@ -95,6 +95,30 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-09-10) - PERBAIKAN BUG VALAS ✅
+
+**Keluhan user: "masih sering error di bagian valas".** Backend ternyata SEHAT — masalahnya di tampilan & cache sisi app.
+
+**Yang DICEK dan terbukti tidak bermasalah:**
+- `fx_rates_daily` punya snapshot 5 hari berturut (6–10 Sep), semuanya `source='bca'`, 49 mata uang/hari. Tidak pernah jatuh ke fallback Yahoo.
+- Cron `zena-fx-rate-daily` sukses tiap hari (`cron.job_run_details` semua `succeeded`).
+- Edge function `fx-rate` sehat: 1,6–3 detik, HTTP 200, `prev_buy` terisi.
+- **Parsing BCA masih benar** — dibandingkan langsung ke halaman live: kolom e-Rate cocok persis.
+- **Log Supabase bersih**: nol error terkait valas. (Error LAIN yang ditemukan & belum diperbaiki: `stock-price-updater` query `investment_holdings.ticker` → 400, kolomnya sudah lama diganti `symbol`; beberapa 406 dari `user_preferences` duplikat + `.single()`.)
+- **Spread akhir pekan memang lebih lebar** — dugaan 6 Sep sekarang TERBUKTI: SGD 1,72% (Sabtu) vs **0,28%** (hari kerja), EUR 1,74% → 0,29%. Jadi angka spread lebar waktu itu bukan salah parsing.
+
+**5 BUG DITEMUKAN & DIPERBAIKI:**
+1. **Saldo valas tampil sebagai Rupiah di 4 tempat** — ini penyebab utama yang user lihat. Dompet `S$ 8,00` muncul sebagai **"Rp 8"** di: pemilih dompet form Catat (2 titik: Dari & Ke), pemilih dompet form Edit Transaksi, dan daftar dompet di Profil. Semua masih pakai `formatRupiah(w.current_balance)`. Fix: `formatMoney(w.current_balance, w.currency)`. **Sebelumnya `ModalPilihWallet` sudah diperbaiki tapi pemilih dompet INLINE di kedua form terlewat.**
+2. **`profil.tsx` menjumlahkan saldo mentah** (`Total Savings`) — S$ 8 ikut terhitung sebagai Rp 8. Fix: konversi lewat `toIDR` + ambil kurs hanya kalau ada dompet valas; kurs gagal → dompet dilewati (kurang lebih baik daripada mata uang tercampur).
+3. **Cache kurs ditimpa, bukan digabung** (`lib/fx.ts`). Tiap layar minta mata uang berbeda (Home cuma yang dipakai dompet, form Catat minta ketiganya). Setelah TTL 5 menit lewat, permintaan sempit dari Home memangkas cache jadi `{SGD}`, sehingga form Catat menembak BCA lagi (~2 detik) — di jendela itulah **"Kurs Belum Ada"** bisa muncul kalau user cepat menyimpan. Fix: gabung dengan cache lama.
+   ⚠️ Koreksi diagnosis awal: penimpaan HANYA terjadi setelah cache basi, karena saat cache segar `getRates` keluar lebih awal dan tidak pernah menulis.
+4. **Simpan transaksi valas gagal keras kalau kurs belum termuat.** Fix: `handleSave` mencoba `getRates([txCurrency])` sekali lagi sebelum menolak, jadi user tidak perlu menutup & membuka ulang form.
+5. Bug di TES SENDIRI: percobaan membuktikan bug cache awalnya "lolos" padahal seharusnya gagal — patch reverting-nya meleset (kode terkompilasi pakai spread, bukan `Object.assign`) DAN skenarionya tidak memajukan waktu melewati TTL. Setelah harness diberi `ageCache`/`peekCache`, tes terbukti menangkap: **perbaikan 5 lolos, perilaku lama 3 gagal**.
+
+**Aturan yang dikuatkan: JANGAN pernah render `current_balance` dengan `formatRupiah` atau `Rp {...}` — selalu `formatMoney(saldo, w.currency)`. Jangan menjumlahkan `current_balance` lintas dompet tanpa konversi.**
+
+---
+
 ## LATEST SESSION (2026-09-07b) - TAB LABA KOTOR ✅
 
 **Tab "Laba Kotor" di Laporan (khusus mode bisnis)** — menampilkan penjualan produk, HPP, laba kotor, margin, plus rincian per produk.

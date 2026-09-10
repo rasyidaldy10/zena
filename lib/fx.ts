@@ -122,7 +122,18 @@ export async function getRates(currencies: string[] = ['USD', 'SGD', 'EUR']): Pr
 
   if (Object.keys(rates).length > 0) {
     try {
-      await AsyncStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), rates } as FxCache))
+      // GABUNG dengan isi cache lama, jangan ditimpa. Tiap layar meminta mata
+      // uang yang berbeda (Home cuma yang dipakai dompet, form transaksi minta
+      // ketiganya). Kalau ditimpa, cache dari layar sempit membuat layar lain
+      // selalu dianggap "tidak lengkap" lalu menembak BCA lagi — jendela ~2
+      // detik itu yang memunculkan "Kurs Belum Ada" kalau user cepat menyimpan.
+      const raw = await AsyncStorage.getItem(CACHE_KEY)
+      const prev = raw ? (JSON.parse(raw) as FxCache).rates : {}
+      const merged: FxRateMap = { ...prev, ...rates }
+      await AsyncStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({ savedAt: Date.now(), rates: merged } as FxCache)
+      )
     } catch { /* cache opsional */ }
   }
   return rates

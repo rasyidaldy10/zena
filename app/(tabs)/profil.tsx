@@ -13,6 +13,8 @@ import { uploadImage } from '../../lib/upload'
 import { PERSONA_CONFIG, BUDGET_METHODS } from '../../constants'
 import { calculateFinancialScore } from '../../lib/scoring'
 import { WALLET_TYPE_CONFIG, UserWallet } from '../../types'
+import { formatMoney } from '../../lib/format'
+import { getRates, toIDR, isForeign } from '../../lib/fx'
 import { Persona, BudgetMethod, UserPreferences } from '../../types'
 import { COLORS, RADIUS, SHADOW } from '../../constants/theme'
 import {
@@ -93,7 +95,24 @@ export default function ProfilScreen() {
       .eq('is_active', true).order('created_at', { ascending: true })
     if (walletsData) {
       setWallets(walletsData)
-      setTotalSavings(walletsData.reduce((sum: number, w: any) => sum + (w.current_balance || 0), 0))
+
+      // Saldo dompet valas harus dikonversi dulu; kalau dijumlahkan mentah,
+      // S$ 8 ikut terhitung sebagai Rp 8. Kursnya cuma diambil kalau memang
+      // ada dompet valas.
+      const foreignCodes = [...new Set(
+        walletsData.map((w: any) => w.currency).filter(isForeign)
+      )] as string[]
+      const fxRates = foreignCodes.length > 0
+        ? await getRates(foreignCodes).catch(() => ({}))
+        : {}
+
+      setTotalSavings(walletsData.reduce((sum: number, w: any) => {
+        const saldo = w.current_balance || 0
+        if (!isForeign(w.currency)) return sum + saldo
+        // Kurs gagal dimuat -> dompet itu dilewati, lebih baik kurang
+        // daripada menambahkan angka bermata uang salah.
+        return sum + (toIDR(saldo, w.currency, fxRates) ?? 0)
+      }, 0))
     }
 
     const { data: holdings } = await supabase
@@ -424,7 +443,7 @@ export default function ProfilScreen() {
                     <Text style={styles.rowName}>{w.wallet_name}</Text>
                     <Text style={styles.rowDesc}>{WALLET_TYPE_CONFIG[w.wallet_type]?.label || w.wallet_type}</Text>
                   </View>
-                  <Text style={styles.walletBalance}>Rp {w.current_balance.toLocaleString('id-ID')}</Text>
+                  <Text style={styles.walletBalance}>{formatMoney(w.current_balance, w.currency)}</Text>
                 </TouchableOpacity>
               ))}
             </View>
