@@ -71,7 +71,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **GitHub:** `rasyidaldy/zena` (private)  
 **EAS Project:** `@rasyidaldy/zena`
 
-**Current Build:** versionCode 7, Build #7  
+**Current Build:** versionCode 8, Build #8 (v1.1.0)  
 **Latest Commit:** 3878b1f (complete UI redesign + tier system + financial health)
 
 **⚠️ SQL yang HARUS dijalankan user di Supabase (selain yang sudah):**
@@ -92,6 +92,24 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 - ✅ **Edge function:** BISA deploy via CLI (sudah login):
   `supabase functions deploy <name> --project-ref lcvenmsxauasaemjjxtc`
 - ⚠️ Web (Chrome): **Alert.alert RN TIDAK jalan** → pakai `lib/alert.ts` (`confirmAsync`/`notify`)
+
+---
+
+## LATEST SESSION (2026-09-17b) - BUILD #8 (v1.1.0) + PROJECT PICKER DI EDIT ✅
+
+**Build APK #8 (versi 1.1.0, versionCode 8)** lewat `eas build --platform android --profile preview`.
+
+**⚠️ PENTING — jebakan env var yang bikin build pertama HARUS dibatalkan:**
+- `.env` di-gitignore, jadi TIDAK ikut terupload ke EAS. Dan **tidak ada satu pun env var tersimpan di EAS** (`eas env:list` kosong untuk preview & production).
+- Build #7 (Juni) dulu jalan karena waktu itu `.env` masih ter-commit (insiden kebocoran yang kemudian dibersihkan). Setelah dibersihkan, build baru otomatis kehilangan `EXPO_PUBLIC_SUPABASE_URL` & `EXPO_PUBLIC_SUPABASE_ANON_KEY` → APK jadi tidak bisa konek Supabase.
+- Ketahuan dari peringatan `No environment variables ... found for the "preview" environment` di keluaran `eas build`. Build `80409c63` DIBATALKAN, lalu kedua variabel dipasang via `eas env:create --environment preview` (dan `production`), `--visibility plaintext`. Hanya 2 variabel `EXPO_PUBLIC_*` ini yang dibutuhkan client (`grep` di `app/lib/components/constants`); kunci `sb_publishable_` memang aman ditanam. JANGAN pernah taruh service role/GROQ/BRICK key di EAS env untuk client.
+- Build ulang `5428ebba` menampilkan `Environment variables loaded: EXPO_PUBLIC_SUPABASE_ANON_KEY, EXPO_PUBLIC_SUPABASE_URL` — itu tanda build sudah benar. **Cek baris ini setiap kali build.**
+- Keystore tetap `Build Credentials 18v635Skgj` (sama dengan #7) → APK bisa dipasang sebagai update, tidak perlu uninstall.
+- `eas.json` belum set `cli.appVersionSource` (peringatan, belum wajib).
+
+**Pemilih project di layar edit (`app/edit-transaksi.tsx`)** — keluhan user: transaksi yang sudah tercatat tidak bisa dimasukkan ke project. Layar edit memang tidak pernah punya pemilih project (hanya `tambah-transaksi` yang punya). Ditambah: pemilih + tombol ✕ lepas kaitan + modal daftar project (opsi "Tidak dikaitkan" di atas). Daftar mengambil SEMUA project (bukan hanya `status='aktif'`) supaya kaitan ke project yang sudah selesai tetap terbaca namanya. Simpan menulis `project_id: selectedProject || null`. `get_project_stats` otomatis ikut karena query by `project_id`. Catatan: `laporan.tsx` `txMode()` menganggap transaksi ber-`project_id` sebagai bisnis — jadi mengaitkan pengeluaran pribadi ke project memindahkannya ke laporan bisnis (perilaku yang memang disengaja sejak awal).
+
+⚠️ **Tegangan dengan kunci periode:** transaksi >2 bulan (mis. Juni) sekarang hanya-baca, jadi TIDAK bisa dikaitkan ke project lewat UI. Sudah diberitahukan ke user; kalau perlu mengaitkan transaksi lama ke project, pilihannya: longgarkan kunci khusus untuk field `project_id`, atau naikkan `EDITABLE_MONTHS_BACK`.
 
 ---
 
