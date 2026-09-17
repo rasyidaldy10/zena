@@ -3,7 +3,7 @@
     "name": "zena",
     "slug": "zena",
     "scheme": "zena",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -14,12 +14,12 @@
     },
     "ios": {
       "bundleIdentifier": "com.rasyid.zena",
-      "buildNumber": "7",
+      "buildNumber": "8",
       "supportsTablet": true
     },
     "android": {
       "package": "com.rasyid.zena",
-      "versionCode": 7,
+      "versionCode": 8,
       "adaptiveIcon": {
         "backgroundColor": "#1763D6",
         "foregroundImage": "./assets/adaptive-icon.png",
