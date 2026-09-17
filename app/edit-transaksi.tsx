@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity,
   StyleSheet, Alert, ActivityIndicator,
-  ScrollView, KeyboardAvoidingView, Platform
+  ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native'
 import { router, useLocalSearchParams } from 'expo-router'
 import { supabase } from '../lib/supabase'
@@ -99,6 +99,8 @@ type Wallet = {
   currency?: string
 }
 
+type Project = { id: string; name: string; client_name: string | null; status: string }
+
 export default function EditTransaksiScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const [transaction, setTransaction] = useState<Transaction | null>(null)
@@ -112,6 +114,9 @@ export default function EditTransaksiScreen() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [selectedProject, setSelectedProject] = useState<string>('')
+  const [showProjectPicker, setShowProjectPicker] = useState(false)
 
   // Kunci periode: transaksi lebih lama dari 2 bulan kalender tidak boleh
   // diubah/dihapus. Dicek di sini (tampilan) DAN di handleSave/handleDelete
@@ -129,10 +134,15 @@ export default function EditTransaksiScreen() {
   const fetchData = async () => {
     const { data: { user } } = await supabase.auth.getUser()
 
-    const [{ data: txn }, { data: walletsData }] = await Promise.all([
+    const [{ data: txn }, { data: walletsData }, { data: projectRows }] = await Promise.all([
       supabase.from('transactions').select('*').eq('id', id).single(),
       supabase.from('user_wallets').select('id, wallet_name, icon, color, current_balance, currency').eq('user_id', user?.id).eq('is_active', true),
+      // Semua project (bukan hanya aktif) supaya kaitan ke project yang sudah
+      // selesai tetap terbaca namanya, bukan tampil "Pilih Project".
+      supabase.from('projects').select('id, name, client_name, status').eq('user_id', user?.id)
+        .order('status', { ascending: true }).order('created_at', { ascending: false }),
     ])
+    if (projectRows) setProjects(projectRows as Project[])
 
     if (txn) {
       setTransaction(txn)
@@ -143,6 +153,7 @@ export default function EditTransaksiScreen() {
       setNote(txn.note || '')
       setSelectedDate(txn.date || new Date().toISOString().split('T')[0])
       setSelectedWallet(txn.wallet_id || txn.wallet_source || '')
+      setSelectedProject(txn.project_id || '')
     }
 
     if (walletsData) setWallets(walletsData)
@@ -238,6 +249,7 @@ export default function EditTransaksiScreen() {
       date: selectedDate,
       wallet_source: selectedWallet,
       wallet_id: selectedWallet,
+      project_id: selectedProject || null,
     }).eq('id', id)
 
     if (error) {
@@ -484,6 +496,24 @@ export default function EditTransaksiScreen() {
           ))}
         </View>
 
+        {/* Project — bisa dikaitkan, diganti, atau dilepas */}
+        <Text style={styles.label}>Project</Text>
+        <View style={styles.projectRow}>
+          <TouchableOpacity style={styles.projectPicker} onPress={() => setShowProjectPicker(true)}>
+            <Text style={[styles.projectPickerText, !selectedProject && { color: '#888780' }]} numberOfLines={1}>
+              {selectedProject
+                ? (projects.find(p => p.id === selectedProject)?.name || 'Project tidak ditemukan')
+                : 'Tidak dikaitkan ke project'}
+            </Text>
+            <Text style={styles.projectPickerArrow}>›</Text>
+          </TouchableOpacity>
+          {!!selectedProject && (
+            <TouchableOpacity style={styles.projectClear} onPress={() => setSelectedProject('')} hitSlop={8}>
+              <Text style={styles.projectClearText}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
         {/* Note */}
         <Text style={styles.label}>Catatan</Text>
         <TextInput
@@ -508,6 +538,46 @@ export default function EditTransaksiScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+      <Modal visible={showProjectPicker} transparent animationType="slide">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Pilih Project</Text>
+              <TouchableOpacity onPress={() => setShowProjectPicker(false)}>
+                <Text style={styles.modalClose}>✕</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ maxHeight: 400 }}>
+              <TouchableOpacity
+                style={styles.projectOption}
+                onPress={() => { setSelectedProject(''); setShowProjectPicker(false) }}
+              >
+                <Text style={[styles.projectOptionName, { color: '#888780' }]}>Tidak dikaitkan</Text>
+                {!selectedProject && <Text style={styles.projectOptionCheck}>✓</Text>}
+              </TouchableOpacity>
+              {projects.length === 0 && (
+                <Text style={styles.projectEmpty}>Belum ada project. Buat dulu di menu Projects.</Text>
+              )}
+              {projects.map((project) => (
+                <TouchableOpacity
+                  key={project.id}
+                  style={styles.projectOption}
+                  onPress={() => { setSelectedProject(project.id); setShowProjectPicker(false) }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.projectOptionName}>{project.name}</Text>
+                    <Text style={styles.projectOptionClient}>
+                      {[project.client_name, project.status !== 'aktif' ? project.status : null]
+                        .filter(Boolean).join(' · ')}
+                    </Text>
+                  </View>
+                  {selectedProject === project.id && <Text style={styles.projectOptionCheck}>✓</Text>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   )
 }
@@ -540,6 +610,32 @@ const styles = StyleSheet.create({
   amountPrefix: { fontSize: 24, color: '#888780', marginRight: 8 },
   amountInput: { flex: 1, fontSize: 32, fontWeight: '600', color: '#fff', paddingVertical: 16 },
   label: { fontSize: 12, fontWeight: '600', color: '#888780', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 },
+  projectRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 24 },
+  projectPicker: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    height: 48, backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16,
+    borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  projectPickerText: { fontSize: 15, color: '#fff', flex: 1 },
+  projectPickerArrow: { fontSize: 20, color: '#888780', marginLeft: 8 },
+  projectClear: {
+    width: 40, height: 48, borderRadius: 12, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
+  },
+  projectClearText: { fontSize: 14, color: '#888780' },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalContent: { backgroundColor: '#1A1A1A', borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  modalTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  modalClose: { fontSize: 18, color: '#888780', padding: 4 },
+  projectOption: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: 0.5, borderBottomColor: '#2A2A2A', gap: 12,
+  },
+  projectOptionName: { fontSize: 14, fontWeight: '600', color: '#fff' },
+  projectOptionClient: { fontSize: 12, color: '#888780', marginTop: 2 },
+  projectOptionCheck: { fontSize: 16, color: PRIMARY, fontWeight: '700' },
+  projectEmpty: { fontSize: 13, color: '#888780', paddingVertical: 16, textAlign: 'center' },
   dateBtn: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     backgroundColor: '#1A1A1A', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14,
