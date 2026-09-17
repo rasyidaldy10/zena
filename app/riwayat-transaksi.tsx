@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase'
 import { Transaction, UserWallet } from '../types'
 import { COLORS, RADIUS } from '../constants/theme'
 import { formatMoney, amountInIDR } from '../lib/format'
+import { isEditablePeriod } from '../lib/period'
 
 const PAGE_SIZE = 50
 
@@ -149,6 +150,9 @@ export default function RiwayatTransaksiScreen() {
     const income = item.type === 'income'
     const wallet = item.wallet_id ? wallets[item.wallet_id] : undefined
     const d = new Date(item.date)
+    // Transaksi di luar jendela 2 bulan tetap bisa dibuka (dilihat), tapi layar
+    // editnya akan hanya-baca. Ikon gembok memberi tahu itu sebelum ditekan.
+    const locked = !isEditablePeriod(item.date)
 
     return (
       <TouchableOpacity
@@ -174,15 +178,18 @@ export default function RiwayatTransaksiScreen() {
         </View>
 
         <View style={styles.amountCol}>
-          <Text
-            style={[
-              styles.amount,
-              transfer ? styles.neutral : income ? styles.income : styles.expense,
-            ]}
-            numberOfLines={1}
-          >
-            {transfer ? '' : income ? '+' : '−'}{formatMoney(item.amount, item.currency)}
-          </Text>
+          <View style={styles.amountRow}>
+            {locked && <Ionicons name="lock-closed" size={11} color={COLORS.textMuted} />}
+            <Text
+              style={[
+                styles.amount,
+                transfer ? styles.neutral : income ? styles.income : styles.expense,
+              ]}
+              numberOfLines={1}
+            >
+              {transfer ? '' : income ? '+' : '−'}{formatMoney(item.amount, item.currency)}
+            </Text>
+          </View>
           {/* Untuk transaksi valas, nilai rupiah terkuncinya ikut ditampilkan
               supaya jelas berapa yang masuk ke laporan. */}
           {item.currency && item.currency !== 'IDR' && (
@@ -368,6 +375,7 @@ const styles = StyleSheet.create({
   title: { fontSize: 13, fontWeight: '600', color: COLORS.text },
   sub: { fontSize: 11, color: COLORS.textMuted, marginTop: 2 },
   amountCol: { alignItems: 'flex-end' },
+  amountRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   amount: { fontSize: 13, fontWeight: '700' },
   amountIdr: { fontSize: 10, color: COLORS.textMuted, marginTop: 1 },
   income: { color: COLORS.income },

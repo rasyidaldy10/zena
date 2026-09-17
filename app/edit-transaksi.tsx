@@ -10,6 +10,7 @@ import { confirmAsync, notify } from '../lib/alert'
 import { CATEGORIES, Transaction } from '../types'
 import { formatMoney, parseAmountInput } from '../lib/format'
 import { isForeign, currencyMeta } from '../lib/fx'
+import { isEditablePeriod, editableFromLabel } from '../lib/period'
 
 const PRIMARY = '#185FA5'
 const GREEN = '#1D9E75'
@@ -112,6 +113,11 @@ export default function EditTransaksiScreen() {
   const [saving, setSaving] = useState(false)
   const [showDatePicker, setShowDatePicker] = useState(false)
 
+  // Kunci periode: transaksi lebih lama dari 2 bulan kalender tidak boleh
+  // diubah/dihapus. Dicek di sini (tampilan) DAN di handleSave/handleDelete
+  // (penegakan), supaya semua jalan masuk ke layar ini kena aturan yang sama.
+  const locked = !!transaction && !isEditablePeriod(transaction.date)
+
   // Mata uang transaksi mengikuti dompetnya; transaksi lama default rupiah.
   const txCurrency = wallets.find(w => w.id === selectedWallet)?.currency
     || transaction?.currency || 'IDR'
@@ -164,8 +170,18 @@ export default function EditTransaksiScreen() {
   }
 
   const handleSave = async () => {
+    if (locked) {
+      notify('Periode Sudah Ditutup', `Transaksi sebelum ${editableFromLabel()} tidak bisa diubah lagi.`)
+      return
+    }
     if (!amount || !category) {
       Alert.alert('Oops', 'Nominal dan kategori harus diisi')
+      return
+    }
+    // Tanggal juga tidak boleh DIPINDAHKAN ke periode tertutup — kalau tidak,
+    // kunci di atas bisa dilewati lewat pintu belakang.
+    if (!isEditablePeriod(selectedDate)) {
+      notify('Periode Sudah Ditutup', `Tanggal transaksi hanya bisa dari ${editableFromLabel()} sampai sekarang.`)
       return
     }
 
@@ -260,6 +276,10 @@ export default function EditTransaksiScreen() {
   }
 
   const handleDelete = async () => {
+    if (locked) {
+      notify('Periode Sudah Ditutup', `Transaksi sebelum ${editableFromLabel()} tidak bisa dihapus lagi.`)
+      return
+    }
     const ok = await confirmAsync(
       'Hapus Transaksi',
       'Yakin mau hapus transaksi ini? Saldo dompet akan dikembalikan.',
@@ -292,6 +312,50 @@ export default function EditTransaksiScreen() {
       <ActivityIndicator color={PRIMARY} />
     </View>
   )
+
+  if (locked && transaction) {
+    const isTransfer = transaction.is_wallet_transfer
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Text style={styles.backText}>← Kembali</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Detail Transaksi</Text>
+          <View style={{ width: 80 }} />
+        </View>
+        <View style={styles.transferInfo}>
+          <Text style={styles.transferIcon}>🔒</Text>
+          <Text style={styles.transferTitle}>Periode Sudah Ditutup</Text>
+          <Text style={styles.transferDesc}>
+            Transaksi ini bertanggal {transaction.date}. Yang bisa diubah hanya
+            transaksi dari {editableFromLabel()} sampai sekarang, supaya laporan
+            bulan-bulan sebelumnya tidak berubah.
+          </Text>
+          <View style={styles.lockedCard}>
+            <View style={styles.lockedRow}>
+              <Text style={styles.lockedLabel}>{isTransfer ? 'Jenis' : 'Kategori'}</Text>
+              <Text style={styles.lockedValue}>
+                {isTransfer ? 'Transfer antar dompet' : (transaction.category || '-')}
+              </Text>
+            </View>
+            <View style={styles.lockedRow}>
+              <Text style={styles.lockedLabel}>Nominal</Text>
+              <Text style={[styles.lockedValue, { color: transaction.type === 'income' ? GREEN : RED }]}>
+                {transaction.type === 'income' ? '+' : '−'}{formatMoney(transaction.amount, transaction.currency)}
+              </Text>
+            </View>
+            {!!transaction.note && (
+              <View style={styles.lockedRow}>
+                <Text style={styles.lockedLabel}>Catatan</Text>
+                <Text style={styles.lockedValue} numberOfLines={3}>{transaction.note}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </View>
+    )
+  }
 
   if (transaction?.is_wallet_transfer) {
     return (
@@ -519,4 +583,11 @@ const styles = StyleSheet.create({
   transferIcon: { fontSize: 48, marginBottom: 16 },
   transferTitle: { fontSize: 18, fontWeight: '600', color: '#fff', marginBottom: 8 },
   transferDesc: { fontSize: 13, color: '#888780', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  lockedCard: {
+    alignSelf: 'stretch', backgroundColor: '#1A1A1A', borderRadius: 12,
+    padding: 14, borderWidth: 0.5, borderColor: '#2A2A2A', gap: 10,
+  },
+  lockedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 },
+  lockedLabel: { fontSize: 12, color: '#888780' },
+  lockedValue: { fontSize: 13, fontWeight: '600', color: '#fff', flex: 1, textAlign: 'right' },
 })

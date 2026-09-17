@@ -95,6 +95,24 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-09-17) - KUNCI PERIODE EDIT (2 BULAN) ✅
+
+**Permintaan:** edit transaksi di riwayat, tapi maksimal 2 bulan ke belakang. Dikonfirmasi ke user: yang dimaksud **kunci periode** (transaksi lebih lama jadi hanya-baca, tetap tampil), hitungan **bulan kalender** (bulan ini + 2 sebelumnya; 17 Sep → Jul/Agu/Sep terbuka, Juni terkunci; 1 Okt → Juli ikut terkunci).
+
+**Aturan di `lib/period.ts`** (fungsi murni, diuji 12/12 termasuk lintas tahun Des→Jan & pergantian bulan): `EDITABLE_MONTHS_BACK = 2`, `isEditablePeriod(date)`, `editableFromMonth()`, `editableFromLabel()`. Perbandingan pakai teks `'YYYY-MM'` dari tanggal LOKAL — sengaja hindari `toISOString()` (bug WIB yang pernah kena). Tanggal kosong/rusak → dianggap TERKUNCI (lebih aman).
+
+**Penegakan di SATU titik (`app/edit-transaksi.tsx`) supaya semua jalan masuk kena** — Riwayat, Home, Laporan, dan detail project semuanya menuju layar ini:
+- `locked` dihitung dari `transaction.date`. Kalau terkunci → layar hanya-baca (🔒 "Periode Sudah Ditutup" + ringkasan kategori/nominal/catatan), tanpa tombol Simpan/Hapus. Cabang ini ditaruh SEBELUM cabang transfer, jadi transfer lama pun tidak bisa dihapus.
+- `handleSave` & `handleDelete` menolak kalau `locked` (pertahanan berlapis, bukan cuma tampilan).
+- **Celah pintu belakang ditutup:** tanggal transaksi yang masih terbuka tidak boleh DIPINDAHKAN ke bulan terkunci (`handleSave` cek `selectedDate`), dan `tambah-transaksi` menolak mencatat mundur ke bulan terkunci. Tanpa dua ini, laporan lama tetap bisa diubah lewat entri baru/pindah tanggal.
+- Riwayat: ikon gembok kecil di baris yang terkunci (tetap bisa dibuka untuk dilihat).
+
+**Dampak ke data nyata (17 Sep 2026):** Juni 72 transaksi TERKUNCI; Jul 75, Agu 104, Sep 64 bisa diedit.
+
+⚠️ Chat/scan (`chat.tsx`) selalu mencatat tanggal HARI INI, jadi tidak perlu dikunci. Novi API (`novi-api`) TIDAK dikunci — agen eksternal masih bisa menulis ke periode lama lewat `record_transaction`/`db_update`; sengaja dibiarkan karena itu jalur admin/otomasi, bukan UI.
+
+---
+
 ## LATEST SESSION (2026-09-10) - PERBAIKAN BUG VALAS ✅
 
 **Keluhan user: "masih sering error di bagian valas".** Backend ternyata SEHAT — masalahnya di tampilan & cache sisi app.
@@ -606,7 +624,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Invoice & Penawaran:** Buat/edit dokumen, nomor otomatis terkunci (`003/GMC/VI/2026` / `PNW-...`), item dinamis, PPN, pilih rekening + 3 template, preview, kirim WhatsApp, Download PDF (HTML cetak via edge function), ubah status (draft/sent/paid/approved/rejected)  
 **✅ Reminder:** Add tagihan, Toggle paid/unpaid  
 **✅ Laporan Laba Kotor (mode bisnis):** Tab "Laba Kotor" — penjualan produk, HPP, laba kotor, margin, dan rincian per produk (qty, penjualan, laba, margin). Dihitung dari `transaction_items` sehingga tidak bergantung pada `business_category` yang tidak pernah terisi.  
-**✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan, pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya.  
+**✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan, pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya. **Kunci periode:** transaksi lebih lama dari 2 bulan kalender jadi hanya-baca (tidak bisa diedit/dihapus/dipindah tanggal, dan tidak bisa dicatat mundur ke sana), ditandai 🔒.  
 **✅ Bottom Nav:** Home, Laporan, + (tambah transaksi), Reminder, Profil  
 **✅ Security:** Elite-level (9.2/10) - Defense-in-depth encryption (7 layers), Rate limiting, Input validation (12 validators), Token theft detection, RLS policies  
 **✅ Marketing Manager:** Higgsfield AI integration (IG/TikTok/WA content), Virality prediction, Campaign generator  

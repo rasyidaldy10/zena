@@ -15,6 +15,7 @@ import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types'
 import { COLORS, RADIUS, SHADOW } from '../constants/theme'
 import { formatMoney, formatDelta, parseAmountInput } from '../lib/format'
 import { getRates, isForeign, currencyMeta, weightedAvgRate, type FxRateMap } from '../lib/fx'
+import { isEditablePeriod, editableFromLabel } from '../lib/period'
 
 const PRIMARY = COLORS.primary
 const GREEN = COLORS.income
@@ -360,6 +361,12 @@ Return ONLY valid JSON, tanpa markdown.`
     }
     if (!selectedWallet) {
       notify('Oops', 'Pilih dompet dulu ya')
+      return
+    }
+    // Periode >2 bulan lalu sudah ditutup: transaksi baru pun tidak boleh
+    // dicatat mundur ke sana, supaya laporan lama tidak berubah lewat entri baru.
+    if (!isEditablePeriod(selectedDate)) {
+      notify('Periode Sudah Ditutup', `Tanggal transaksi hanya bisa dari ${editableFromLabel()} sampai sekarang.`)
       return
     }
     if (type === 'transfer' && wallets.length <= 1) {
