@@ -95,6 +95,28 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 
 ---
 
+## LATEST SESSION (2026-10-10) - PROFIT PROJECT + RIWAYAT PER DOMPET + SUARA 2 ARAH ✅
+
+**1. Profit project salah hitung — DUA sebab, keduanya diperbaiki.**
+- **Sebab A (data):** transaksi Rp 258.000.000 tanggal 10 Okt ADA tapi `project_id` NULL — dicatat manual, bukan lewat tombol "Tandai Lunas". Jadi `get_project_stats` cuma melihat DP 400jt. Sudah dikaitkan ke HYDRANT (nominal, tanggal, jenis cocok persis dengan Termin 1).
+- **Sebab B (rumus & sumber data):** `total_paid` dari `project_terms`, tapi `estimated_profit` dari `transactions` — **dua sumber berbeda di kartu yang sama**. Terbukti menyimpang di 4 project, ke DUA arah (termin tanpa transaksi, dan transaksi tanpa termin). Plus rumus lama `estimated_profit = income − expense` sebenarnya ARUS KAS, bukan estimasi: project aktif hampir selalu tampak minus karena belanja mendahului tagihan. HYDRANT tampil **−136jt / margin −14%** padahal kontrak 940jt & pengeluaran 536jt.
+- **Fix (`FIX_PROJECT_PROFIT.sql`, sudah dijalankan + diverifikasi):**
+  `estimated_profit = contract_value − expense` · `margin = profit / contract` · **kolom baru `cash_flow` = income − expense** · `total_paid = GREATEST(termin_lunas, income_tercatat)` supaya pembayaran yang hanya tercatat di salah satu tempat tidak hilang · kolom baru `income_recorded` & `terms_paid` dikembalikan terpisah supaya UI bisa MEMPERINGATKAN saat tidak cocok (bukan menyembunyikan).
+  HYDRANT sekarang: dibayar 658jt, est. profit **403.936.400 (margin 43%)**, arus kas **+121.936.400**.
+- **Akar masalah di app diperbaiki:** `handleWalletSelected` dulu menandai termin lunas DULU baru insert transaksi — kalau insert gagal, termin "lunas" tanpa catatan uang (persis pola selisih ini). Urutan dibalik: transaksi dulu, termin belakangan. Sekalian isi `currency`/`amount_idr`/`is_wallet_transfer` dan pakai tanggal LOKAL (bukan `toISOString()`).
+- UI `business-project-detail`: baris **Arus Kas Project** terpisah dari Estimasi Profit + kotak peringatan kuning saat `terms_paid ≠ income_recorded`. 3 project masih selisih (igm, pompa RS Jiwa, RS PMC) dan kini ketahuan otomatis.
+
+**2. Riwayat per dompet** — dompet di beranda dulu `View` (tidak bisa ditekan) dan `detail-wallet` TIDAK menampilkan transaksi sama sekali. Alih-alih bikin layar baru, `riwayat-transaksi` diberi saringan dompet: terima `?wallet=<id>`, chip pemilih dompet, judul ikut nama dompet. Dompet di beranda jadi `TouchableOpacity` + chevron → riwayat dompet itu. Otomatis dapat pencarian, saring bulan, muat bertahap, edit, kunci periode, dan tampilan valas yang sudah ada. Data nyata: bca bisnis 269 txn/3 bulan, BANK BCA 59, mandiri 27.
+
+**3. Suara dua arah (commit `ba4fda5`).** User minta "secanggih VN ke GPT". Dijelaskan: ChatGPT pakai speech-to-speech (Realtime API) yang mendengar audio langsung tanpa jadi teks dulu — itu sebabnya jauh lebih jelas; Zena pakai 3 langkah (Whisper → teks → Claude) sehingga salah dengar di langkah pertama tidak bisa diperbaiki. User memilih tetap pakai Claude+Whisper (gratis) daripada OpenAI Realtime (~Rp 350–900/menit).
+- **2 bug akurasi diperbaiki di `groq-transcribe`:** audio browser direkam **webm** tapi SELALU dilabeli `audio/m4a` (client & server) → pengurai Whisper diberi petunjuk format salah. Sekarang mime & ekstensi ikut platform. Ditambah `prompt` berisi kamus istilah keuangan Indonesia (bias pengenalan angka lisan) + `temperature 0`.
+- **Alur percakapan (`chat.tsx`):** `voiceStageRef` idle→answer→confirm. Zena bertanya → `speak(..., onEnd)` otomatis mulai merekam → transkrip dilempar ke `processTypedTransactions` (jalur yang sama dengan teks ketik, jadi MULTI-transaksi + keterangan per transaksi) → Zena membacakan ringkasan pakai `terbilang()` (angka jadi kata) → user bilang "betul"/koreksi lisan/"batal". Koreksi lisan diproses `reviseRowsByVoice` (Claude memperbaiki daftar). Bar status menampilkan tahapnya.
+- `lib/speech.ts` dapat parameter `onEnd`; `lib/terbilang.ts` baru (diporting dari generator PDF). Kode mati dibersihkan: `parseTransactionFromVoice` & `processVoiceNote` dihapus dari `lib/groq.ts` (sisa `transcribeAudio` saja).
+
+⚠️ **Sisa yang diketahui:** edge function `groq-parse-transaction` kini tidak dipakai siapa pun (kandidat dihapus). Percakapan suara hanya jalan di WEB (`lib/speech.ts` keluar lebih awal kalau `Platform.OS !== 'web'`) — di APK, `speak()` langsung memanggil `onEnd`, jadi Zena tidak bersuara tapi alurnya tetap lanjut.
+
+---
+
 ## LATEST SESSION (2026-09-17b) - BUILD #8 (v1.1.0) + PROJECT PICKER DI EDIT ✅
 
 **Build APK #8 (versi 1.1.0, versionCode 8)** lewat `eas build --platform android --profile preview`.
@@ -642,7 +664,7 @@ Read the exact versioned docs at https://docs.expo.dev/versions/v56.0.0/ before 
 **✅ Invoice & Penawaran:** Buat/edit dokumen, nomor otomatis terkunci (`003/GMC/VI/2026` / `PNW-...`), item dinamis, PPN, pilih rekening + 3 template, preview, kirim WhatsApp, Download PDF (HTML cetak via edge function), ubah status (draft/sent/paid/approved/rejected)  
 **✅ Reminder:** Add tagihan, Toggle paid/unpaid  
 **✅ Laporan Laba Kotor (mode bisnis):** Tab "Laba Kotor" — penjualan produk, HPP, laba kotor, margin, dan rincian per produk (qty, penjualan, laba, margin). Dihitung dari `transaction_items` sehingga tidak bergantung pada `business_category` yang tidak pernah terisi.  
-**✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan, pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya. **Kunci periode:** transaksi lebih lama dari 2 bulan kalender jadi hanya-baca (tidak bisa diedit/dihapus/dipindah tanggal, dan tidak bisa dicatat mundur ke sana), ditandai 🔒.  
+**✅ Riwayat Transaksi:** Layar `riwayat-transaksi` — semua transaksi lintas bulan (atau **per dompet**: tekan dompet di beranda), pencarian catatan/kategori, saring arah uang & bulan, muat bertahap 50 baris, tiap baris menuju edit. Nominal valas tampil apa adanya + nilai rupiah terkuncinya. **Kunci periode:** transaksi lebih lama dari 2 bulan kalender jadi hanya-baca (tidak bisa diedit/dihapus/dipindah tanggal, dan tidak bisa dicatat mundur ke sana), ditandai 🔒.  
 **✅ Bottom Nav:** Home, Laporan, + (tambah transaksi), Reminder, Profil  
 **✅ Security:** Elite-level (9.2/10) - Defense-in-depth encryption (7 layers), Rate limiting, Input validation (12 validators), Token theft detection, RLS policies  
 **✅ Marketing Manager:** Higgsfield AI integration (IG/TikTok/WA content), Virality prediction, Campaign generator  

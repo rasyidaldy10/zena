@@ -109,7 +109,33 @@ export default function BusinessProjectDetailScreen() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) throw new Error('Not authenticated')
 
-      // 1. Update term paid_at
+      // Transaksi dicatat DULU, baru termin ditandai lunas. Urutan sebaliknya
+      // pernah menyisakan termin "lunas" tanpa catatan uang masuk ketika insert
+      // gagal — itu sumber selisih antara termin & pemasukan yang bikin profit
+      // project salah hitung. Kalau langkah ini gagal, termin tetap belum
+      // ditandai, jadi aman diulang.
+      const today = new Date()
+      const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+      const { error: transactionError } = await supabase.from('transactions').insert({
+        user_id: session.user.id,
+        amount: selectedTerm.amount,
+        currency: 'IDR',
+        amount_idr: selectedTerm.amount,
+        type: 'income',
+        category: 'Bisnis',
+        wallet_id: wallet.id,
+        wallet_source: wallet.wallet_name,
+        project_id: id,
+        source: 'manual',
+        is_categorized: true,
+        is_wallet_transfer: false,
+        note: `Pembayaran termin: ${selectedTerm.label}`,
+        date: localDate,
+      })
+
+      if (transactionError) throw transactionError
+
       const { error: termError } = await supabase
         .from('project_terms')
         .update({
@@ -119,23 +145,6 @@ export default function BusinessProjectDetailScreen() {
         .eq('id', selectedTerm.id)
 
       if (termError) throw termError
-
-      // 2. Insert transaction income
-      const { error: transactionError } = await supabase.from('transactions').insert({
-        user_id: session.user.id,
-        amount: selectedTerm.amount,
-        type: 'income',
-        category: 'Bisnis',
-        wallet_id: wallet.id,
-        wallet_source: wallet.wallet_name,
-        project_id: id,
-        source: 'manual',
-        is_categorized: true,
-        note: `Pembayaran termin: ${selectedTerm.label}`,
-        date: new Date().toISOString(),
-      })
-
-      if (transactionError) throw transactionError
 
       // 3. Update wallet balance
       const { error: walletError } = await supabase
@@ -325,6 +334,20 @@ export default function BusinessProjectDetailScreen() {
             </Text>
           </View>
 
+          {/* Arus kas dipisah dari estimasi profit: yang satu perkiraan hasil
+              akhir (kontrak − pengeluaran), yang satu posisi uang saat ini. */}
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Arus Kas Project</Text>
+            <Text
+              style={[
+                styles.detailValueBold,
+                { color: (project.cash_flow || 0) >= 0 ? COLORS.SUCCESS : COLORS.DANGER },
+              ]}
+            >
+              {(project.cash_flow || 0) >= 0 ? '+' : '−'}{formatRupiah(project.cash_flow || 0)}
+            </Text>
+          </View>
+
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Margin</Text>
             <Text
@@ -336,6 +359,18 @@ export default function BusinessProjectDetailScreen() {
               {(project.margin_pct || 0).toFixed(1)}%
             </Text>
           </View>
+
+          {/* Termin dan transaksi dicatat terpisah dan bisa berbeda. Daripada
+              diam-diam memakai salah satunya, selisihnya ditampilkan. */}
+          {(project.terms_paid ?? 0) !== (project.income_recorded ?? 0) && (
+            <View style={styles.warnBox}>
+              <Text style={styles.warnText}>
+                ⚠️ Termin lunas {formatRupiah(project.terms_paid || 0)}, tapi pemasukan
+                tercatat {formatRupiah(project.income_recorded || 0)}. Cek lagi — mungkin ada
+                pembayaran yang belum dicatat, atau transaksi yang belum dikaitkan ke project ini.
+              </Text>
+            </View>
+          )}
 
           <View style={styles.progressContainer}>
             <View style={styles.progressHeader}>
@@ -605,6 +640,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
+  warnBox: {
+    backgroundColor: COLORS.WARNING + '18', borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: COLORS.WARNING + '55', marginTop: 4,
+  },
+  warnText: { fontSize: 11, color: COLORS.TEXT, lineHeight: 16 },
   separator: {
     height: 1,
     backgroundColor: COLORS.BORDER,

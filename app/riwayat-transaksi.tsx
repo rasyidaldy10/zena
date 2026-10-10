@@ -3,7 +3,7 @@ import {
   View, Text, TextInput, StyleSheet, TouchableOpacity,
   ActivityIndicator, FlatList, RefreshControl, Platform,
 } from 'react-native'
-import { Stack, router, useFocusEffect } from 'expo-router'
+import { Stack, router, useFocusEffect, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '../lib/supabase'
 import { Transaction, UserWallet } from '../types'
@@ -38,8 +38,12 @@ function recentMonths(): { value: string; label: string }[] {
 }
 
 export default function RiwayatTransaksiScreen() {
+  // Dibuka dari beranda dengan ?wallet=<id> untuk melihat riwayat satu dompet.
+  const { wallet: walletParam } = useLocalSearchParams<{ wallet?: string }>()
+  const [walletId, setWalletId] = useState<string>(walletParam || '')
   const [rows, setRows] = useState<Transaction[]>([])
   const [wallets, setWallets] = useState<Record<string, UserWallet>>({})
+  const [walletList, setWalletList] = useState<UserWallet[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
@@ -72,6 +76,8 @@ export default function RiwayatTransaksiScreen() {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1)
+
+    if (walletId) q = q.eq('wallet_id', walletId)
 
     if (flow === 'transfer') q = q.eq('is_wallet_transfer', true)
     else if (flow !== 'all') q = q.eq('type', flow).eq('is_wallet_transfer', false)
@@ -121,10 +127,10 @@ export default function RiwayatTransaksiScreen() {
     setLoadingMore(false)
   }
 
-  useEffect(() => { reload() }, [debounced, flow, month])
+  useEffect(() => { reload() }, [debounced, flow, month, walletId])
 
   // Muat ulang saat kembali dari layar edit, supaya perubahan langsung terlihat.
-  useFocusEffect(useCallback(() => { reload(true) }, [debounced, flow, month]))
+  useFocusEffect(useCallback(() => { reload(true) }, [debounced, flow, month, walletId]))
 
   useEffect(() => {
     (async () => {
@@ -134,9 +140,11 @@ export default function RiwayatTransaksiScreen() {
         .from('user_wallets')
         .select('id, wallet_name, icon, currency')
         .eq('user_id', session.user.id)
+      const list = (data ?? []) as UserWallet[]
       const map: Record<string, UserWallet> = {}
-      for (const w of (data ?? []) as UserWallet[]) map[w.id] = w
+      for (const w of list) map[w.id] = w
       setWallets(map)
+      setWalletList(list)
     })()
   }, [])
 
@@ -204,7 +212,7 @@ export default function RiwayatTransaksiScreen() {
     <View style={styles.container}>
       <Stack.Screen
         options={{
-          title: 'Riwayat Transaksi',
+          title: walletId ? (wallets[walletId]?.wallet_name || 'Riwayat Dompet') : 'Riwayat Transaksi',
           headerShown: true,
           headerLeft: () => (
             <TouchableOpacity onPress={() => router.back()} style={{ paddingHorizontal: 12 }}>
@@ -232,6 +240,28 @@ export default function RiwayatTransaksiScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Saring per dompet — ada isinya hanya kalau punya >1 dompet */}
+      {walletList.length > 1 && (
+        <FlatList
+          horizontal
+          data={[{ id: '', wallet_name: 'Semua Dompet', icon: '' } as any, ...walletList]}
+          keyExtractor={w => w.id || 'all'}
+          showsHorizontalScrollIndicator={false}
+          style={styles.monthBar}
+          contentContainerStyle={styles.monthBarContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={[styles.mChip, walletId === item.id && styles.mChipOn]}
+              onPress={() => setWalletId(item.id)}
+            >
+              <Text style={[styles.mChipText, walletId === item.id && styles.mChipTextOn]}>
+                {item.icon ? `${item.icon} ` : ''}{item.wallet_name}
+              </Text>
+            </TouchableOpacity>
+          )}
+        />
+      )}
 
       {/* Filter arah uang */}
       <View style={styles.chipRow}>
@@ -273,6 +303,7 @@ export default function RiwayatTransaksiScreen() {
         <View style={styles.summary}>
           <Text style={styles.summaryText}>
             {rows.length}{done ? '' : '+'} transaksi
+            {walletId && wallets[walletId] ? ` · ${wallets[walletId].wallet_name}` : ''}
           </Text>
           <Text style={[
             styles.summaryNet,

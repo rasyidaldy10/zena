@@ -321,6 +321,12 @@ export interface Project {
   created_at: string
   // Computed fields (from helper function)
   total_paid?: number
+  /** Arus kas project: pemasukan tercatat dikurangi pengeluaran */
+  cash_flow?: number
+  /** Pemasukan dari tabel transactions (untuk mendeteksi selisih dengan termin) */
+  income_recorded?: number
+  /** Jumlah termin yang ditandai lunas */
+  terms_paid?: number
   total_expense?: number
   estimated_profit?: number
   margin_pct?: number

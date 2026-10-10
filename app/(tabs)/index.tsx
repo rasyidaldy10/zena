@@ -466,7 +466,13 @@ export default function HomeScreen() {
                   const move = foreign ? dailyMovement(w.current_balance, w.currency!, rates) : null
                   return (
                     <View key={w.id}>
-                      <View style={[styles.walletItem, isChild && styles.walletItemChild]}>
+                      {/* Tekan dompet -> riwayat transaksi dompet itu saja,
+                          lengkap dengan pencarian & edit seperti riwayat umum. */}
+                      <TouchableOpacity
+                        style={[styles.walletItem, isChild && styles.walletItemChild]}
+                        activeOpacity={0.6}
+                        onPress={() => router.push(`/riwayat-transaksi?wallet=${w.id}`)}
+                      >
                         {isChild && <View style={styles.walletChildBar} />}
                         <Text style={styles.walletIcon}>{w.icon}</Text>
                         <View style={styles.walletInfo}>
@@ -494,7 +500,8 @@ export default function HomeScreen() {
                             </Text>
                           )}
                         </View>
-                      </View>
+                        <Ionicons name="chevron-forward" size={14} color={TEXT_SECONDARY} />
+                      </TouchableOpacity>
                       {childrenOf(w.id).map(c => renderWallet(c, true))}
                     </View>
                   )
