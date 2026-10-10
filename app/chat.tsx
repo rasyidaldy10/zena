@@ -11,7 +11,8 @@ import { supabase } from '../lib/supabase'
 import { claudeChat, claudeVision } from '../lib/claude'
 import { getContextualSystemPrompt } from '../lib/personas'
 import { speak, stopSpeaking } from '../lib/speech'
-import { processVoiceNote } from '../lib/groq'
+import { transcribeAudio } from '../lib/groq'
+import { terbilang } from '../lib/terbilang'
 import { parseTransactionText, ParsedTransaction } from '../lib/transaction-parser'
 import { amountInIDR } from '../lib/format'
 import TransactionConfirmCard from '../components/TransactionConfirmCard'
@@ -73,6 +74,16 @@ export default function ChatScreen() {
   const userIdRef = useRef<string | null>(null)
   const historyReadyRef = useRef(false)
   const scrollRef = useRef<ScrollView>(null)
+
+  // Percakapan suara dua arah:
+  //   idle    -> tidak ada sesi
+  //   answer  -> Zena sudah bertanya, menunggu user menyebut transaksi
+  //   confirm -> Zena sudah membacakan hasil, menunggu "betul" / koreksi / "batal"
+  // Disimpan di ref karena dibaca di dalam callback async (stopRecording, onEnd TTS).
+  type VoiceStage = 'idle' | 'answer' | 'confirm'
+  const voiceStageRef = useRef<VoiceStage>('idle')
+  const [voiceStage, setVoiceStage] = useState<VoiceStage>('idle')
+  const setStage = (st: VoiceStage) => { voiceStageRef.current = st; setVoiceStage(st) }
 
   useEffect(() => {
     initChat()
@@ -365,7 +376,7 @@ export default function ChatScreen() {
     : EXPENSE_CATEGORIES
 
   // Bangun kartu review dari array transaksi mentah (dipakai scan & input teks)
-  const presentRows = async (rawList: any[], emptyMsg: string) => {
+  const presentRows = async (rawList: any[], emptyMsg: string): Promise<ScanRow[] | null> => {
     const validCats = (flow: string) => (flow === 'in' ? incomeCats : expenseCats)
     const rows: ScanRow[] = rawList
       .map((t) => {
@@ -379,7 +390,7 @@ export default function ChatScreen() {
 
     if (rows.length === 0) {
       setMessages(prev => [...prev, { role: 'assistant', content: emptyMsg }])
-      return
+      return null
     }
     const { data: { user } } = await supabase.auth.getUser()
     // Hasil scan struk/mutasi selalu dalam rupiah, jadi hanya tawarkan dompet
@@ -396,16 +407,17 @@ export default function ChatScreen() {
     const wl = (wallets || []) as ScanWalletOpt[]
     if (wl.length === 0) {
       setMessages(prev => [...prev, { role: 'assistant', content: `Kebaca ${rows.length} transaksi, tapi kamu belum punya dompet rupiah ${activeMode === 'personal' ? 'pribadi' : 'bisnis'}. Tambah dompet dulu ya!` }])
-      return
+      return null
     }
     setScanWallets(wl)
     setScanWalletInitial(wl[0]?.id)
     setScanRows(rows)
     setMessages(prev => [...prev, { role: 'assistant', content: `✅ Kebaca ${rows.length} transaksi. Cek satu-satu — bisa pilih dompet, ubah masuk/keluar, nominal, kategori, batalin per item, atau simpan sekaligus.` }])
+    return rows
   }
 
   // Input TEKS dengan banyak transaksi / tempelan mutasi → ekstrak jadi banyak kartu
-  const processTypedTransactions = async (text: string) => {
+  const processTypedTransactions = async (text: string): Promise<ScanRow[] | null> => {
     setLoading(true)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 50)
     try {
@@ -426,9 +438,10 @@ Return ONLY valid JSON.`
       const clean = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       const data = JSON.parse(clean)
       const rawList: any[] = Array.isArray(data?.transactions) ? data.transactions : []
-      await presentRows(rawList, 'Hmm, belum kebaca transaksinya. Coba tulis lebih jelas ya, misal: "belanja sayur 20rb dan ayam 35rb".')
+      return await presentRows(rawList, 'Hmm, belum kebaca transaksinya. Coba tulis lebih jelas ya, misal: "belanja sayur 20rb dan ayam 35rb".')
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Hmm, belum kebaca transaksinya. Coba tulis lebih jelas ya, misal: "belanja sayur 20rb dan ayam 35rb".' }])
+      return null
     }
     setLoading(false)
     setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
@@ -546,9 +559,27 @@ Return ONLY valid JSON, no markdown, no explanation.`
   const handleVoiceNote = async () => {
     if (isRecording) {
       await stopRecording()
-    } else {
-      await startRecording()
+      return
     }
+    if (voiceStageRef.current === 'idle') {
+      // Sesi baru: Zena bertanya dulu, lalu otomatis mendengarkan.
+      startVoiceSession()
+      return
+    }
+    // Sesi sedang berjalan & Zena masih bicara: potong, langsung dengarkan.
+    stopSpeaking()
+    await startRecording()
+  }
+
+  // Simpan/batalkan lewat kartu (bukan suara) juga harus mengakhiri sesi,
+  // supaya Zena tidak tiba-tiba menyalakan mic lagi setelah bicara.
+  const handleSaveScanFromCard = async (rows: ScanRow[], walletId: string) => {
+    stopSpeaking(); setStage('idle')
+    await handleSaveScan(rows, walletId)
+  }
+  const handleCancelScanFromCard = () => {
+    stopSpeaking(); setStage('idle')
+    handleCancelScan()
   }
 
   const startRecording = async () => {
@@ -573,6 +604,80 @@ Return ONLY valid JSON, no markdown, no explanation.`
     }
   }
 
+  // ── Percakapan suara dua arah ──────────────────────────────────────────
+  // Zena bertanya → user menjawab → Zena membacakan hasil → user bilang
+  // "betul" (simpan) / mengoreksi (parsing ulang) / "batal". Tiap giliran
+  // user tetap menekan mic, tapi perekaman dimulai otomatis begitu Zena
+  // selesai bicara supaya terasa seperti percakapan.
+
+  const speakThenListen = (text: string) => {
+    setMessages(prev => [...prev, { role: 'assistant', content: `🔊 ${text}` }])
+    speak(text, persona, 'id-ID', () => {
+      // Mulai mendengarkan hanya kalau sesi masih aktif (user bisa saja membatalkan)
+      if (voiceStageRef.current !== 'idle') startRecording()
+    })
+  }
+
+  const endVoiceSession = (sayThis?: string) => {
+    setStage('idle')
+    if (sayThis) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `🔊 ${sayThis}` }])
+      speak(sayThis, persona, 'id-ID')
+    }
+  }
+
+  const startVoiceSession = () => {
+    stopSpeaking()
+    setStage('answer')
+    speakThenListen('Mau catat apa hari ini?')
+  }
+
+  /** Kalimat ringkasan yang dibacakan, dengan nominal sebagai kata. */
+  const rowsToSpeech = (rows: ScanRow[]): string => {
+    const items = rows.filter(r => r.include)
+    const wallet = scanWallets.find(w => w.id === scanWalletInitial)?.wallet_name
+    const parts = items.map(r => {
+      const arah = r.flow === 'in' ? 'masuk' : 'keluar'
+      const nama = r.description || r.category
+      return `${nama} ${terbilang(r.amount)} rupiah ${arah}`
+    })
+    const daftar = parts.length === 1 ? parts[0]
+      : parts.slice(0, -1).join(', ') + ', dan ' + parts[parts.length - 1]
+    return `Oke, aku catat ${items.length} transaksi: ${daftar}${wallet ? `, ke dompet ${wallet}` : ''}. Betul?`
+  }
+
+  const YES = /^\s*(ya|iya|yes|yup|betul|bener|benar|oke|ok|okay|sip|siap|simpan|lanjut|setuju|boleh)\b/i
+  const NO  = /^\s*(batal|gak jadi|nggak jadi|ga jadi|tidak jadi|tidak|jangan|cancel|enggak|nggak|gak)\b/i
+
+  /** Koreksi lisan → Claude memperbaiki daftar transaksi yang sudah ada. */
+  const reviseRowsByVoice = async (current: ScanRow[], correction: string): Promise<ScanRow[] | null> => {
+    const sys = 'Kamu mesin koreksi daftar transaksi keuangan. Balas HANYA JSON valid, tanpa penjelasan.'
+    const currentJson = JSON.stringify(
+      current.filter(r => r.include).map(r => ({ flow: r.flow, amount: r.amount, description: r.description, category: r.category }))
+    )
+    const prompt = [
+      'Daftar transaksi saat ini (JSON):',
+      currentJson,
+      '',
+      `User mengoreksi lewat suara: "${correction.replace(/"/g, "'")}"`,
+      '',
+      'Terapkan koreksinya (ubah nominal/keterangan/kategori, hapus, atau tambah transaksi) dan kembalikan daftar LENGKAP yang sudah benar:',
+      '{ "transactions": [ { "flow": "in" | "out", "amount": 50000, "description": "keterangan singkat", "category": "<kategori valid>" } ] }',
+      `Kategori valid uang KELUAR: ${expenseCats.join(', ')}. Uang MASUK: ${incomeCats.join(', ')}.`,
+      '"amount" angka bersih tanpa titik. Kalau koreksinya tidak jelas, kembalikan daftar apa adanya.',
+      'Return ONLY valid JSON.',
+    ].join('\n')
+    try {
+      const result = await claudeChat(sys, [{ role: 'user', content: prompt }], { maxTokens: 1500 })
+      const clean = result.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+      const data = JSON.parse(clean)
+      const rawList: any[] = Array.isArray(data?.transactions) ? data.transactions : []
+      return await presentRows(rawList, 'Hmm, koreksinya belum kebaca. Coba ulangi ya.')
+    } catch {
+      return null
+    }
+  }
+
   const stopRecording = async () => {
     if (!recording) return
 
@@ -583,48 +688,65 @@ Return ONLY valid JSON, no markdown, no explanation.`
       await recording.stopAndUnloadAsync()
       const uri = recording.getURI()
       setRecording(null)
+      if (!uri) throw new Error('No audio URI')
 
-      if (!uri) {
-        throw new Error('No audio URI')
-      }
-
-      // Convert audio to base64 untuk dikirim ke Edge Function
+      // Format rekaman beda per platform: browser = webm/opus, HP = m4a.
+      // Labelnya harus benar supaya decoder Whisper tidak salah menafsirkan.
+      const mime = Platform.OS === 'web' ? 'audio/webm' : 'audio/m4a'
       const base64Audio = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       })
-      const audioUri = `data:audio/m4a;base64,${base64Audio}`
+      const transcript = (await transcribeAudio(`data:${mime};base64,${base64Audio}`)).trim()
 
-      // Process dengan Groq: Transcribe + Parse
-      const result = await processVoiceNote(audioUri)
+      setMessages(prev => [...prev, { role: 'user', content: `🎤 "${transcript}"` }])
 
-      setMessages(prev => [
-        ...prev,
-        { role: 'user', content: `🎤 "${result.transcription}"` }
-      ])
-
-      // If parsed successfully, create ParsedTransaction
-      if (result.nominal && result.kategori) {
-        const parsed: ParsedTransaction = {
-          type: 'personal',
-          transaction_type: result.tipe === 'income' ? 'income' : 'expense',
-          amount: result.nominal,
-          description: result.catatan || result.transcription,
-          category: result.kategori,
-          confidence: 0.85,
-        }
-        setPendingTransaction(parsed)
-        setMessages(prev => [...prev, { role: 'assistant', content: `✅ Berhasil parse voice note!` }])
-      } else {
-        setMessages(prev => [...prev, { role: 'assistant', content: `Maaf, nominal atau kategori tidak terdeteksi. Coba ketik manual ya!` }])
+      if (!transcript) {
+        if (voiceStageRef.current !== 'idle') speakThenListen('Maaf, aku nggak kedengeran. Coba ulangi ya.')
+        else setMessages(prev => [...prev, { role: 'assistant', content: 'Maaf, suaranya nggak kedengeran. Coba lagi ya.' }])
+        return
       }
 
+      const stage = voiceStageRef.current
+
+      if (stage === 'confirm' && scanRows) {
+        if (YES.test(transcript)) {
+          const rows = scanRows.filter(r => r.include)
+          if (rows.length > 0 && scanWalletInitial) {
+            await handleSaveScan(rows, scanWalletInitial)
+            endVoiceSession('Sip, sudah tersimpan.')
+          } else {
+            endVoiceSession('Nggak ada yang bisa disimpan. Coba lagi ya.')
+          }
+          return
+        }
+        if (NO.test(transcript)) {
+          setScanRows(null)
+          endVoiceSession('Oke, dibatalkan.')
+          return
+        }
+        // Bukan ya/tidak → anggap koreksi
+        const revised = await reviseRowsByVoice(scanRows, transcript)
+        if (revised) speakThenListen(rowsToSpeech(revised))
+        else speakThenListen('Koreksinya belum kebaca. Coba sebutkan lagi, atau bilang "betul" kalau sudah pas.')
+        return
+      }
+
+      // Tahap 'answer' (atau mic ditekan langsung tanpa sesi): ekstrak transaksi.
+      // Lewat jalur yang sama dengan teks ketik, jadi bisa banyak transaksi
+      // sekaligus dan keterangannya diekstrak per transaksi.
+      const rows = await processTypedTransactions(transcript)
+      if (rows) {
+        setStage('confirm')
+        speakThenListen(rowsToSpeech(rows))
+      } else if (stage !== 'idle') {
+        speakThenListen('Aku belum nangkep transaksinya. Coba sebutkan lagi, misalnya: bensin seratus lima puluh ribu.')
+      }
+    } catch (err: any) {
+      endVoiceSession()
+      notify('Error', `Gagal memproses voice note: ${err?.message || 'coba lagi ya'}`)
+    } finally {
       setLoading(false)
       setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
-
-    } catch (err: any) {
-      console.error('Recording stop error:', err)
-      setLoading(false)
-      Alert.alert('Error', `Gagal memproses voice note: ${err.message}`)
     }
   }
 
@@ -722,8 +844,8 @@ Return ONLY valid JSON, no markdown, no explanation.`
             expenseCategories={expenseCats}
             initialWalletId={scanWalletInitial}
             loading={savingScan}
-            onSave={handleSaveScan}
-            onCancel={handleCancelScan}
+            onSave={handleSaveScanFromCard}
+            onCancel={handleCancelScanFromCard}
           />
         )}
         {loading && (
@@ -754,6 +876,21 @@ Return ONLY valid JSON, no markdown, no explanation.`
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Status percakapan suara — supaya jelas Zena lagi nunggu apa */}
+      {voiceStage !== 'idle' && (
+        <View style={styles.voiceBar}>
+          <View style={[styles.voiceDot, isRecording && styles.voiceDotLive]} />
+          <Text style={styles.voiceBarText}>
+            {isRecording
+              ? (voiceStage === 'confirm' ? 'Mendengarkan… bilang "betul", koreksi, atau "batal"' : 'Mendengarkan… sebutkan transaksinya')
+              : (loading ? 'Zena lagi mikir…' : 'Zena bicara… (tekan 🎤 untuk langsung jawab)')}
+          </Text>
+          <TouchableOpacity onPress={() => { stopSpeaking(); if (isRecording) stopRecording(); setStage('idle') }} hitSlop={8}>
+            <Text style={styles.voiceBarEnd}>Selesai</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Input */}
       <View style={styles.inputWrap}>
@@ -827,6 +964,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#1A1A1A', borderWidth: 0.5, borderColor: '#2A2A2A',
   },
   quickText: { fontSize: 12, color: '#888780' },
+  voiceBar: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingHorizontal: 14, paddingVertical: 8,
+    backgroundColor: '#12202E', borderTopWidth: 0.5, borderTopColor: PRIMARY + '60',
+  },
+  voiceDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: PRIMARY },
+  voiceDotLive: { backgroundColor: '#E24B4A' },
+  voiceBarText: { flex: 1, fontSize: 12, color: '#C9D6E4' },
+  voiceBarEnd: { fontSize: 12, color: PRIMARY, fontWeight: '700' },
   inputWrap: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
     paddingHorizontal: 12, paddingVertical: 12,

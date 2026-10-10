@@ -29,14 +29,31 @@ const cleanText = (text: string): string =>
     .replace(/#+\s/g, '')
     .trim()
 
-export const speak = (text: string, persona: Persona = 'bestie', lang = 'id-ID'): void => {
-  if (Platform.OS !== 'web') return
-  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+/**
+ * Bacakan teks. `onEnd` dipanggil saat selesai bicara (atau langsung, kalau
+ * TTS tidak tersedia) — dipakai percakapan suara untuk otomatis mulai
+ * mendengarkan begitu Zena selesai bertanya.
+ */
+export const speak = (
+  text: string,
+  persona: Persona = 'bestie',
+  lang = 'id-ID',
+  onEnd?: () => void,
+): void => {
+  const unavailable =
+    Platform.OS !== 'web' || typeof window === 'undefined' || !('speechSynthesis' in window)
+  if (unavailable) { onEnd?.(); return }
   window.speechSynthesis.cancel()
   const utterance = new SpeechSynthesisUtterance(cleanText(text))
   utterance.rate = PERSONA_RATE[persona]
   utterance.pitch = PERSONA_PITCH[persona]
   utterance.lang = lang
+  if (onEnd) {
+    let done = false
+    const finish = () => { if (!done) { done = true; onEnd() } }
+    utterance.onend = finish
+    utterance.onerror = finish
+  }
   window.speechSynthesis.speak(utterance)
 }
 
